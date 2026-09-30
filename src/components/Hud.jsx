@@ -59,9 +59,9 @@ const DIR_ARROW = {
 }
 
 const CAM_LABELS = {
-  aligned: '3D Chuẩn',
-  topdown: '2D Trên Cao',
-  cinematic: 'Góc Nghiêng',
+  aligned: 'Classic 3D',
+  topdown: 'Top-Down 2D',
+  cinematic: 'Cinematic',
 }
 
 export function TitleOverlay() {
@@ -72,31 +72,31 @@ export function TitleOverlay() {
   const toggleCameraMode = useGame((s) => s.toggleCameraMode)
 
   return (
-    <div className="sheet" role="dialog" aria-label="Rắn Xinh title">
+    <div className="sheet" role="dialog" aria-label="Moonlit Serpent title">
       <div className="lockup">
-        <p className="overline">vũ khúc trăng đêm trong vườn ngọc</p>
-        <h1 lang="vi">Rắn Xinh</h1>
+        <p className="overline">a moonlit nocturne in the jade garden</p>
+        <h1>Moonlit Serpent</h1>
         <p className="tagline">
-          <span>Một trải nghiệm Rắn Săn Mồi 3D thi vị và sắc nét</span>
+          <span>A poetic, razor-sharp 3D snake experience</span>
         </p>
         <div className="rule" />
         <div className="actions">
           <button type="button" className="btn btn--primary" onClick={start} autoFocus>
-            Bắt đầu chơi
+            Start playing
           </button>
           <button type="button" className="btn" onClick={openHowTo}>
-            Cách chơi
+            How to play
           </button>
           <button
             type="button"
             className="btn btn--secondary"
             onClick={toggleCameraMode}
-            title="Đổi góc nhìn (Phím C)"
+            title="Change camera (C key)"
           >
-            Góc nhìn: {CAM_LABELS[cameraMode] || '3D Chuẩn'}
+            Camera: {CAM_LABELS[cameraMode] || 'Classic 3D'}
           </button>
         </div>
-        {best > 0 && <p className="best-note">kỷ lục · {best} điểm</p>}
+        {best > 0 && <p className="best-note">best · {best} pts</p>}
       </div>
     </div>
   )
@@ -105,45 +105,45 @@ export function TitleOverlay() {
 export function HowToOverlay() {
   const closeHowTo = useGame((s) => s.closeHowTo)
   return (
-    <div className="sheet" role="dialog" aria-label="Cách chơi">
+    <div className="sheet" role="dialog" aria-label="How to play">
       <div className="sheet-card">
-        <p className="overline">hướng dẫn</p>
-        <h2>Cách chơi Rắn Xinh</h2>
+        <p className="overline">guide</p>
+        <h2>How to play Moonlit Serpent</h2>
         <div className="howto-list">
           <p>
             <span className="num">1</span>
             <span>
-              Điều khiển bằng <kbd>W A S D</kbd> hoặc các phím <kbd>↑ ↓ ← →</kbd>. Góc nhìn 3D chuẩn được căn thẳng (Lên là Lên, Phải là Phải), rẽ cua chuẩn xác và không sợ nhầm hướng.
+              Steer with <kbd>W A S D</kbd> or the <kbd>↑ ↓ ← →</kbd> keys. The classic 3D camera is axis-aligned (Up means Up, Right means Right), so every turn lands exactly where you expect.
             </span>
           </p>
           <p>
             <span className="num">2</span>
             <span>
-              <b>Tăng tốc (Dash)</b>: Giữ phím <kbd>Space</kbd> hoặc <kbd>Shift</kbd> (hoặc nút ⚡ trên màn hình) để rắn lướt nhanh gấp đôi qua khoảng trống.
+              <b>Dash</b>: Hold <kbd>Space</kbd> or <kbd>Shift</kbd> (or the on-screen ⚡ button) to surge forward at double speed.
             </span>
           </p>
           <p>
             <span className="num">3</span>
             <span>
-              <b>Đổi góc nhìn</b>: Bấm phím <kbd>C</kbd> để chuyển giữa <b>3D Chuẩn</b>, <b>2D Trên Cao</b> (chiến thuật siêu dễ nhìn), hoặc <b>Góc Nghiêng</b>.
+              <b>Camera</b>: Press <kbd>C</kbd> to switch between <b>Classic 3D</b>, <b>Top-Down 2D</b> (easiest for strategy), or <b>Cinematic</b>.
             </span>
           </p>
           <p>
             <span className="num">4</span>
             <span>
-              Ăn <b>Hoa Sen Vàng</b> để dài ra (+1 điểm). Thỉnh thoảng sẽ xuất hiện <b>Bạch Ngọc Liên</b> rực sáng quý hiếm (+3 điểm).
+              Eat <b>planets</b> (Earth, Mars, Saturn, Jupiter, Neptune) to grow (+1 pt). Occasionally a rare blazing <b>Supernova</b> appears (+3 pts).
             </span>
           </p>
           <p>
             <span className="num">5</span>
             <span>
-              Hàng rào ngọc phát sáng và thân mình là những chướng ngại vật duy nhất.
+              The glowing jade fence and your own body are the only obstacles.
             </span>
           </p>
-          <p className="small">Trên điện thoại: Vuốt trên mặt hồ hoặc dùng cụm phím ảo bên dưới.</p>
+          <p className="small">On mobile: swipe across the lake or use the virtual buttons below.</p>
         </div>
         <button type="button" className="btn btn--primary" onClick={closeHowTo}>
-          Đã hiểu
+          Got it
         </button>
       </div>
     </div>
@@ -154,21 +154,21 @@ export function PauseOverlay() {
   const resume = useGame((s) => s.resume)
   const toTitle = useGame((s) => s.toTitle)
   return (
-    <div className="sheet" role="dialog" aria-label="Tạm dừng">
+    <div className="sheet" role="dialog" aria-label="Paused">
       <div className="sheet-card">
-        <p className="overline">tạm nghỉ</p>
-        <h2>Đang tạm dừng</h2>
-        <p>Khu vườn nguyệt dạ đang chờ bạn.</p>
+        <p className="overline">taking a breather</p>
+        <h2>Paused</h2>
+        <p>The moonlit garden awaits your return.</p>
         <div className="sheet-actions">
           <button type="button" className="btn btn--primary" onClick={resume} autoFocus>
-            Tiếp tục
+            Resume
           </button>
           <button type="button" className="btn" onClick={toTitle}>
-            Về màn hình chính
+            Back to title
           </button>
         </div>
         <p className="hint">
-          Bấm <kbd>P</kbd> hoặc <kbd>Esc</kbd> để tiếp tục
+          Press <kbd>P</kbd> or <kbd>Esc</kbd> to resume
         </p>
       </div>
     </div>
@@ -183,25 +183,25 @@ export function GameOverOverlay() {
   const toTitle = useGame((s) => s.toTitle)
 
   return (
-    <div className="sheet" role="dialog" aria-label="Kết thúc ván">
+    <div className="sheet" role="dialog" aria-label="Game over">
       <div className="sheet-card">
-        <p className="overline">kết thúc</p>
-        <h2>Mặt hồ phẳng lặng trở lại</h2>
-        {isNewBest && <span className="best-badge">✦ Kỷ Lục Mới!</span>}
+        <p className="overline">the end</p>
+        <h2>The lake grows still once more</h2>
+        {isNewBest && <span className="best-badge">✦ New Best!</span>}
         <div className="result-score" aria-live="polite">
           {score}
         </div>
-        <p className="result-best">kỷ lục cao nhất · {best} điểm</p>
+        <p className="result-best">all-time best · {best} pts</p>
         <div className="sheet-actions">
           <button type="button" className="btn btn--primary" onClick={start} autoFocus>
-            Chơi lại ngay
+            Play again
           </button>
           <button type="button" className="btn" onClick={toTitle}>
-            Về trang chủ
+            Back to title
           </button>
         </div>
         <p className="hint">
-          Bấm phím <kbd>Space</kbd> để lướt tiếp
+          Press <kbd>Space</kbd> to glide again
         </p>
       </div>
     </div>
@@ -226,9 +226,9 @@ function QueueChip({ currentDir, queuedDir }) {
   return (
     <div
       className={`chip queue-chip ${hasQueue ? 'queue-chip--buffered' : ''}`}
-      title={hasQueue ? `Đang rẽ: ${queuedDir}` : `Hướng hiện tại: ${currentDir}`}
+      title={hasQueue ? `Turning: ${queuedDir}` : `Current direction: ${currentDir}`}
     >
-      <span>Hướng</span>
+      <span>Dir</span>
       <div className="queue-arrows">
         <b className="dir-main">{DIR_ARROW[currentDir] || '→'}</b>
         {hasQueue && <b className="dir-next">{DIR_ARROW[queuedDir]}</b>}
@@ -242,14 +242,17 @@ function PlayingHud() {
   const length = useGame((s) => s.length)
   const best = useGame((s) => s.best)
   const isBoosting = useGame((s) => s.isBoosting)
+  const currentDir = useGame((s) => s.currentDir)
+  const queuedDir = useGame((s) => s.queuedDir)
 
   return (
     <div className="hud-top">
       <div className="chips">
-        <Chip label="Điểm" value={score} highlight />
-        <Chip label="Độ Dài" value={length} />
-        <Chip label="Kỷ Lục" value={best} />
-        {isBoosting && <div className="chip chip--boost">⚡ TĂNG TỐC</div>}
+        <Chip label="Score" value={score} highlight />
+        <Chip label="Length" value={length} />
+        <Chip label="Best" value={best} />
+        <QueueChip currentDir={currentDir} queuedDir={queuedDir} />
+        {isBoosting && <div className="chip chip--boost">⚡ DASH</div>}
       </div>
     </div>
   )
@@ -270,8 +273,8 @@ function Corners() {
       <button
         type="button"
         className="icon-btn"
-        aria-label="Đổi góc nhìn camera (Phím C)"
-        title={`Góc nhìn: ${CAM_LABELS[cameraMode] || '3D Chuẩn'} (Phím C)`}
+        aria-label="Change camera angle (C key)"
+        title={`Camera: ${CAM_LABELS[cameraMode] || 'Classic 3D'} (C key)`}
         onClick={toggleCameraMode}
       >
         {icons.camera}
@@ -280,8 +283,8 @@ function Corners() {
       <button
         type="button"
         className={`icon-btn ${showControls ? 'icon-btn--active' : ''}`}
-        aria-label="Bật/Tắt phím điều khiển ảo"
-        title="Bật/Tắt phím điều khiển ảo"
+        aria-label="Toggle virtual controls"
+        title="Toggle virtual controls"
         onClick={toggleControls}
       >
         {icons.gamepad}
@@ -290,8 +293,8 @@ function Corners() {
       <button
         type="button"
         className="icon-btn"
-        aria-label={muted ? 'Bật âm thanh' : 'Tắt âm thanh'}
-        title={muted ? 'Bật âm thanh (Phím M)' : 'Tắt âm thanh (Phím M)'}
+        aria-label={muted ? 'Unmute' : 'Mute'}
+        title={muted ? 'Unmute (M key)' : 'Mute (M key)'}
         aria-pressed={muted}
         onClick={() => setMuted(!muted)}
       >
@@ -302,21 +305,13 @@ function Corners() {
         <button
           type="button"
           className="icon-btn"
-          aria-label={status === 'paused' ? 'Tiếp tục' : 'Tạm dừng'}
-          title="Tạm dừng / Tiếp tục (Phím P)"
+          aria-label={status === 'paused' ? 'Resume' : 'Pause'}
+          title="Pause / Resume (P key)"
           onClick={togglePause}
         >
           {icons.pause}
         </button>
       )}
-    </div>
-  )
-}
-
-function KeyLegend() {
-  return (
-    <div className="legend" aria-hidden="true">
-      <kbd>WASD</kbd> / <kbd>↑ ↓ ← →</kbd> lái · Giữ <kbd>Space</kbd> tăng tốc · <kbd>C</kbd> đổi góc nhìn · <kbd>P</kbd> tạm dừng
     </div>
   )
 }
@@ -335,8 +330,8 @@ function OnScreenControls() {
       <button
         type="button"
         className="btn-boost"
-        aria-label="Tăng tốc"
-        title="Giữ để tăng tốc"
+        aria-label="Dash"
+        title="Hold to dash"
         onPointerDown={(e) => {
           e.preventDefault()
           inputBus.emit({ type: 'boost', boosting: true })
@@ -350,17 +345,17 @@ function OnScreenControls() {
         }}
       >
         {icons.zap}
-        <span>Tăng tốc</span>
+        <span>Dash</span>
       </button>
 
       {/* D-Pad */}
-      <div className="dpad" aria-label="Phím điều hướng" role="group">
+      <div className="dpad" aria-label="Direction pad" role="group">
         {dirs.map(([key, cls, icon]) => (
           <button
             key={key}
             type="button"
             className={`dbtn dbtn--${cls}`}
-            aria-label={`Đi hướng ${key}`}
+            aria-label={`Go ${key}`}
             onPointerDown={(e) => {
               e.preventDefault()
               inputBus.emit({ type: 'turn', key })

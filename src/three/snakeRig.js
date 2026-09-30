@@ -8,7 +8,7 @@ const INK = new THREE.Color(0x0a1411)
 const JADE_GLOW = new THREE.Color(0x4eedb8)
 const GOLD_PULSE = new THREE.Color(0xffd54f)
 
-const MAX_SEGMENTS = 300
+const MAX_SEGMENTS = 400 // matches the 20x20 grid: the snake can never exceed 400 cells
 const BODY_Y = 0.36
 const HEAD_Y = 0.50
 const HEAD_R = 0.64

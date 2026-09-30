@@ -1,14 +1,14 @@
-# AGENT.md — Rắn Xinh (Snake)
+# AGENT.md — Moonlit Serpent (Snake)
 
 Guidance for AI coding agents working in this repository.
 
 ## What this is
 
-**Rắn Xinh** (`ran-xinh`) is a premium 3D Snake game: a serpent gliding through a moonlit Vietnamese ink garden. Classic grid Snake rules, rendered with Three.js, UI in React.
+**Moonlit Serpent** (`ran-xinh`) is a premium 3D Snake game: a serpent gliding through a moonlit Vietnamese ink garden. Classic grid Snake rules, rendered with Three.js, UI in React.
 
 - Package name: `ran-xinh`
 - Stack: **Vite 6 + React 18 + Three.js + Zustand**
-- Language: mostly English in code; UI/copy can be Vietnamese
+- Language: English in code and all player-facing UI/copy (Vietnamese ink-garden art theme retained; switched 2026-10-01 for global audience + font safety)
 - Repo: https://github.com/trinhbuikhang/Snake
 
 ## Commands
@@ -64,7 +64,7 @@ src/
 
 ### Camera modes (`store` + `engine`)
 
-- `aligned` — axes match screen (default “3D chuẩn”)
+- `aligned` — axes match screen (default “Classic 3D”)
 - `topdown` — near-overhead 2.5D
 - `cinematic` — gentle isometric tilt
 
@@ -74,7 +74,7 @@ src/
 2. **Prefer extending existing modules** over new frameworks (no extra state libs, no R3F unless explicitly requested).
 3. **Respect mute and `prefers-reduced-motion`** (engine already checks reduced motion).
 4. **localStorage keys** are prefixed `ran-xinh-`; keep that prefix for any new prefs.
-5. **Vietnamese product voice** in player-facing strings is intentional; keep code identifiers in English.
+5. **English product voice** in player-facing strings; keep code identifiers in English.
 6. Avoid drive-by refactors and unrelated file edits.
 
 ## Out of scope unless asked

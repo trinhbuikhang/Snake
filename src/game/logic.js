@@ -59,12 +59,12 @@ export const PLANETS = ['earth', 'mars', 'saturn', 'jupiter', 'neptune']
 export const SUPERNOVA = 'sun'
 
 export const PLANET_NAMES = {
-  earth: 'Trái Đất',
-  mars: 'Sao Hỏa',
-  saturn: 'Sao Thổ',
-  jupiter: 'Sao Mộc',
-  neptune: 'Hải Vương',
-  sun: 'Siêu Tân Tinh',
+  earth: 'Earth',
+  mars: 'Mars',
+  saturn: 'Saturn',
+  jupiter: 'Jupiter',
+  neptune: 'Neptune',
+  sun: 'Supernova',
 }
 
 function placeFood(game) {
@@ -108,8 +108,9 @@ export function createGame() {
 
 // Queue a turn with smart buffering:
 // - Ignores reverse turns (prevent suicide).
-// - Allows up to 2 queued turns (corner cut).
-// - If 2 turns are already queued and player changes mind, update the second turn instead of dropping!
+// - Allows up to 2 queued turns (corner cut); extra taps while the buffer is
+//   full are dropped. (Replacing the 2nd queued turn is impossible on a
+//   4-direction grid: every alternative is either a no-op or a suicide turn.)
 export function turn(game, key) {
   const d = DIR[key]
   if (!d) return false
@@ -123,18 +124,9 @@ export function turn(game, key) {
   // Already heading in that direction
   if (d === refDir) return false
 
-  if (game.queue.length < 2) {
-    game.queue.push(key)
-    return true
-  } else {
-    // If player taps a different 2nd turn before tick, replace pending 2nd turn if valid
-    const firstQueued = DIR[game.queue[0]]
-    if (!isOpposite(d, firstQueued) && d !== firstQueued) {
-      game.queue[1] = key
-      return true
-    }
-  }
-  return false
+  if (game.queue.length >= 2) return false
+  game.queue.push(key)
+  return true
 }
 
 // Advance one discrete grid step. Returns { dead } or { ate, bloom, score, length }.
