@@ -24,7 +24,11 @@ function writeJSON(key, value) {
 
 export const readBest = () => Math.max(0, parseInt(readJSON(BEST_KEY) || '0', 10) || 0)
 export const readMuted = () => readJSON(MUTE_KEY) === '1'
-export const readCam = () => readJSON(CAM_KEY) || 'aligned' // 'aligned' | 'topdown' | 'cinematic'
+const CAM_MODES = ['aligned', 'topdown', 'cinematic']
+export const readCam = () => {
+  const v = readJSON(CAM_KEY)
+  return CAM_MODES.includes(v) ? v : 'aligned'
+}
 export const readCtrls = () => readJSON(CTRLS_KEY) === '1'
 
 export const useGame = create((set, get) => ({
@@ -41,7 +45,7 @@ export const useGame = create((set, get) => ({
   queuedDir: null,
   isBoosting: false,
 
-  // Camera mode: 'aligned' (3D Chuẩn - Up is Up) | 'topdown' (Nhìn Thẳng 2D) | 'cinematic' (Góc Nghiêng)
+  // Camera mode: 'aligned' (Classic 3D - Up is Up) | 'topdown' (Top-Down 2D) | 'cinematic' (Cinematic tilt)
   cameraMode: 'aligned',
 
   // Controls display toggle
@@ -124,7 +128,7 @@ export const useGame = create((set, get) => ({
   addScore(delta, length, isBloom = false, planet = '') {
     const newScore = get().score + delta
     const id = Date.now() + Math.random()
-    const name = planet === 'sun' || isBloom ? 'SIÊU TÂN TINH!' : (planet === 'earth' ? 'TRÁI ĐẤT' : planet === 'mars' ? 'SAO HỎA' : planet === 'saturn' ? 'SAO THỔ' : planet === 'jupiter' ? 'SAO MỘC' : planet === 'neptune' ? 'HẢI VƯƠNG' : '')
+    const name = planet === 'sun' || isBloom ? 'SUPERNOVA!' : (planet === 'earth' ? 'EARTH' : planet === 'mars' ? 'MARS' : planet === 'saturn' ? 'SATURN' : planet === 'jupiter' ? 'JUPITER' : planet === 'neptune' ? 'NEPTUNE' : '')
     const text = name ? `+${delta} ${name}` : `+${delta}`
 
     set((s) => ({

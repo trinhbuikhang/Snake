@@ -238,7 +238,8 @@ export function buildGarden(scene, { envTex, reduced }) {
   const grid = new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(linePts), gridMat)
   scene.add(grid)
 
-  // Subtle checkered stone stepping pads to make each cell instantly readable
+  // Subtle checkered stone stepping pads to make each cell instantly readable.
+  // Rendered as two InstancedMeshes (one per shade): 2 draw calls instead of 400.
   const cellGeo = new THREE.PlaneGeometry(0.88, 0.88)
   const cellMat1 = new THREE.MeshBasicMaterial({
     color: 0x142b23,
@@ -252,17 +253,31 @@ export function buildGarden(scene, { envTex, reduced }) {
     opacity: 0.2,
     depthWrite: false,
   })
-  const checkerGroup = new THREE.Group()
+  const altCells = []
+  const mainCells = []
   for (let y = -9.5; y <= 9.5; y += 1) {
     for (let x = -9.5; x <= 9.5; x += 1) {
       const isAlt = (Math.round(x + 9.5) + Math.round(y + 9.5)) % 2 === 0
-      const tile = new THREE.Mesh(cellGeo, isAlt ? cellMat1 : cellMat2)
-      tile.rotation.x = -Math.PI / 2
-      tile.position.set(x, 0.004, y)
-      checkerGroup.add(tile)
+      ;(isAlt ? altCells : mainCells).push([x, y])
     }
   }
-  scene.add(checkerGroup)
+  const tileM4 = new THREE.Matrix4()
+  const tileQuat = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0))
+  const tileScale = new THREE.Vector3(1, 1, 1)
+  const tilePos = new THREE.Vector3()
+  for (const [cells, mat] of [
+    [altCells, cellMat1],
+    [mainCells, cellMat2],
+  ]) {
+    const inst = new THREE.InstancedMesh(cellGeo, mat, cells.length)
+    cells.forEach(([x, y], i) => {
+      tilePos.set(x, 0.004, y)
+      tileM4.compose(tilePos, tileQuat, tileScale)
+      inst.setMatrixAt(i, tileM4)
+    })
+    inst.instanceMatrix.needsUpdate = true
+    scene.add(inst)
+  }
 
 
   // Flat, flush luminous perimeter line along the play-field boundary (completely flat at water level, never occludes the board or snake)
@@ -966,14 +981,14 @@ export function buildGarden(scene, { envTex, reduced }) {
       const activeKey = bloom ? 'sun' : (planetType || 'earth')
 
       const planetNames = {
-        earth: '+1 TRÁI ĐẤT',
-        mars: '+1 SAO HỎA',
-        saturn: '+1 SAO THỔ',
-        jupiter: '+1 SAO MỘC',
-        neptune: '+1 HẢI VƯƠNG',
-        sun: '+3 SIÊU TÂN TINH!',
+        earth: '+1 EARTH',
+        mars: '+1 MARS',
+        saturn: '+1 SATURN',
+        jupiter: '+1 JUPITER',
+        neptune: '+1 NEPTUNE',
+        sun: '+3 SUPERNOVA!',
       }
-      const label = planetNames[activeKey] || (bloom ? '+3 SIÊU TÂN TINH!' : '+1')
+      const label = planetNames[activeKey] || (bloom ? '+3 SUPERNOVA!' : '+1')
       spawnScorePopup(x, z, label, bloom, activeKey)
 
       const rippleColor = bloom
@@ -1110,6 +1125,7 @@ export function buildGarden(scene, { envTex, reduced }) {
           const prog = p.t / p.dur
           if (prog >= 1) {
             scene.remove(p.sprite)
+            p.sprite.material.map?.dispose() // CanvasTexture per popup — must be freed, not just the material
             p.sprite.material.dispose()
             popups.splice(i, 1)
           } else {

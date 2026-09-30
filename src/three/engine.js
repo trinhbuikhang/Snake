@@ -155,6 +155,8 @@ export function createEngine(canvas, { reduced } = {}) {
     if (logic.food) {
       const w = gridToWorld(logic.food.x, logic.food.y)
       garden.setFood(w.x, w.z, logic.foodIsBloom, logic.foodPlanet)
+    } else {
+      garden.hideFood() // board full: don't leave a stale planet floating around
     }
     updateDirectionStore()
   }
@@ -374,6 +376,7 @@ export function createEngine(canvas, { reduced } = {}) {
   const unsubStore = useGame.subscribe((s, prev) => {
     if (s.status !== prev.status) {
       if (s.status === 'playing' && (prev.status === 'title' || prev.status === 'dead')) {
+        unlock() // runs inside the user's click/keypress gesture, so AudioContext creation is allowed
         resetGame()
         audio.setPadOn(true)
       } else if (s.status === 'playing' && prev.status === 'paused') {
@@ -518,7 +521,7 @@ export function createEngine(canvas, { reduced } = {}) {
     let death = null
     if (st.status === 'playing' && !dying) paintT = clamp01(accum / interval.v)
     else if (st.status === 'title') paintT = clamp01(demoAccum / DEMO_INTERVAL)
-    else if (st.status === 'paused') paintT = 1
+    else if (st.status === 'paused' || dying) paintT = 1 // dying: hold the death pose, don't snap back a tick
     if (rig.death) death = { t: rig.death.t }
 
     const cells = st.status === 'title' ? demoCur : curCells
