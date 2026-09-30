@@ -142,7 +142,7 @@ function paintDivider(ctx, y) {
   ctx.restore()
 }
 
-function paintText(ctx, { score, best, length, phaseName, dateLabel, hasSnapshot }) {
+function paintText(ctx, { score, best, length, phaseName, modeName, dateLabel, hasSnapshot }) {
   ctx.textAlign = 'center'
   ctx.textBaseline = 'alphabetic'
 
@@ -162,7 +162,8 @@ function paintText(ctx, { score, best, length, phaseName, dateLabel, hasSnapshot
   }
   ctx.fillStyle = GOLD
   ctx.font = `500 30px ${SERIF}`
-  ctx.fillText(`· ${phaseName} ·`, W / 2 + 3, 205)
+  const subtitle = modeName && modeName !== 'Classic' ? `· ${phaseName} · ${modeName} ·` : `· ${phaseName} ·`
+  ctx.fillText(subtitle, W / 2 + 3, 205)
 
   const statsY = hasSnapshot ? 1085 : 560
 
@@ -220,7 +221,7 @@ function paintText(ctx, { score, best, length, phaseName, dateLabel, hasSnapshot
   ctx.fillText('a night in the ink garden', W / 2, H - 72)
 }
 
-export function composeMoonCard({ snapshotDataURL, score, best, length, phaseName, dateLabel }) {
+export function composeMoonCard({ snapshotDataURL, score, best, length, phaseName, modeName, dateLabel }) {
   return new Promise((resolve) => {
     const canvas = document.createElement('canvas')
     canvas.width = W
@@ -232,7 +233,7 @@ export function composeMoonCard({ snapshotDataURL, score, best, length, phaseNam
     const finish = (img) => {
       const hasSnapshot = !!img
       if (img) paintSnapshot(ctx, img)
-      paintText(ctx, { score, best, length, phaseName, dateLabel, hasSnapshot })
+      paintText(ctx, { score, best, length, phaseName, modeName, dateLabel, hasSnapshot })
       resolve(canvas)
     }
 

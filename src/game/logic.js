@@ -33,11 +33,11 @@ export const KEY_DIRS = {
 
 export const isOpposite = (a, b) => !!a && !!b && a.x === -b.x && a.y === -b.y
 
-export function speedInterval(foodsEaten, isBoosting = false, speedMult = 1) {
+export function speedInterval(foodsEaten, isBoosting = false, speedMult = 1, modeMult = 1) {
   const steps = Math.floor(foodsEaten / SPEED_STEP_EVERY)
   const iv = BASE_INTERVAL * Math.pow(SPEED_DECAY, steps)
   const clamped = Math.max(iv, MIN_INTERVAL)
-  const phased = clamped / speedMult // moon phase: full moon runs faster, new moon slower
+  const phased = clamped / speedMult / modeMult // moon phase & game mode: full moon runs faster, zen drifts slower
   return isBoosting ? phased * BOOST_MULTIPLIER : phased
 }
 
@@ -86,6 +86,23 @@ export function moonPhaseById(id) {
   return MOON_PHASES.find((p) => p.id === id) || MOON_PHASES[2] // default: Half Moon
 }
 
+// Game modes ("Ba nẻo chơi"): Classic is the timeless hunt, Lantern Rush is a
+// 60-second feast against the clock, and Zen Garden is a deathless drift.
+// Pure data + rules — no React/Three/DOM.
+export const LANTERN_DURATION = 60 // seconds per Lantern Rush run
+
+export const GAME_MODES = [
+  { id: 'classic', name: 'Classic',     speedMult: 1 },
+  { id: 'lantern', name: 'Lantern Rush', speedMult: 1.05, timeLimit: LANTERN_DURATION },
+  { id: 'zen',     name: 'Zen Garden',   speedMult: 0.85 },
+]
+
+export const MODE_IDS = GAME_MODES.map((m) => m.id)
+
+export function gameModeById(id) {
+  return GAME_MODES.find((m) => m.id === id) || GAME_MODES[0] // default: Classic
+}
+
 function placeFood(game) {
   const cells = freeCells(game)
   if (!cells.length) {
@@ -106,10 +123,11 @@ function placeFood(game) {
   }
 }
 
-export function createGame(moonId = 'half') {
+export function createGame(moonId = 'half', modeId = 'classic') {
   const cx = Math.floor(N / 2)
   const snake = []
   for (let i = 0; i < INITIAL_LENGTH; i++) snake.push({ x: cx - i, y: cx })
+  const mode = gameModeById(modeId)
   const game = {
     dir: 'right',
     queue: [],
@@ -121,6 +139,9 @@ export function createGame(moonId = 'half') {
     score: 0,
     alive: true,
     moon: moonPhaseById(moonId).id,
+    mode: mode.id,
+    // Lantern Rush only: seconds remaining. Null in other modes.
+    timeLeft: mode.id === 'lantern' ? LANTERN_DURATION : null,
   }
   placeFood(game)
   return game
@@ -149,9 +170,19 @@ export function turn(game, key) {
   return true
 }
 
-// Advance one discrete grid step. Returns { dead } or { ate, bloom, score, length }.
-export function step(game) {
+// Advance one discrete grid step. dt is the seconds this tick consumed (used by
+// the Lantern Rush countdown). Returns { dead } or { ate, bloom, score, length }.
+export function step(game, dt = 0) {
   if (!game.alive) return { dead: true }
+  // Lantern Rush: the clock runs out before anything else matters.
+  if (game.mode === 'lantern' && game.timeLeft != null) {
+    game.timeLeft -= dt
+    if (game.timeLeft <= 0) {
+      game.timeLeft = 0
+      game.alive = false
+      return { dead: true, cause: 'time' }
+    }
+  }
   let dirKey = game.dir
   while (game.queue.length) {
     const q = game.queue.shift()
@@ -163,18 +194,28 @@ export function step(game) {
   }
   const d = DIR[dirKey]
   const h = game.snake[0]
-  const nh = { x: h.x + d.x, y: h.y + d.y }
-  if (nh.x < 0 || nh.y < 0 || nh.x >= N || nh.y >= N) {
+  const zen = game.mode === 'zen'
+  let nx = h.x + d.x
+  let ny = h.y + d.y
+  if (zen) {
+    // Zen Garden: no walls — the serpent drifts around the world.
+    nx = ((nx % N) + N) % N
+    ny = ((ny % N) + N) % N
+  } else if (nx < 0 || ny < 0 || nx >= N || ny >= N) {
     game.alive = false
     return { dead: true, cause: 'wall' }
   }
+  const nh = { x: nx, y: ny }
   const eat = game.food && game.food.x === nh.x && game.food.y === nh.y
-  const bodyLimit = game.snake.length - (eat ? 0 : 1)
-  for (let i = 0; i < bodyLimit; i++) {
-    const s = game.snake[i]
-    if (s.x === nh.x && s.y === nh.y) {
-      game.alive = false
-      return { dead: true, cause: 'self' }
+  if (!zen) {
+    // Zen Garden: no self-death either — the body is mist, not stone.
+    const bodyLimit = game.snake.length - (eat ? 0 : 1)
+    for (let i = 0; i < bodyLimit; i++) {
+      const s = game.snake[i]
+      if (s.x === nh.x && s.y === nh.y) {
+        game.alive = false
+        return { dead: true, cause: 'self' }
+      }
     }
   }
   game.dir = dirKey

@@ -61,6 +61,7 @@ src/
 - Speed: `BASE_INTERVAL` → speeds up every `SPEED_STEP_EVERY` foods; floor `MIN_INTERVAL`; boost multiplies interval by `BOOST_MULTIPLIER`
 - Food themes: planets + occasional “bloom” / supernova (`PLANETS`, `SUPERNOVA`)
 - Moon-phase run modifiers ("Tuần trăng") live in `src/game/logic.js` (`MOON_PHASES`): score values, speed multiplier, light intensity, food glow. Player choice persisted under `ran-xinh-moon`.
+- Game modes ("Ba nẻo chơi") live in `src/game/logic.js` (`GAME_MODES`): `classic` (survive), `lantern` (60s `LANTERN_DURATION` time attack — `step(game, dt)` counts down `timeLeft`, `cause: 'time'`), `zen` (walls wrap, no self-death, slower). Choice persisted under `ran-xinh-mode`; per-mode bests in `ran-xinh-bests` (legacy `ran-xinh-best` migrates into `classic`). Store exposes `deathCause` (`wall`/`self`/`time`/`zen`) for the game-over overlay; zen sessions end via `endZenSession()` (pause menu), never by death.
 - Directions: arrows / WASD / HJKL; opposite turns rejected
 
 ### Camera modes (`store` + `engine`)
