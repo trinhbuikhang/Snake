@@ -919,6 +919,7 @@ export function buildGarden(scene, { envTex, reduced }) {
   planetsHolder.add(foodLight)
 
   let activePlanetKey = 'earth'
+  let foodGlowMult = 1 // moon-phase multiplier for the food beacon light
 
   // Particle systems
   const burst = new ParticleField(scene, { capacity: 450, size: 0.24, additive: true })
@@ -966,6 +967,14 @@ export function buildGarden(scene, { envTex, reduced }) {
         foodLight.intensity = 3.2
         beaconMat.color.set(0x29b6f6)
       }
+      foodLight.intensity *= foodGlowMult // new moon: food shines brighter in the dark
+    },
+
+    // Moon-phase control: how strongly the food beacon glows (1 = normal)
+    setFoodGlow(mult) {
+      const next = mult > 0 ? mult : 1
+      if (foodGroup.visible) foodLight.intensity = (foodLight.intensity / foodGlowMult) * next
+      foodGlowMult = next
     },
 
     hideFood() {
@@ -976,19 +985,20 @@ export function buildGarden(scene, { envTex, reduced }) {
       spawnRipple(x, z, maxScale, 1.0, color)
     },
 
-    burstAt(x, y, z, bloom, planetType = 'earth') {
+    burstAt(x, y, z, bloom, planetType = 'earth', delta = null) {
       if (reduced) return
       const activeKey = bloom ? 'sun' : (planetType || 'earth')
 
       const planetNames = {
-        earth: '+1 EARTH',
-        mars: '+1 MARS',
-        saturn: '+1 SATURN',
-        jupiter: '+1 JUPITER',
-        neptune: '+1 NEPTUNE',
-        sun: '+3 SUPERNOVA!',
+        earth: 'EARTH',
+        mars: 'MARS',
+        saturn: 'SATURN',
+        jupiter: 'JUPITER',
+        neptune: 'NEPTUNE',
+        sun: 'SUPERNOVA!',
       }
-      const label = planetNames[activeKey] || (bloom ? '+3 SUPERNOVA!' : '+1')
+      const pts = delta ?? (bloom ? 3 : 1) // moon phase can change the score value
+      const label = `+${pts} ${planetNames[activeKey] || ''}`.trim()
       spawnScorePopup(x, z, label, bloom, activeKey)
 
       const rippleColor = bloom

@@ -33,11 +33,12 @@ export const KEY_DIRS = {
 
 export const isOpposite = (a, b) => !!a && !!b && a.x === -b.x && a.y === -b.y
 
-export function speedInterval(foodsEaten, isBoosting = false) {
+export function speedInterval(foodsEaten, isBoosting = false, speedMult = 1) {
   const steps = Math.floor(foodsEaten / SPEED_STEP_EVERY)
   const iv = BASE_INTERVAL * Math.pow(SPEED_DECAY, steps)
   const clamped = Math.max(iv, MIN_INTERVAL)
-  return isBoosting ? clamped * BOOST_MULTIPLIER : clamped
+  const phased = clamped / speedMult // moon phase: full moon runs faster, new moon slower
+  return isBoosting ? phased * BOOST_MULTIPLIER : phased
 }
 
 export function gridToWorld(x, y) {
@@ -67,6 +68,24 @@ export const PLANET_NAMES = {
   sun: 'Supernova',
 }
 
+// Moon-phase run modifiers ("Tuần trăng").
+// Each run happens under one moon phase, chosen on the title screen like a
+// flavorful difficulty: full moon = high risk / high reward, new moon = calm
+// and dark with stronger food glow. Pure data — no React/Three/DOM.
+export const MOON_PHASES = [
+  { id: 'new',      name: 'New Moon',  planetScore: 1, bloomScore: 5, speedMult: 0.9,  light: 0.45, foodGlow: 1.7 },
+  { id: 'crescent', name: 'Crescent',  planetScore: 1, bloomScore: 4, speedMult: 0.95, light: 0.7,  foodGlow: 1.3 },
+  { id: 'half',     name: 'Half Moon', planetScore: 1, bloomScore: 3, speedMult: 1.0,  light: 1.0,  foodGlow: 1.0 },
+  { id: 'gibbous',  name: 'Gibbous',   planetScore: 2, bloomScore: 4, speedMult: 1.08, light: 1.15, foodGlow: 1.0 },
+  { id: 'full',     name: 'Full Moon', planetScore: 2, bloomScore: 6, speedMult: 1.15, light: 1.35, foodGlow: 1.0 },
+]
+
+export const MOON_IDS = MOON_PHASES.map((p) => p.id)
+
+export function moonPhaseById(id) {
+  return MOON_PHASES.find((p) => p.id === id) || MOON_PHASES[2] // default: Half Moon
+}
+
 function placeFood(game) {
   const cells = freeCells(game)
   if (!cells.length) {
@@ -87,7 +106,7 @@ function placeFood(game) {
   }
 }
 
-export function createGame() {
+export function createGame(moonId = 'half') {
   const cx = Math.floor(N / 2)
   const snake = []
   for (let i = 0; i < INITIAL_LENGTH; i++) snake.push({ x: cx - i, y: cx })
@@ -101,6 +120,7 @@ export function createGame() {
     foodsEaten: 0,
     score: 0,
     alive: true,
+    moon: moonPhaseById(moonId).id,
   }
   placeFood(game)
   return game
@@ -162,10 +182,12 @@ export function step(game) {
   if (eat) {
     const bloom = game.foodIsBloom
     const planet = game.foodPlanet || (bloom ? SUPERNOVA : 'earth')
-    game.score += bloom ? 3 : 1
+    const phase = moonPhaseById(game.moon)
+    const gained = bloom ? phase.bloomScore : phase.planetScore
+    game.score += gained
     game.foodsEaten++
     placeFood(game)
-    return { ate: true, bloom, planet, score: game.score, length: game.snake.length }
+    return { ate: true, bloom, planet, gained, score: game.score, length: game.snake.length }
   }
   game.snake.pop()
   return { dead: false, ate: false }

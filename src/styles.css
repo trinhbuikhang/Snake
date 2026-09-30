@@ -711,3 +711,76 @@ kbd {
     transition-duration: 0.01ms !important;
   }
 }
+/* ---- Moon-phase picker ("Tuần trăng") ---- */
+.moon-picker {
+  margin-top: 1.4rem;
+}
+
+.moon-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: rgba(244, 240, 230, 0.55);
+  margin: 0 0 0.6rem;
+}
+
+.moon-row {
+  display: flex;
+  justify-content: center;
+  gap: 0.45rem;
+}
+
+.moon-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.55rem 0.5rem 0.45rem;
+  min-width: 3.4rem;
+  border-radius: 0.9rem;
+  border: 1px solid rgba(244, 240, 230, 0.16);
+  background: rgba(10, 22, 18, 0.55);
+  color: rgba(244, 240, 230, 0.75);
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s, transform 0.2s;
+}
+
+.moon-btn:hover {
+  border-color: rgba(217, 185, 106, 0.6);
+  transform: translateY(-2px);
+}
+
+.moon-btn--active {
+  border-color: var(--gold-glow);
+  background: rgba(217, 185, 106, 0.14);
+  color: var(--cream);
+  box-shadow: 0 0 18px rgba(255, 193, 7, 0.25);
+}
+
+.moon-emoji {
+  font-size: 1.5rem;
+  line-height: 1;
+  filter: drop-shadow(0 0 6px rgba(245, 240, 225, 0.35));
+}
+
+.moon-name {
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.moon-hint {
+  margin: 0.55rem 0 0;
+  font-size: 0.85rem;
+  font-style: italic;
+  color: var(--gold-glow);
+  min-height: 1.3em;
+}
+
+.result-moon {
+  font-size: 0.85rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: rgba(127, 231, 195, 0.8);
+  margin: -1rem 0 1.5rem;
+}

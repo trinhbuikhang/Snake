@@ -13,6 +13,7 @@ import {
   step,
   turn,
   speedInterval,
+  moonPhaseById,
   BASE_INTERVAL,
   gridToWorld,
 } from '../game/logic.js'
@@ -115,8 +116,19 @@ export function createEngine(canvas, { reduced } = {}) {
   let interval = { v: BASE_INTERVAL }
   let accum = 0
   let isBoosting = false
+  let moonSpeedMult = 1 // moon-phase speed modifier for this run
 
   const worldCells = (snake) => snake.map((c) => gridToWorld(c.x, c.y))
+
+  // Moon-phase ("Tuần trăng") ambience: light intensity, food glow, run speed
+  function applyMoonPhase() {
+    const phase = moonPhaseById(useGame.getState().moonPhase)
+    moon.intensity = 2.1 * phase.light
+    hemi.intensity = 0.65 * (0.55 + 0.45 * phase.light)
+    amb.intensity = 0.28 * (0.6 + 0.4 * phase.light)
+    garden.setFoodGlow(phase.foodGlow)
+    moonSpeedMult = phase.speedMult
+  }
 
   function updateDirectionStore() {
     const st = useGame.getState()
@@ -125,7 +137,8 @@ export function createEngine(canvas, { reduced } = {}) {
   }
 
   function resetGame() {
-    logic = createGame()
+    logic = createGame(useGame.getState().moonPhase)
+    applyMoonPhase()
     curCells = worldCells(logic.snake)
     prevCells = cloneXZ(curCells)
     accum = 0
@@ -213,6 +226,7 @@ export function createEngine(canvas, { reduced } = {}) {
     deathT = 0
     accum = 0
     camShake = 0.38 // Screen impact shake
+    snapshotPending = true // capture the moment of death for the shareable moon card
   }
 
   function finalizeDeath() {
@@ -225,11 +239,28 @@ export function createEngine(canvas, { reduced } = {}) {
     else audio.playEat()
 
     const hw = curCells[0]
-    garden.burstAt(hw.x, 0.85, hw.z, ev.bloom, ev.planet)
-    useGame.getState().addScore(ev.bloom ? 3 : 1, ev.length, ev.bloom, ev.planet)
+    garden.burstAt(hw.x, 0.85, hw.z, ev.bloom, ev.planet, ev.gained)
+    useGame.getState().addScore(ev.gained, ev.length, ev.bloom, ev.planet)
     rig.onEat()
     pulse = 1.15
     camShake = ev.bloom ? 0.22 : 0.08
+  }
+
+  // ---- death snapshot for the shareable moon card ---------------------------
+  let snapshotPending = false
+
+  function captureSnapshot() {
+    try {
+      const maxW = 960
+      const scale = Math.min(1, maxW / (canvas.width || 1))
+      const c = document.createElement('canvas')
+      c.width = Math.max(2, Math.round(canvas.width * scale))
+      c.height = Math.max(2, Math.round(canvas.height * scale))
+      c.getContext('2d').drawImage(canvas, 0, 0, c.width, c.height)
+      useGame.getState().setDeathSnapshot(c.toDataURL('image/jpeg', 0.85))
+    } catch {
+      useGame.getState().setDeathSnapshot(null)
+    }
   }
 
   let pulse = 0
@@ -251,7 +282,7 @@ export function createEngine(canvas, { reduced } = {}) {
     if (st.status === 'playing' && !dying) {
       isBoosting = boosting
       st.setBoosting(boosting)
-      interval.v = speedInterval(logic.foodsEaten, isBoosting)
+      interval.v = speedInterval(logic.foodsEaten, isBoosting, moonSpeedMult)
     }
   }
 
@@ -391,6 +422,7 @@ export function createEngine(canvas, { reduced } = {}) {
     }
     if (s.muted !== prev.muted) audio.setMuted(s.muted)
     if (s.cameraMode !== prev.cameraMode) updateCameraTarget()
+    if (s.moonPhase !== prev.moonPhase) applyMoonPhase() // title-screen picker: update ambience live
   })
 
   const initialStore = useGame.getState()
@@ -492,7 +524,7 @@ export function createEngine(canvas, { reduced } = {}) {
 
     if (st.status === 'playing' && !dying) {
       accum += dt
-      interval.v = speedInterval(logic.foodsEaten, isBoosting)
+      interval.v = speedInterval(logic.foodsEaten, isBoosting, moonSpeedMult)
       let guard = 0
       while (accum >= interval.v) {
         const ev = step(logic)
@@ -502,7 +534,7 @@ export function createEngine(canvas, { reduced } = {}) {
         }
         commitTick()
         if (ev.ate) handleEat(ev)
-        interval.v = speedInterval(logic.foodsEaten, isBoosting)
+        interval.v = speedInterval(logic.foodsEaten, isBoosting, moonSpeedMult)
         accum -= interval.v
         if (++guard > 6) {
           accum = 0
@@ -540,6 +572,13 @@ export function createEngine(canvas, { reduced } = {}) {
 
     if (composer) composer.render()
     else renderer.render(scene, camera)
+
+    // Capture the death frame synchronously with the render (same task),
+    // so the drawing buffer is still valid without preserveDrawingBuffer.
+    if (snapshotPending) {
+      snapshotPending = false
+      captureSnapshot()
+    }
   }
 
   // ---- lifecycle ----------------------------------------------------------------
