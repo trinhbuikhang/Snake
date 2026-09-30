@@ -60,6 +60,7 @@ src/
 - Grid size: `N = 20`
 - Speed: `BASE_INTERVAL` → speeds up every `SPEED_STEP_EVERY` foods; floor `MIN_INTERVAL`; boost multiplies interval by `BOOST_MULTIPLIER`
 - Food themes: planets + occasional “bloom” / supernova (`PLANETS`, `SUPERNOVA`)
+- Moon-phase run modifiers ("Tuần trăng") live in `src/game/logic.js` (`MOON_PHASES`): score values, speed multiplier, light intensity, food glow. Player choice persisted under `ran-xinh-moon`.
 - Directions: arrows / WASD / HJKL; opposite turns rejected
 
 ### Camera modes (`store` + `engine`)

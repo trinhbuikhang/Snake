@@ -1,5 +1,8 @@
+import { useState } from 'react'
 import { useGame } from '../game/store.js'
 import { inputBus } from '../game/inputBus.js'
+import { MOON_PHASES, moonPhaseById } from '../game/logic.js'
+import { composeMoonCard } from '../game/moonCard.js'
 
 const arr = (d) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -64,6 +67,44 @@ const CAM_LABELS = {
   cinematic: 'Cinematic',
 }
 
+// Title-screen moon-phase picker ("Tuần trăng"): a flavorful difficulty choice.
+const MOON_UI = {
+  new: { emoji: '🌑', hint: 'Calm & dark · Supernova +5' },
+  crescent: { emoji: '🌒', hint: 'Gentle pace · Supernova +4' },
+  half: { emoji: '🌓', hint: 'Classic balance' },
+  gibbous: { emoji: '🌔', hint: 'Bold · Planets +2' },
+  full: { emoji: '🌕', hint: 'High risk · Planets +2, faster' },
+}
+
+function MoonPicker() {
+  const moonPhase = useGame((s) => s.moonPhase)
+  const setMoonPhase = useGame((s) => s.setMoonPhase)
+  return (
+    <div className="moon-picker">
+      <p className="moon-label">choose your moon</p>
+      <div className="moon-row" role="radiogroup" aria-label="Moon phase">
+        {MOON_PHASES.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            role="radio"
+            aria-checked={moonPhase === p.id}
+            title={`${p.name} — ${MOON_UI[p.id].hint}`}
+            className={`moon-btn${moonPhase === p.id ? ' moon-btn--active' : ''}`}
+            onClick={() => setMoonPhase(p.id)}
+          >
+            <span className="moon-emoji" aria-hidden="true">
+              {MOON_UI[p.id].emoji}
+            </span>
+            <span className="moon-name">{p.name.replace(' Moon', '')}</span>
+          </button>
+        ))}
+      </div>
+      <p className="moon-hint">{MOON_UI[moonPhase]?.hint}</p>
+    </div>
+  )
+}
+
 export function TitleOverlay() {
   const best = useGame((s) => s.best)
   const start = useGame((s) => s.start)
@@ -96,6 +137,7 @@ export function TitleOverlay() {
             Camera: {CAM_LABELS[cameraMode] || 'Classic 3D'}
           </button>
         </div>
+        <MoonPicker />
         {best > 0 && <p className="best-note">best · {best} pts</p>}
       </div>
     </div>
@@ -131,7 +173,7 @@ export function HowToOverlay() {
           <p>
             <span className="num">4</span>
             <span>
-              Eat <b>planets</b> (Earth, Mars, Saturn, Jupiter, Neptune) to grow (+1 pt). Occasionally a rare blazing <b>Supernova</b> appears (+3 pts).
+              Eat <b>planets</b> (Earth, Mars, Saturn, Jupiter, Neptune) to grow. Occasionally a rare blazing <b>Supernova</b> appears. The <b>moon you choose</b> on the title screen sets the stakes — a full moon pays double but runs faster.
             </span>
           </p>
           <p>
@@ -178,9 +220,52 @@ export function PauseOverlay() {
 export function GameOverOverlay() {
   const score = useGame((s) => s.score)
   const best = useGame((s) => s.best)
+  const length = useGame((s) => s.length)
+  const moonPhase = useGame((s) => s.moonPhase)
+  const deathSnapshot = useGame((s) => s.deathSnapshot)
   const isNewBest = useGame((s) => s.isNewBest)
   const start = useGame((s) => s.start)
   const toTitle = useGame((s) => s.toTitle)
+  const [sharing, setSharing] = useState(false)
+
+  async function handleShare() {
+    if (sharing) return
+    setSharing(true)
+    try {
+      const card = await composeMoonCard({
+        snapshotDataURL: deathSnapshot,
+        score,
+        best,
+        length,
+        phaseName: moonPhaseById(moonPhase).name,
+        dateLabel: new Date().toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+        }),
+      })
+      const blob = await new Promise((resolve) => card.toBlob(resolve, 'image/png'))
+      if (!blob) return
+      const file = new File([blob], 'moonlit-serpent-card.png', { type: 'image/png' })
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'Moonlit Serpent — my moon card' })
+      } else {
+        // Fallback: download the card image
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = 'moonlit-serpent-card.png'
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        setTimeout(() => URL.revokeObjectURL(url), 5000)
+      }
+    } catch {
+      // Share sheet dismissed — nothing to do
+    } finally {
+      setSharing(false)
+    }
+  }
 
   return (
     <div className="sheet" role="dialog" aria-label="Game over">
@@ -192,12 +277,22 @@ export function GameOverOverlay() {
           {score}
         </div>
         <p className="result-best">all-time best · {best} pts</p>
+        <p className="result-moon">{moonPhaseById(moonPhase).name} run</p>
         <div className="sheet-actions">
           <button type="button" className="btn btn--primary" onClick={start} autoFocus>
             Play again
           </button>
           <button type="button" className="btn" onClick={toTitle}>
             Back to title
+          </button>
+          <button
+            type="button"
+            className="btn btn--secondary"
+            onClick={handleShare}
+            disabled={sharing}
+            title="Generate a shareable moon card of this run"
+          >
+            {sharing ? 'Painting your card…' : '🌙 Share moon card'}
           </button>
         </div>
         <p className="hint">

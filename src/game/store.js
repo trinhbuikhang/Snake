@@ -1,9 +1,11 @@
 import { create } from 'zustand'
+import { MOON_IDS } from './logic.js'
 
 export const BEST_KEY = 'ran-xinh-best'
 export const MUTE_KEY = 'ran-xinh-muted'
 export const CAM_KEY = 'ran-xinh-cam'
 export const CTRLS_KEY = 'ran-xinh-ctrls'
+export const MOON_KEY = 'ran-xinh-moon'
 
 function readJSON(key) {
   try {
@@ -30,6 +32,10 @@ export const readCam = () => {
   return CAM_MODES.includes(v) ? v : 'aligned'
 }
 export const readCtrls = () => readJSON(CTRLS_KEY) === '1'
+export const readMoon = () => {
+  const v = readJSON(MOON_KEY)
+  return MOON_IDS.includes(v) ? v : 'half'
+}
 
 export const useGame = create((set, get) => ({
   status: 'title', // title | playing | paused | dead
@@ -48,6 +54,12 @@ export const useGame = create((set, get) => ({
   // Camera mode: 'aligned' (Classic 3D - Up is Up) | 'topdown' (Top-Down 2D) | 'cinematic' (Cinematic tilt)
   cameraMode: 'aligned',
 
+  // Moon phase run modifier: 'new' | 'crescent' | 'half' | 'gibbous' | 'full'
+  moonPhase: 'half',
+
+  // Snapshot of the canvas at the moment of death, for the shareable moon card
+  deathSnapshot: null,
+
   // Controls display toggle
   showControls: false,
 
@@ -60,6 +72,7 @@ export const useGame = create((set, get) => ({
       muted: readMuted(),
       cameraMode: readCam(),
       showControls: readCtrls(),
+      moonPhase: readMoon(),
     })
   },
 
@@ -74,6 +87,7 @@ export const useGame = create((set, get) => ({
       queuedDir: null,
       isBoosting: false,
       floatingTexts: [],
+      deathSnapshot: null,
     })
   },
   pause() {
@@ -117,6 +131,16 @@ export const useGame = create((set, get) => ({
   setCameraMode(mode) {
     writeJSON(CAM_KEY, mode)
     set({ cameraMode: mode })
+  },
+
+  setMoonPhase(moonPhase) {
+    if (!MOON_IDS.includes(moonPhase)) return
+    writeJSON(MOON_KEY, moonPhase)
+    set({ moonPhase })
+  },
+
+  setDeathSnapshot(deathSnapshot) {
+    set({ deathSnapshot })
   },
 
   toggleControls() {
