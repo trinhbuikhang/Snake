@@ -14,6 +14,8 @@ import {
   turn,
   speedInterval,
   moonPhaseById,
+  gameModeById,
+  LANTERN_DURATION,
   BASE_INTERVAL,
   gridToWorld,
 } from '../game/logic.js'
@@ -117,17 +119,22 @@ export function createEngine(canvas, { reduced } = {}) {
   let accum = 0
   let isBoosting = false
   let moonSpeedMult = 1 // moon-phase speed modifier for this run
+  let modeSpeedMult = 1 // game-mode speed modifier for this run
+  let lastTimeSec = -1 // last Lantern Rush second pushed to the store
 
   const worldCells = (snake) => snake.map((c) => gridToWorld(c.x, c.y))
 
-  // Moon-phase ("Tuần trăng") ambience: light intensity, food glow, run speed
-  function applyMoonPhase() {
-    const phase = moonPhaseById(useGame.getState().moonPhase)
+  // Run modifiers ("Tuần trăng" + game mode): light intensity, food glow, speed
+  function applyRunModifiers() {
+    const st = useGame.getState()
+    const phase = moonPhaseById(st.moonPhase)
+    const mode = gameModeById(st.gameMode)
     moon.intensity = 2.1 * phase.light
     hemi.intensity = 0.65 * (0.55 + 0.45 * phase.light)
     amb.intensity = 0.28 * (0.6 + 0.4 * phase.light)
     garden.setFoodGlow(phase.foodGlow)
     moonSpeedMult = phase.speedMult
+    modeSpeedMult = mode.speedMult
   }
 
   function updateDirectionStore() {
@@ -137,8 +144,11 @@ export function createEngine(canvas, { reduced } = {}) {
   }
 
   function resetGame() {
-    logic = createGame(useGame.getState().moonPhase)
-    applyMoonPhase()
+    const st = useGame.getState()
+    logic = createGame(st.moonPhase, st.gameMode)
+    applyRunModifiers()
+    lastTimeSec = -1
+    st.setTimeLeft(logic.mode === 'lantern' ? LANTERN_DURATION : null)
     curCells = worldCells(logic.snake)
     prevCells = cloneXZ(curCells)
     accum = 0
@@ -172,6 +182,14 @@ export function createEngine(canvas, { reduced } = {}) {
       garden.hideFood() // board full: don't leave a stale planet floating around
     }
     updateDirectionStore()
+    // Lantern Rush: push the countdown to the HUD whenever the second changes.
+    if (logic.mode === 'lantern' && logic.timeLeft != null) {
+      const sec = Math.max(0, Math.ceil(logic.timeLeft))
+      if (sec !== lastTimeSec) {
+        lastTimeSec = sec
+        useGame.getState().setTimeLeft(sec)
+      }
+    }
   }
 
   // ---- title-screen orbit demo ------------------------------------------
@@ -217,21 +235,25 @@ export function createEngine(canvas, { reduced } = {}) {
   let deathT = 0
 
   function handleDeath(ev) {
+    const timeUp = ev.cause === 'time' // Lantern Rush: the feast ends, no tragedy
     audio.setPadOn(false)
-    audio.playDeath()
+    if (timeUp) audio.playBloom()
+    else audio.playDeath()
     garden.petalFall()
     garden.hideFood()
     rig.startDeath(curCells, { x: curCells[0].x, z: curCells[0].z })
     dying = true
     deathT = 0
     accum = 0
-    camShake = 0.38 // Screen impact shake
+    camShake = timeUp ? 0 : 0.38 // a finished feast needs no screen impact
+    logic.deathCause = ev.cause || 'unknown'
+    if (logic.mode === 'lantern') useGame.getState().setTimeLeft(0)
     snapshotPending = true // capture the moment of death for the shareable moon card
   }
 
   function finalizeDeath() {
     dying = false
-    useGame.getState().gameOver({ score: logic.score, length: logic.snake.length })
+    useGame.getState().gameOver({ score: logic.score, length: logic.snake.length, cause: logic.deathCause })
   }
 
   function handleEat(ev) {
@@ -282,7 +304,7 @@ export function createEngine(canvas, { reduced } = {}) {
     if (st.status === 'playing' && !dying) {
       isBoosting = boosting
       st.setBoosting(boosting)
-      interval.v = speedInterval(logic.foodsEaten, isBoosting, moonSpeedMult)
+      interval.v = speedInterval(logic.foodsEaten, isBoosting, moonSpeedMult, modeSpeedMult)
     }
   }
 
@@ -422,7 +444,7 @@ export function createEngine(canvas, { reduced } = {}) {
     }
     if (s.muted !== prev.muted) audio.setMuted(s.muted)
     if (s.cameraMode !== prev.cameraMode) updateCameraTarget()
-    if (s.moonPhase !== prev.moonPhase) applyMoonPhase() // title-screen picker: update ambience live
+    if (s.moonPhase !== prev.moonPhase || s.gameMode !== prev.gameMode) applyRunModifiers() // title-screen pickers: update ambience & speed live
   })
 
   const initialStore = useGame.getState()
@@ -524,17 +546,18 @@ export function createEngine(canvas, { reduced } = {}) {
 
     if (st.status === 'playing' && !dying) {
       accum += dt
-      interval.v = speedInterval(logic.foodsEaten, isBoosting, moonSpeedMult)
+      interval.v = speedInterval(logic.foodsEaten, isBoosting, moonSpeedMult, modeSpeedMult)
       let guard = 0
       while (accum >= interval.v) {
-        const ev = step(logic)
+        const tickDt = interval.v // seconds this tick consumes (drives the lantern clock)
+        const ev = step(logic, tickDt)
         if (ev.dead) {
           handleDeath(ev)
           break
         }
         commitTick()
         if (ev.ate) handleEat(ev)
-        interval.v = speedInterval(logic.foodsEaten, isBoosting, moonSpeedMult)
+        interval.v = speedInterval(logic.foodsEaten, isBoosting, moonSpeedMult, modeSpeedMult)
         accum -= interval.v
         if (++guard > 6) {
           accum = 0

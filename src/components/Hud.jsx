@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useGame } from '../game/store.js'
 import { inputBus } from '../game/inputBus.js'
-import { MOON_PHASES, moonPhaseById } from '../game/logic.js'
+import { MOON_PHASES, moonPhaseById, GAME_MODES, gameModeById } from '../game/logic.js'
 import { composeMoonCard } from '../game/moonCard.js'
 
 const arr = (d) => (
@@ -105,8 +105,45 @@ function MoonPicker() {
   )
 }
 
+// Title-screen game-mode picker ("Ba nẻo chơi"): three ways into the garden.
+const MODE_UI = {
+  classic: { emoji: '🐍', hint: 'Survive & thrive · the timeless hunt' },
+  lantern: { emoji: '🏮', hint: '60 seconds · eat everything that glows' },
+  zen: { emoji: '🍃', hint: 'No death · drift and grow in peace' },
+}
+
+function ModePicker() {
+  const gameMode = useGame((s) => s.gameMode)
+  const setGameMode = useGame((s) => s.setGameMode)
+  return (
+    <div className="mode-picker">
+      <p className="mode-label">choose your journey</p>
+      <div className="mode-row" role="radiogroup" aria-label="Game mode">
+        {GAME_MODES.map((m) => (
+          <button
+            key={m.id}
+            type="button"
+            role="radio"
+            aria-checked={gameMode === m.id}
+            title={`${m.name} — ${MODE_UI[m.id].hint}`}
+            className={`mode-btn${gameMode === m.id ? ' mode-btn--active' : ''}`}
+            onClick={() => setGameMode(m.id)}
+          >
+            <span className="mode-emoji" aria-hidden="true">
+              {MODE_UI[m.id].emoji}
+            </span>
+            <span className="mode-name">{m.name}</span>
+          </button>
+        ))}
+      </div>
+      <p className="mode-hint">{MODE_UI[gameMode]?.hint}</p>
+    </div>
+  )
+}
+
 export function TitleOverlay() {
   const best = useGame((s) => s.best)
+  const gameMode = useGame((s) => s.gameMode)
   const start = useGame((s) => s.start)
   const openHowTo = useGame((s) => s.openHowTo)
   const cameraMode = useGame((s) => s.cameraMode)
@@ -137,8 +174,13 @@ export function TitleOverlay() {
             Camera: {CAM_LABELS[cameraMode] || 'Classic 3D'}
           </button>
         </div>
+        <ModePicker />
         <MoonPicker />
-        {best > 0 && <p className="best-note">best · {best} pts</p>}
+        {best > 0 && (
+          <p className="best-note">
+            best · {best} pts{gameMode !== 'classic' ? ` · ${gameModeById(gameMode).name}` : ''}
+          </p>
+        )}
       </div>
     </div>
   )
@@ -182,6 +224,12 @@ export function HowToOverlay() {
               The glowing jade fence and your own body are the only obstacles.
             </span>
           </p>
+          <p>
+            <span className="num">6</span>
+            <span>
+              <b>Three ways to play</b>: <b>Classic</b> (survive &amp; thrive), <b>Lantern Rush</b> (a 60-second feast against the clock), or <b>Zen Garden</b> (no death — drift and grow in peace). Choose on the title screen; each mode keeps its own best score.
+            </span>
+          </p>
           <p className="small">On mobile: swipe across the lake or use the virtual buttons below.</p>
         </div>
         <button type="button" className="btn btn--primary" onClick={closeHowTo}>
@@ -195,6 +243,8 @@ export function HowToOverlay() {
 export function PauseOverlay() {
   const resume = useGame((s) => s.resume)
   const toTitle = useGame((s) => s.toTitle)
+  const gameMode = useGame((s) => s.gameMode)
+  const endZenSession = useGame((s) => s.endZenSession)
   return (
     <div className="sheet" role="dialog" aria-label="Paused">
       <div className="sheet-card">
@@ -208,6 +258,16 @@ export function PauseOverlay() {
           <button type="button" className="btn" onClick={toTitle}>
             Back to title
           </button>
+          {gameMode === 'zen' && (
+            <button
+              type="button"
+              className="btn btn--secondary"
+              onClick={endZenSession}
+              title="End this zen session and see your summary"
+            >
+              🍃 End session
+            </button>
+          )}
         </div>
         <p className="hint">
           Press <kbd>P</kbd> or <kbd>Esc</kbd> to resume
@@ -217,16 +277,29 @@ export function PauseOverlay() {
   )
 }
 
+// Game-over copy varies by how the run ended.
+const END_COPY = {
+  time: { overline: "time's up", title: 'The lanterns dim — what a feast!' },
+  zen: { overline: 'session complete', title: 'The garden breathes with you' },
+  wall: { overline: 'the end', title: 'The lake grows still once more' },
+  self: { overline: 'the end', title: 'The serpent ties its final knot' },
+  unknown: { overline: 'the end', title: 'The lake grows still once more' },
+}
+
 export function GameOverOverlay() {
   const score = useGame((s) => s.score)
   const best = useGame((s) => s.best)
   const length = useGame((s) => s.length)
   const moonPhase = useGame((s) => s.moonPhase)
+  const gameMode = useGame((s) => s.gameMode)
+  const deathCause = useGame((s) => s.deathCause)
   const deathSnapshot = useGame((s) => s.deathSnapshot)
   const isNewBest = useGame((s) => s.isNewBest)
   const start = useGame((s) => s.start)
   const toTitle = useGame((s) => s.toTitle)
   const [sharing, setSharing] = useState(false)
+
+  const endCopy = END_COPY[deathCause] || END_COPY.unknown
 
   async function handleShare() {
     if (sharing) return
@@ -238,6 +311,7 @@ export function GameOverOverlay() {
         best,
         length,
         phaseName: moonPhaseById(moonPhase).name,
+        modeName: gameModeById(gameMode).name,
         dateLabel: new Date().toLocaleDateString('en-US', {
           month: 'short',
           day: 'numeric',
@@ -270,14 +344,18 @@ export function GameOverOverlay() {
   return (
     <div className="sheet" role="dialog" aria-label="Game over">
       <div className="sheet-card">
-        <p className="overline">the end</p>
-        <h2>The lake grows still once more</h2>
+        <p className="overline">{endCopy.overline}</p>
+        <h2>{endCopy.title}</h2>
         {isNewBest && <span className="best-badge">✦ New Best!</span>}
         <div className="result-score" aria-live="polite">
           {score}
         </div>
-        <p className="result-best">all-time best · {best} pts</p>
-        <p className="result-moon">{moonPhaseById(moonPhase).name} run</p>
+        <p className="result-best">
+          {gameModeById(gameMode).name} best · {best} pts
+        </p>
+        <p className="result-moon">
+          {gameModeById(gameMode).name} · {moonPhaseById(moonPhase).name} run
+        </p>
         <div className="sheet-actions">
           <button type="button" className="btn btn--primary" onClick={start} autoFocus>
             Play again
@@ -339,6 +417,11 @@ function PlayingHud() {
   const isBoosting = useGame((s) => s.isBoosting)
   const currentDir = useGame((s) => s.currentDir)
   const queuedDir = useGame((s) => s.queuedDir)
+  const gameMode = useGame((s) => s.gameMode)
+  const timeLeft = useGame((s) => s.timeLeft)
+
+  const showTimer = gameMode === 'lantern' && timeLeft != null
+  const timerText = showTimer ? `0:${String(Math.max(0, timeLeft)).padStart(2, '0')}` : ''
 
   return (
     <div className="hud-top">
@@ -346,6 +429,16 @@ function PlayingHud() {
         <Chip label="Score" value={score} highlight />
         <Chip label="Length" value={length} />
         <Chip label="Best" value={best} />
+        {showTimer && (
+          <div
+            className={`chip chip--timer${timeLeft <= 10 ? ' chip--timer-low' : ''}`}
+            title="Time remaining in this Lantern Rush"
+            aria-live="off"
+          >
+            <span>🏮</span>
+            <b>{timerText}</b>
+          </div>
+        )}
         <QueueChip currentDir={currentDir} queuedDir={queuedDir} />
         {isBoosting && <div className="chip chip--boost">⚡ DASH</div>}
       </div>

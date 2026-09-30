@@ -1,11 +1,13 @@
 import { create } from 'zustand'
-import { MOON_IDS } from './logic.js'
+import { MOON_IDS, MODE_IDS } from './logic.js'
 
-export const BEST_KEY = 'ran-xinh-best'
+export const BEST_KEY = 'ran-xinh-best' // legacy single best, migrated into BESTS_KEY
+export const BESTS_KEY = 'ran-xinh-bests'
 export const MUTE_KEY = 'ran-xinh-muted'
 export const CAM_KEY = 'ran-xinh-cam'
 export const CTRLS_KEY = 'ran-xinh-ctrls'
 export const MOON_KEY = 'ran-xinh-moon'
+export const MODE_KEY = 'ran-xinh-mode'
 
 function readJSON(key) {
   try {
@@ -25,6 +27,25 @@ function writeJSON(key, value) {
 }
 
 export const readBest = () => Math.max(0, parseInt(readJSON(BEST_KEY) || '0', 10) || 0)
+// Per-mode bests, with one-time migration from the legacy single best.
+export const readBests = () => {
+  const fresh = { classic: 0, lantern: 0, zen: 0 }
+  try {
+    const raw = readJSON(BESTS_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw)
+      for (const id of MODE_IDS) {
+        const v = parseInt(parsed?.[id], 10)
+        if (Number.isFinite(v) && v > 0) fresh[id] = v
+      }
+      return fresh
+    }
+  } catch {
+    /* corrupted JSON — fall through to migration */
+  }
+  fresh.classic = readBest()
+  return fresh
+}
 export const readMuted = () => readJSON(MUTE_KEY) === '1'
 const CAM_MODES = ['aligned', 'topdown', 'cinematic']
 export const readCam = () => {
@@ -35,6 +56,32 @@ export const readCtrls = () => readJSON(CTRLS_KEY) === '1'
 export const readMoon = () => {
   const v = readJSON(MOON_KEY)
   return MOON_IDS.includes(v) ? v : 'half'
+}
+export const readMode = () => {
+  const v = readJSON(MODE_KEY)
+  return MODE_IDS.includes(v) ? v : 'classic'
+}
+
+// Shared finish logic for gameOver() and endZenSession(): records the run,
+// updates the current mode's best, and moves to the 'dead' status so the
+// game-over overlay (and the moon card) can present the result.
+function completeRun(get, set, cause) {
+  const mode = get().gameMode
+  const score = get().score
+  const bests = { ...get().bests }
+  const prevBest = bests[mode] || 0
+  const newBest = Math.max(prevBest, score)
+  bests[mode] = newBest
+  writeJSON(BESTS_KEY, JSON.stringify(bests))
+  set({
+    status: 'dead',
+    bests,
+    best: newBest,
+    isNewBest: score > prevBest,
+    isBoosting: false,
+    deathCause: cause,
+    timeLeft: null,
+  })
 }
 
 export const useGame = create((set, get) => ({
@@ -57,6 +104,18 @@ export const useGame = create((set, get) => ({
   // Moon phase run modifier: 'new' | 'crescent' | 'half' | 'gibbous' | 'full'
   moonPhase: 'half',
 
+  // Game mode: 'classic' | 'lantern' | 'zen'
+  gameMode: 'classic',
+
+  // Best score per mode; `best` mirrors the current mode's best for the HUD.
+  bests: { classic: 0, lantern: 0, zen: 0 },
+
+  // Lantern Rush countdown (seconds left), null in other modes
+  timeLeft: null,
+
+  // How the last run ended: 'wall' | 'self' | 'time' | 'zen' | null
+  deathCause: null,
+
   // Snapshot of the canvas at the moment of death, for the shareable moon card
   deathSnapshot: null,
 
@@ -67,12 +126,16 @@ export const useGame = create((set, get) => ({
   floatingTexts: [],
 
   hydrate() {
+    const bests = readBests()
+    const gameMode = readMode()
     set({
-      best: readBest(),
+      bests,
+      best: bests[gameMode] || 0,
       muted: readMuted(),
       cameraMode: readCam(),
       showControls: readCtrls(),
       moonPhase: readMoon(),
+      gameMode,
     })
   },
 
@@ -88,6 +151,8 @@ export const useGame = create((set, get) => ({
       isBoosting: false,
       floatingTexts: [],
       deathSnapshot: null,
+      timeLeft: null,
+      deathCause: null,
     })
   },
   pause() {
@@ -139,6 +204,16 @@ export const useGame = create((set, get) => ({
     set({ moonPhase })
   },
 
+  setGameMode(gameMode) {
+    if (!MODE_IDS.includes(gameMode)) return
+    writeJSON(MODE_KEY, gameMode)
+    set({ gameMode, best: get().bests[gameMode] || 0 })
+  },
+
+  setTimeLeft(timeLeft) {
+    set({ timeLeft })
+  },
+
   setDeathSnapshot(deathSnapshot) {
     set({ deathSnapshot })
   },
@@ -170,15 +245,16 @@ export const useGame = create((set, get) => ({
   },
 
   gameOver(result) {
-    if (result.score > get().best) writeJSON(BEST_KEY, result.score)
-    set({
-      status: 'dead',
-      score: result.score,
-      length: result.length,
-      best: Math.max(get().best, result.score),
-      isNewBest: result.score > get().best,
-      isBoosting: false,
-    })
+    set({ score: result.score, length: result.length })
+    completeRun(get, set, result.cause || 'unknown')
+  },
+
+  // Zen Garden has no death: the player ends the session from the pause menu.
+  endZenSession() {
+    const st = get()
+    if (st.gameMode !== 'zen') return
+    if (st.status !== 'playing' && st.status !== 'paused') return
+    completeRun(get, set, 'zen')
   },
 
   setMuted(m) {
