@@ -198,8 +198,15 @@ export function createSnakeRig(scene) {
       rig.cur = cur
     },
 
-    setDir(dx, dz) {
-      const prevYaw = rig.yawTarget
+    // P4 "The Garden Remembers": re-tint the serpent's glow for purchased inks.
+    // 'jade' restores the original rose/gold look.
+    setInk(ink) {
+      if (!ink) return
+      sharedMat.emissive.set(ink.emissive)
+      ridgeMat.color.set(ink.ridge)
+    },
+
+    setDir(dx, dz) {      const prevYaw = rig.yawTarget
       rig.yawTarget = Math.atan2(dx, dz)
       // Calculate angular delta for banking roll
       let diff = rig.yawTarget - prevYaw
