@@ -740,6 +740,18 @@ function NightBanner() {
   )
 }
 
+// The breath before the run: the garden is visible and the snake is still.
+// Purely presentational — it never steals input, so a swipe during the beat
+// still pre-steers the snake on touch screens.
+function ReadyVeil() {
+  return (
+    <div className="ready-veil" role="status" aria-label="The night begins">
+      <p className="ready-veil__line">The night begins</p>
+      <p className="ready-veil__sub">the garden holds its breath</p>
+    </div>
+  )
+}
+
 // P6 "First Light": gentle first-night guide — three short hints shown only on
 // the player's very first night. They auto-advance; tapping skips the guide.
 const COACH_COPY = [
@@ -846,35 +858,38 @@ function VerseToasts() {
 // The night opens with a quiet moment: the night's new whispers and verses
 // are read one at a time BEFORE gameplay begins, instead of bursting over
 // the live garden in unreadable stacks.
+// Dwell time per poem on the prologue screen: long enough to actually
+// read, never a flash. Verses get more room than one-line whispers.
+const PROLOGUE_DWELL = { verse: 6000, whisper: 4500 }
+
 export function PrologueOverlay() {
   const night = useGame((s) => s.night)
   const queue = useGame((s) => s.prologueQueue)
+  const index = useGame((s) => s.prologueIndex)
   const moonPhase = useGame((s) => s.moonPhase)
   const gameMode = useGame((s) => s.gameMode)
   const nightEvent = useGame((s) => s.nightEvent)
   const beginNight = useGame((s) => s.beginNight)
-  const [index, setIndex] = useState(0)
+  const advancePrologue = useGame((s) => s.advancePrologue)
 
   const phase = moonPhaseById(moonPhase)
   const mode = gameModeById(gameMode)
   const event = nightEventById(nightEvent)
 
-  // Walk through the night's new poems, then begin the run on its own.
-  // Any tap or keypress skips straight to gameplay.
-  useEffect(() => {
-    const last = index >= queue.length
-    const wait = queue.length === 0 ? 2200 : last ? 2600 : 3600
-    const t = setTimeout(() => {
-      if (last) beginNight()
-      else setIndex((i) => i + 1)
-    }, wait)
-    return () => clearTimeout(t)
-  }, [index, queue.length, beginNight])
-
+  // Walk through the night's new poems at reading pace. The last card holds
+  // until the player chooses to begin — the night never starts by surprise,
+  // and a stray tap can no longer skip the poems unread.
   const item = index < queue.length ? queue[index] : null
+  const isLast = queue.length === 0 || index >= queue.length - 1
+  useEffect(() => {
+    if (!item || isLast) return undefined
+    const t = setTimeout(advancePrologue, PROLOGUE_DWELL[item.kind] || 4500)
+    return () => clearTimeout(t)
+  }, [item, isLast, advancePrologue])
+
   return (
-    <div className="prologue-overlay" onClick={beginNight} role="dialog" aria-label="The night begins">
-      <div className="prologue-inner">
+    <div className="prologue-overlay" role="dialog" aria-label="The night begins">
+      <div className="prologue-inner" onClick={advancePrologue}>
         <p className="prologue-kicker">Night {night}</p>
         <p className="prologue-sub">
           {phase?.name} · {mode?.name}
@@ -912,7 +927,7 @@ export function PrologueOverlay() {
         )}
         <button
           type="button"
-          className="prologue-begin"
+          className={`prologue-begin${isLast ? ' prologue-begin--ready' : ''}`}
           onClick={(e) => {
             e.stopPropagation()
             beginNight()
@@ -920,7 +935,9 @@ export function PrologueOverlay() {
         >
           Begin the night ▸
         </button>
-        <p className="prologue-hint">tap anywhere to begin</p>
+        <p className="prologue-hint">
+          {queue.length > 0 ? 'tap the card for the next poem' : 'the garden waits for you'}
+        </p>
       </div>
     </div>
   )
@@ -1306,10 +1323,15 @@ export default function Hud() {
       {status === 'title' && showJournal && !showHowTo && <JournalOverlay />}
       {status === 'title' && showGarden && !showHowTo && <GardenOverlay />}
       {status === 'prologue' && <PrologueOverlay />}
+      {status === 'ready' && (
+        <>
+          <NightBanner />
+          <ReadyVeil />
+        </>
+      )}
       {status === 'playing' && (
         <>
           <PlayingHud />
-          <NightBanner />
           <CoachMarks />
           <div className="toast-stack">
             <VerseToasts />

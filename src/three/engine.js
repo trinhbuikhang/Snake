@@ -20,7 +20,7 @@ import {
   gridToWorld,
   N,
 } from '../game/logic.js'
-import { useGame } from '../game/store.js'
+import { useGame, READY_BEAT_S } from '../game/store.js'
 import { inputBus } from '../game/inputBus.js'
 import audio from '../audio/sound.js'
 import { buildGarden } from './garden.js'
@@ -137,6 +137,7 @@ export function createEngine(canvas, { reduced } = {}) {
   let prevCells = []
   let interval = { v: BASE_INTERVAL }
   let accum = 0
+  let readyAccum = 0 // clock for the "night begins" beat before the run starts
   let isBoosting = false
   let moonSpeedMult = 1 // moon-phase speed modifier for this run
   let modeSpeedMult = 1 // game-mode speed modifier for this run
@@ -369,7 +370,9 @@ export function createEngine(canvas, { reduced } = {}) {
   // ---- input ---------------------------------------------------------------
   function requestTurn(key) {
     const st = useGame.getState()
-    if (st.status === 'playing' && !dying) {
+    // During the ready beat the snake is still, but the player may already
+    // choose a direction — it takes effect on the first step.
+    if ((st.status === 'playing' || st.status === 'ready') && !dying) {
       const accepted = turn(logic, key)
       if (accepted) {
         audio.playTurn()
@@ -408,11 +411,12 @@ export function createEngine(canvas, { reduced } = {}) {
       if (st.showHowTo) {
         st.closeHowTo()
         if (st.status === 'title' || st.status === 'dead') st.start()
-        else if (st.status === 'prologue') st.beginNight()
+        else if (st.status === 'prologue') st.advancePrologue()
         return
       }
       if (st.status === 'title' || st.status === 'dead') st.start()
-      else if (st.status === 'prologue') st.beginNight()
+      else if (st.status === 'prologue') st.advancePrologue()
+      else if (st.status === 'ready') st.enterPlaying()
       return
     }
 
@@ -509,9 +513,16 @@ export function createEngine(canvas, { reduced } = {}) {
   // ---- store wiring ----------------------------------------------------------
   const unsubStore = useGame.subscribe((s, prev) => {
     if (s.status !== prev.status) {
-      if (s.status === 'playing' && (prev.status === 'title' || prev.status === 'dead' || prev.status === 'prologue')) {
+      // Entering a run: the prologue now opens a "ready" beat first (the
+      // garden visible, the snake still), and only then does play begin.
+      // resetGame() runs on the beat so the player sees the true board.
+      const enteringRun =
+        (s.status === 'ready' || s.status === 'playing') &&
+        (prev.status === 'title' || prev.status === 'dead' || prev.status === 'prologue')
+      if (enteringRun) {
         unlock() // runs inside the user's click/keypress gesture, so AudioContext creation is allowed
         resetGame()
+        readyAccum = 0
         // P6 "First Light": Silent Night keeps its promise — no music, only water.
         const ev = nightEventById(useGame.getState().nightEvent)
         if (ev.id === 'silent') {
@@ -521,6 +532,10 @@ export function createEngine(canvas, { reduced } = {}) {
           audio.setWaterOn(false)
           audio.setPadOn(true)
         }
+      } else if (s.status === 'playing' && prev.status === 'ready') {
+        // The ready beat ends: start the simulation from a clean slate.
+        accum = 0
+        prevCells = cloneXZ(curCells)
       } else if (s.status === 'playing' && prev.status === 'paused') {
         accum = 0
         prevCells = cloneXZ(curCells)
@@ -673,6 +688,14 @@ export function createEngine(canvas, { reduced } = {}) {
           spiritMesh.position.set(w.x, 0.45 + Math.sin(animT * 6) * 0.06, w.z)
         }
       }
+    } else if (st.status === 'ready' && !dying) {
+      // The "night begins" beat: the garden breathes, the snake holds still.
+      // Driven by the frame loop so a backgrounded tab can't skip it.
+      readyAccum += dt
+      if (readyAccum >= READY_BEAT_S) {
+        readyAccum = 0
+        st.enterPlaying()
+      }
     } else if ((st.status === 'title' || st.status === 'prologue') && !dying) {
       demoAccum += dt
       while (demoAccum >= DEMO_INTERVAL) {
@@ -684,6 +707,7 @@ export function createEngine(canvas, { reduced } = {}) {
     let paintT = 0
     let death = null
     if (st.status === 'playing' && !dying) paintT = clamp01(accum / interval.v)
+    else if (st.status === 'ready') paintT = 0 // the snake holds its opening pose
     else if (st.status === 'title' || st.status === 'prologue') paintT = clamp01(demoAccum / DEMO_INTERVAL)
     else if (st.status === 'paused' || dying) paintT = 1 // dying: hold the death pose, don't snap back a tick
     if (rig.death) death = { t: rig.death.t }
