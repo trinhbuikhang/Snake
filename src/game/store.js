@@ -4,6 +4,7 @@ import { evaluateWhispers } from './whispers.js'
 import { evaluateVerses } from './verses.js'
 import { EVENT_IDS, rollNightEvent } from './nightEvents.js'
 import { isoWeekId, communityEventForWeek } from './community.js'
+import { playVerse } from '../audio/sound.js'
 import {
   INK_IDS, inkById,
   LANTERN_MAX_TIER, LANTERN_COSTS, lanternCount,
@@ -32,6 +33,8 @@ export const KEEPSAKE_KEY = 'ran-xinh-keepsakes' // [{ id, night, date }]
 export const STREAK_KEY = 'ran-xinh-streak' // { count, lastDay }
 // P5 "Shared Skies"
 export const NAME_KEY = 'ran-xinh-name' // gardener's display name for shared cards
+export const ONBOARDED_KEY = 'ran-xinh-onboarded' // first-night coach marks seen
+export const COACH_STEPS = 3 // number of first-night guide steps
 export const COMMUNITY_BOOST = 10 // extra roll weight for the week's shared sky
 
 function readJSON(key) {
@@ -87,6 +90,7 @@ export const readMode = () => {
   return MODE_IDS.includes(v) ? v : 'classic'
 }
 export const readNight = () => Math.max(0, parseInt(readJSON(NIGHT_KEY) || '0', 10) || 0)
+export const readOnboarded = () => readJSON(ONBOARDED_KEY) === '1'
 // Lifetime counters: { supernovas, planets, deaths, spiritCatches, zenSessions,
 // lanternFeasts }. Missing/corrupt → zeros.
 export const readTotals = () => {
@@ -212,6 +216,11 @@ export const readSeen = () => {
 function completeRun(get, set, cause) {
   const mode = get().gameMode
   const score = get().score
+  // P6: the first night's coach marks end with the run, finished or not.
+  if (get().coachStep >= 0) {
+    writeJSON(ONBOARDED_KEY, '1')
+    set({ coachStep: -1 })
+  }
   const bests = { ...get().bests }
   const prevBest = bests[mode] || 0
   const newBest = Math.max(prevBest, score)
@@ -351,6 +360,8 @@ export const useGame = create((set, get) => ({
   whisperToasts: [],
   // nightBanner: { night, modeLabel, phaseLabel } shown briefly when a run starts
   nightBanner: null,
+  // coachStep: P6 first-night guide. -1 = hidden/done, 0..2 = visible steps.
+  coachStep: -1,
   // showJournal: the collection overlay is open
   showJournal: false,
 
@@ -491,6 +502,20 @@ export const useGame = create((set, get) => ({
   beginNight() {
     if (get().status !== 'prologue') return
     set({ status: 'playing', prologueQueue: [] })
+    // P6 "First Light": first-ever night gets gentle coach marks.
+    if (get().night === 1 && !readOnboarded()) set({ coachStep: 0 })
+  },
+
+  // P6 "First Light": first-night coach marks (auto-advance, tap to skip).
+  advanceCoach() {
+    const step = get().coachStep
+    if (step < 0) return
+    if (step >= COACH_STEPS - 1) get().dismissCoach()
+    else set({ coachStep: step + 1 })
+  },
+  dismissCoach() {
+    writeJSON(ONBOARDED_KEY, '1')
+    set({ coachStep: -1 })
   },
 
   // --- P4 "The Garden Remembers" ---
@@ -805,6 +830,8 @@ export const useGame = create((set, get) => ({
     if (freshAll.length === 0) return
     writeJSON(VERSES_KEY, JSON.stringify(unlocked))
     const toasts = freshAll.map((v) => ({ ...v, toastId: `v${Date.now()}-${Math.random().toString(36).slice(2, 8)}` }))
+    // P6: a soft moon-chime marks the moment a verse joins the chronicle.
+    playVerse()
     set((prev) => ({
       unlockedVerses: unlocked,
       verseToasts: [...prev.verseToasts, ...toasts].slice(-4),
