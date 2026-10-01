@@ -312,6 +312,7 @@ export function createEngine(canvas, { reduced } = {}) {
   function handleDeath(ev) {
     const timeUp = ev.cause === 'time' // Lantern Rush: the feast ends, no tragedy
     audio.setPadOn(false)
+    audio.setWaterOn(false)
     if (timeUp) audio.playBloom()
     else audio.playDeath()
     garden.petalFall()
@@ -511,7 +512,15 @@ export function createEngine(canvas, { reduced } = {}) {
       if (s.status === 'playing' && (prev.status === 'title' || prev.status === 'dead' || prev.status === 'prologue')) {
         unlock() // runs inside the user's click/keypress gesture, so AudioContext creation is allowed
         resetGame()
-        audio.setPadOn(true)
+        // P6 "First Light": Silent Night keeps its promise — no music, only water.
+        const ev = nightEventById(useGame.getState().nightEvent)
+        if (ev.id === 'silent') {
+          audio.setPadOn(false)
+          audio.setWaterOn(true)
+        } else {
+          audio.setWaterOn(false)
+          audio.setPadOn(true)
+        }
       } else if (s.status === 'playing' && prev.status === 'paused') {
         accum = 0
         prevCells = cloneXZ(curCells)
@@ -520,8 +529,10 @@ export function createEngine(canvas, { reduced } = {}) {
       } else if (s.status === 'title') {
         resetDemo()
         audio.setPadOn(false)
+        audio.setWaterOn(false)
       } else if (s.status === 'dead') {
         audio.setPadOn(false)
+        audio.setWaterOn(false)
       }
     }
     if (s.muted !== prev.muted) audio.setMuted(s.muted)

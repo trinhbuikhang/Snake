@@ -740,6 +740,52 @@ function NightBanner() {
   )
 }
 
+// P6 "First Light": gentle first-night guide — three short hints shown only on
+// the player's very first night. They auto-advance; tapping skips the guide.
+const COACH_COPY = [
+  {
+    title: 'Welcome, gardener',
+    text: 'Steer with WASD or the arrow keys — on touch, swipe across the lake.',
+  },
+  {
+    title: 'Eat the planets',
+    text: 'Glowing planets make you grow. A golden supernova is worth far more.',
+  },
+  {
+    title: 'Mind the garden',
+    text: 'The jade fence and your own tail end the night. Press P to rest anytime.',
+  },
+]
+
+function CoachMarks() {
+  const coachStep = useGame((s) => s.coachStep)
+  const advanceCoach = useGame((s) => s.advanceCoach)
+  const dismissCoach = useGame((s) => s.dismissCoach)
+
+  useEffect(() => {
+    if (coachStep < 0) return undefined
+    const t = setTimeout(advanceCoach, 5500)
+    return () => clearTimeout(t)
+  }, [coachStep, advanceCoach])
+
+  if (coachStep < 0 || coachStep >= COACH_COPY.length) return null
+  const step = COACH_COPY[coachStep]
+  return (
+    <div className="coach-marks" role="status" aria-live="polite">
+      <button type="button" className="coach-card" onClick={dismissCoach} aria-label="Skip the guide">
+        <p className="coach-card__title">{step.title}</p>
+        <p className="coach-card__text">{step.text}</p>
+        <p className="coach-card__dots" aria-hidden="true">
+          {COACH_COPY.map((_, i) => (
+            <span key={i} className={i === coachStep ? 'on' : ''} />
+          ))}
+        </p>
+        <p className="coach-card__skip">tap to skip</p>
+      </button>
+    </div>
+  )
+}
+
 function WhisperToast({ toast, onDone }) {
   useEffect(() => {
     const t = setTimeout(onDone, 4500)
@@ -1264,6 +1310,7 @@ export default function Hud() {
         <>
           <PlayingHud />
           <NightBanner />
+          <CoachMarks />
           <div className="toast-stack">
             <VerseToasts />
             <WhisperToasts />

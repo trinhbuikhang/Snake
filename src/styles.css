@@ -80,6 +80,22 @@ body {
   display: block;
   z-index: var(--z-canvas);
   touch-action: none;
+  /* P6: the engine chunk loads async — fade the lake in once it is ready. */
+  opacity: 0;
+  transition: opacity 1.4s ease;
+}
+
+.garden-canvas--ready {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .garden-canvas {
+    transition: none;
+  }
+  .garden-canvas--ready {
+    opacity: 1;
+  }
 }
 
 .vignette {
@@ -911,6 +927,89 @@ kbd {
   12% { opacity: 1; transform: translateX(-50%) translateY(0); }
   78% { opacity: 1; }
   100% { opacity: 0; transform: translateX(-50%) translateY(8px); }
+}
+
+/* P6 "First Light": gentle first-night coach marks — three short hints that
+   auto-advance; tapping the card skips the guide entirely. */
+.coach-marks {
+  position: fixed;
+  left: 50%;
+  bottom: calc(110px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  width: min(430px, calc(100vw - 48px));
+  z-index: 40;
+  pointer-events: none;
+}
+
+.coach-card {
+  pointer-events: auto;
+  width: 100%;
+  text-align: center;
+  font-family: inherit;
+  color: var(--cream);
+  background: rgba(10, 17, 14, 0.85);
+  border: 1px solid rgba(212, 175, 105, 0.4);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-soft);
+  padding: 12px 18px 10px;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: coachIn 0.45s ease;
+}
+
+.coach-card__title {
+  font-family: Georgia, 'Times New Roman', serif;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  font-size: 0.8rem;
+  color: var(--gold-glow);
+  margin: 0 0 6px;
+}
+
+.coach-card__text {
+  font-size: 0.95rem;
+  line-height: 1.45;
+  color: rgba(244, 240, 230, 0.92);
+  margin: 0 0 8px;
+}
+
+.coach-card__dots {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  margin: 0 0 4px;
+}
+
+.coach-card__dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(244, 240, 230, 0.25);
+}
+
+.coach-card__dots span.on {
+  background: var(--gold-glow);
+  box-shadow: 0 0 8px rgba(255, 213, 79, 0.8);
+}
+
+.coach-card__skip {
+  font-size: 0.7rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(244, 240, 230, 0.45);
+  margin: 0;
+}
+
+@keyframes coachIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .coach-card {
+    animation: none;
+  }
 }
 
 /* Whispers + verses share one anchored column so the two stacks can never
