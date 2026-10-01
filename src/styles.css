@@ -1455,10 +1455,69 @@ kbd {
   100% { opacity: 1; transform: none; }
 }
 
+/* The last prologue card waits for the player: the button breathes gently
+   so it reads as the way forward. */
+.prologue-begin--ready {
+  animation: prologuePulse 2.4s ease-in-out infinite;
+}
+
+@keyframes prologuePulse {
+  0%, 100% { box-shadow: 0 0 0 rgba(217, 185, 106, 0); }
+  50% { box-shadow: 0 0 26px rgba(217, 185, 106, 0.55); }
+}
+
+.prologue-card {
+  cursor: pointer;
+}
+
+/* ---- The ready beat: one breath between the prologue and the run ---- */
+
+.ready-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 48;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  pointer-events: none;
+  animation: readyVeilIn 1.8s ease forwards;
+}
+
+.ready-veil__line {
+  margin: 0;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-size: clamp(1.7rem, 5vw, 2.7rem);
+  letter-spacing: 0.24em;
+  text-indent: 0.24em;
+  color: #f4e9c8;
+  text-shadow: 0 0 26px rgba(244, 233, 200, 0.45);
+}
+
+.ready-veil__sub {
+  margin: 0;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-size: 0.95rem;
+  letter-spacing: 0.16em;
+  color: rgba(214, 226, 240, 0.72);
+}
+
+@keyframes readyVeilIn {
+  0% { opacity: 0; }
+  22% { opacity: 1; }
+  72% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .prologue-overlay,
   .prologue-card,
-  .prologue-quiet {
+  .prologue-quiet,
+  .ready-veil,
+  .prologue-begin--ready {
     animation-duration: 0.01s;
   }
 }
