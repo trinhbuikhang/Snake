@@ -36,6 +36,12 @@ export const NAME_KEY = 'ran-xinh-name' // gardener's display name for shared ca
 export const ONBOARDED_KEY = 'ran-xinh-onboarded' // first-night coach marks seen
 export const COACH_STEPS = 3 // number of first-night guide steps
 export const COMMUNITY_BOOST = 10 // extra roll weight for the week's shared sky
+// The "night begins" ready beat: seconds of stillness between the prologue
+// and the run, so the player is never thrown into motion.
+export const READY_BEAT_S = 1.8
+// First-night coach marks wait until the snake is already moving, so the
+// guide never covers the player's first orienting seconds.
+export const COACH_DELAY_MS = 2000
 
 function readJSON(key) {
   try {
@@ -392,6 +398,8 @@ export const useGame = create((set, get) => ({
   // actually read them before the run begins. Each entry is
   // { kind: 'whisper'|'verse', id, text? , lines? }.
   prologueQueue: [],
+  // prologueIndex: which poem of the prologueQueue is being read.
+  prologueIndex: 0,
   // tonightEvent: the special event rolled for the upcoming night ('none' =
   // quiet night), announced on the title screen. nightEvent: the event active
   // during the current run.
@@ -472,6 +480,7 @@ export const useGame = create((set, get) => ({
       whisperToasts: [],
       verseToasts: [],
       prologueQueue: [],
+      prologueIndex: 0,
       streak,
       moonriseArmed: false,
       moonriseActive: moonrise,
@@ -497,13 +506,37 @@ export const useGame = create((set, get) => ({
       verseToasts: [],
     })
   },
-  // Called from the prologue screen (button, tap, or keypress) once the
-  // player has read the night's new whispers and verses.
+  // Called from the prologue screen (button, card tap, or keypress) once
+  // the player has read the night's new whispers and verses. Opens the
+  // "ready" beat — the garden is visible and the snake is still — before
+  // the run truly starts, so the player is never thrown into motion.
   beginNight() {
     if (get().status !== 'prologue') return
-    set({ status: 'playing', prologueQueue: [] })
-    // P6 "First Light": first-ever night gets gentle coach marks.
-    if (get().night === 1 && !readOnboarded()) set({ coachStep: 0 })
+    set({ status: 'ready', prologueQueue: [] })
+  },
+
+  // The ready beat ends and the run truly starts. Guarded so a hurried tap
+  // and the engine's own timer can't both fire it.
+  enterPlaying() {
+    if (get().status !== 'ready') return
+    set({ status: 'playing', nightBanner: null })
+    // P6 "First Light": first-ever night gets gentle coach marks — delayed
+    // until the snake is already moving, so the guide never covers the
+    // player's first orienting seconds.
+    if (get().night === 1 && !readOnboarded()) {
+      setTimeout(() => {
+        if (get().status === 'playing' && get().coachStep < 0) set({ coachStep: 0 })
+      }, COACH_DELAY_MS)
+    }
+  },
+
+  // Step through the prologue's poems: the next poem, or the night itself
+  // once the last one has been read.
+  advancePrologue() {
+    if (get().status !== 'prologue') return
+    const { prologueIndex, prologueQueue } = get()
+    if (prologueIndex < prologueQueue.length - 1) set({ prologueIndex: prologueIndex + 1 })
+    else get().beginNight()
   },
 
   // P6 "First Light": first-night coach marks (auto-advance, tap to skip).
