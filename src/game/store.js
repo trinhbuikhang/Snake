@@ -3,6 +3,7 @@ import { MOON_IDS, MODE_IDS } from './logic.js'
 import { evaluateWhispers } from './whispers.js'
 import { evaluateVerses } from './verses.js'
 import { EVENT_IDS, rollNightEvent } from './nightEvents.js'
+import { isoWeekId, communityEventForWeek } from './community.js'
 import {
   INK_IDS, inkById,
   LANTERN_MAX_TIER, LANTERN_COSTS, lanternCount,
@@ -29,6 +30,9 @@ export const GARDEN_KEY = 'ran-xinh-garden' // { lantern, lotus, inks, ink }
 export const JOURNEY_KEY = 'ran-xinh-journey' // { progress, completed }
 export const KEEPSAKE_KEY = 'ran-xinh-keepsakes' // [{ id, night, date }]
 export const STREAK_KEY = 'ran-xinh-streak' // { count, lastDay }
+// P5 "Shared Skies"
+export const NAME_KEY = 'ran-xinh-name' // gardener's display name for shared cards
+export const COMMUNITY_BOOST = 10 // extra roll weight for the week's shared sky
 
 function readJSON(key) {
   try {
@@ -180,6 +184,15 @@ export const readStreak = () => {
   } catch { /* corrupted save — start fresh */ }
   return fresh
 }
+// P5 "Shared Skies": the name the gardener signs shared cards with.
+export const readName = () => {
+  try {
+    const v = readJSON(NAME_KEY)
+    return typeof v === 'string' ? v.trim().slice(0, 24) : ''
+  } catch {
+    return ''
+  }
+}
 // Seen run contexts: { modes: [...], phases: [...] }.
 export const readSeen = () => {
   const fresh = { modes: [], phases: [] }
@@ -238,6 +251,31 @@ function completeRun(get, set, cause) {
   }
   writeJSON(JOURNEY_KEY, JSON.stringify(journey))
 
+  // P5 "Shared Skies" — Tonight's Highlights: the run's most beautiful
+  // moments, finalized here. Candidates were noted during play; keep the top
+  // 3 by priority, in the order they happened, for the game-over reel.
+  const candidates = [...(get().nightHighlights || [])]
+  if (wasMoonrise) {
+    candidates.push({
+      kind: 'moonrise',
+      text: 'The moon leaned close, and the sky rained stars.',
+      priority: 2,
+      at: Date.now(),
+    })
+  }
+  if (score > prevBest && prevBest > 0) {
+    candidates.push({
+      kind: 'newbest',
+      text: 'Tonight, the moon learned your name.',
+      priority: 3,
+      at: Date.now(),
+    })
+  }
+  const highlights = [...candidates]
+    .sort((a, b) => b.priority - a.priority || a.at - b.at)
+    .slice(0, 3)
+    .sort((a, b) => a.at - b.at)
+
   set({
     status: 'dead',
     bests,
@@ -252,6 +290,7 @@ function completeRun(get, set, cause) {
     moonriseActive: false,
     moonriseCoda,
     lastMoonlight: ml,
+    highlights,
   })
 }
 
@@ -331,6 +370,12 @@ export const useGame = create((set, get) => ({
   moonriseCoda: null,
   lastMoonlight: 0,
   verseToasts: [],
+  // P5 "Shared Skies"
+  gardenerName: '', // display name signed on shared cards (ran-xinh-name)
+  communityEvent: 'none', // this ISO week's shared sky event id
+  nightHighlights: [], // highlight candidates noted during the run
+  highlights: [], // finalized top-3 moments for the game-over reel
+  milestone: 0, // highest score milestone (25/50/100) noted this run
   // prologueQueue: whispers + verses unlocked by the nightStart evaluation,
   // shown one at a time on the pre-play prologue screen so the player can
   // actually read them before the run begins. Each entry is
@@ -366,6 +411,8 @@ export const useGame = create((set, get) => ({
       journey: readJourney(),
       keepsakes: readKeepsakes(),
       streak: readStreak(),
+      gardenerName: readName(),
+      communityEvent: communityEventForWeek(isoWeekId(new Date())),
     })
   },
 
@@ -379,7 +426,10 @@ export const useGame = create((set, get) => ({
     // P4 — a deliberately-started Moonrise Night overrides the rolled event.
     const moonrise = prev.moonriseArmed === true
     const nightEvent = moonrise ? 'moonrise' : (prev.tonightEvent || 'none')
-    const tonightEvent = rollNightEvent()
+    // P5 — Shared Skies: the week's community event gets bonus roll weight
+    // so every gardener is more likely to meet the same sky.
+    const communityEvent = communityEventForWeek(isoWeekId(new Date()))
+    const tonightEvent = rollNightEvent(Math.random, { [communityEvent]: COMMUNITY_BOOST })
     // P4 — lunar streak: one counted day per calendar day, consecutive days
     // extend it. A broken streak simply stops the bonus; never a punishment.
     const advancedStreak = nextStreak(prev.streak, toDayString())
@@ -416,6 +466,10 @@ export const useGame = create((set, get) => ({
       moonriseActive: moonrise,
       moonriseCoda: null,
       lastMoonlight: 0,
+      communityEvent,
+      nightHighlights: [],
+      highlights: [],
+      milestone: 0,
     })
     get().checkWhispers('nightStart', { isFirstMode, isFirstPhase })
     get().checkVerses('nightStart', { isFirstMode, isFirstPhase })
@@ -454,6 +508,24 @@ export const useGame = create((set, get) => ({
 
   dismissMoonriseCoda() {
     set({ moonriseCoda: null })
+  },
+
+  // P5 "Shared Skies" — the name signed on shared cards.
+  setGardenerName(name) {
+    const clean = typeof name === 'string' ? name.trim().slice(0, 24) : ''
+    writeJSON(NAME_KEY, clean)
+    set({ gardenerName: clean })
+  },
+
+  // P5 "Shared Skies" — note a beautiful moment of the current night.
+  // One entry per kind (re-noting refreshes the text); candidates are
+  // finalized into the top-3 `highlights` when the run completes.
+  noteHighlight(kind, text, priority) {
+    const at = Date.now()
+    set((s) => {
+      const rest = (s.nightHighlights || []).filter((h) => h.kind !== kind)
+      return { nightHighlights: [...rest, { kind, text, priority, at }].slice(-8) }
+    })
   },
 
   _spend(cost) {
@@ -600,6 +672,10 @@ export const useGame = create((set, get) => ({
     writeJSON(TOTALS_KEY, JSON.stringify(totals))
     set({ totals })
     set({ score: result.score, length: result.length })
+    // P5 "Shared Skies" — a lantern feast deserves a highlight of its own.
+    if (cause === 'time' && result.score >= 40) {
+      get().noteHighlight('feast', 'Sixty seconds of falling stars — a lantern feast.', 1)
+    }
     completeRun(get, set, cause)
     get().checkWhispers('death', { cause })
     get().checkVerses('death', { cause })
@@ -676,6 +752,23 @@ export const useGame = create((set, get) => ({
     if (get().isBoosting) nightStats.boostEats = (nightStats.boostEats || 0) + 1
     writeJSON(TOTALS_KEY, JSON.stringify(totals))
     set({ totals, nightStats })
+    // P5 "Shared Skies" — note the night's beautiful moments for the reel.
+    if (bloom && nightStats.supernovas === 1) {
+      get().noteHighlight('supernova', 'A dying star chose you to carry its last light.', 2)
+    }
+    const score = get().score
+    const seenMilestone = get().milestone || 0
+    const MILESTONES = [
+      [25, 'Twenty-five lights — the pond begins to glow.'],
+      [50, 'Fifty lights. The garden holds its breath.'],
+      [100, 'A hundred lights. The night will remember this.'],
+    ]
+    for (const [t, text] of MILESTONES) {
+      if (score >= t && seenMilestone < t) {
+        set({ milestone: t })
+        get().noteHighlight('milestone', text, t >= 100 ? 2 : 1)
+      }
+    }
     get().checkWhispers(bloom ? 'supernova' : 'eat')
     get().checkVerses(bloom ? 'supernova' : 'eat')
   },
@@ -696,6 +789,7 @@ export const useGame = create((set, get) => ({
         mode: get().gameMode,
         moonPhase: get().moonPhase,
         nightEvent: get().nightEvent,
+        communityEvent: get().communityEvent,
         bests: get().bests,
         totals: get().totals,
         nightStats: get().nightStats,
@@ -730,6 +824,7 @@ export const useGame = create((set, get) => ({
     const totals = { ...get().totals, spiritCatches: get().totals.spiritCatches + 1 }
     writeJSON(TOTALS_KEY, JSON.stringify(totals))
     set({ totals })
+    get().noteHighlight('spirit', 'The Jade Carp chose to be caught.', 3)
     get().checkVerses('spirit')
   },
 

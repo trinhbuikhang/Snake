@@ -142,7 +142,7 @@ function paintDivider(ctx, y) {
   ctx.restore()
 }
 
-function paintText(ctx, { score, best, length, phaseName, modeName, dateLabel, hasSnapshot }) {
+function paintText(ctx, { score, best, length, phaseName, modeName, dateLabel, hasSnapshot, gardenerName }) {
   ctx.textAlign = 'center'
   ctx.textBaseline = 'alphabetic'
 
@@ -215,10 +215,14 @@ function paintText(ctx, { score, best, length, phaseName, modeName, dateLabel, h
     ctx.font = `500 24px ${SANS}`
   })
 
-  // Tagline
+  // Tagline (+ the gardener's signature, P5 Shared Skies)
   ctx.fillStyle = 'rgba(239,232,211,0.5)'
   ctx.font = `italic 500 30px ${SERIF}`
-  ctx.fillText('a night in the ink garden', W / 2, H - 72)
+  ctx.fillText(
+    gardenerName ? `a night in the ink garden — inked by ${gardenerName}` : 'a night in the ink garden',
+    W / 2,
+    H - 72,
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -226,7 +230,7 @@ function paintText(ctx, { score, best, length, phaseName, modeName, dateLabel, h
 // verse — same ink-night look as the score card, no snapshot needed.
 // ---------------------------------------------------------------------------
 
-function paintVerseText(ctx, { lines, night, title }) {
+function paintVerseText(ctx, { lines, night, title, gardenerName }) {
   const cx = W / 2
 
   // Overline
@@ -259,6 +263,13 @@ function paintVerseText(ctx, { lines, night, title }) {
   ctx.font = `italic 500 34px ${SERIF}`
   ctx.fillText(title, cx, H * 0.66)
 
+  // P5 Shared Skies — the gardener signs their card
+  if (gardenerName) {
+    ctx.fillStyle = 'rgba(217,185,106,0.85)'
+    ctx.font = `italic 500 30px ${SERIF}`
+    ctx.fillText(`— inked by ${gardenerName}`, cx, H * 0.66 + 52)
+  }
+
   // Footer
   try {
     ctx.letterSpacing = '4px'
@@ -276,8 +287,109 @@ function paintVerseText(ctx, { lines, night, title }) {
   ctx.textAlign = 'left'
 }
 
+// ---------------------------------------------------------------------------
+// Tonight's Highlights (P5 Shared Skies): a shareable 1080x1350 card for the
+// three most beautiful moments of a night — the game's automatic highlight
+// reel, as a still card the player can post.
+// highlights: [{ text }] (up to 3, chronological).
+// ---------------------------------------------------------------------------
+
+function paintHighlightText(ctx, { highlights, night, score, modeName, phaseName, gardenerName }) {
+  const cx = W / 2
+
+  try {
+    ctx.letterSpacing = '6px'
+  } catch {
+    /* ignore */
+  }
+  ctx.textAlign = 'center'
+  ctx.fillStyle = 'rgba(217,185,106,0.9)'
+  ctx.font = `600 30px ${SANS}`
+  ctx.fillText("TONIGHT'S HIGHLIGHTS", cx, 262)
+  try {
+    ctx.letterSpacing = '0px'
+  } catch {
+    /* ignore */
+  }
+
+  ctx.fillStyle = 'rgba(239,232,211,0.55)'
+  ctx.font = `500 28px ${SERIF}`
+  ctx.fillText(`Night ${night} · ${phaseName}${modeName && modeName !== 'Classic' ? ` · ${modeName}` : ''}`, cx, 314)
+
+  // The three moments, each framed by a brush divider
+  let y = 462
+  highlights.forEach((h) => {
+    paintDivider(ctx, y - 72)
+    ctx.fillStyle = CREAM
+    ctx.font = `italic 500 44px ${SERIF}`
+    // Gentle wrap: split on a middle space if the line is long
+    const words = h.text.split(' ')
+    let lines = [h.text]
+    if (h.text.length > 34 && words.length > 3) {
+      const mid = Math.ceil(words.length / 2)
+      lines = [words.slice(0, mid).join(' '), words.slice(mid).join(' ')]
+    }
+    lines.forEach((line, i) => {
+      ctx.fillText(line, cx, y + i * 60)
+    })
+    y += lines.length * 60 + 110
+  })
+  paintDivider(ctx, y - 72)
+
+  // Score seal
+  ctx.fillStyle = 'rgba(239,232,211,0.7)'
+  ctx.font = `500 26px ${SANS}`
+  try {
+    ctx.letterSpacing = '8px'
+  } catch {
+    /* ignore */
+  }
+  ctx.fillText('SCORE', cx + 4, y + 40)
+  try {
+    ctx.letterSpacing = '0px'
+  } catch {
+    /* ignore */
+  }
+  ctx.fillStyle = '#ffffff'
+  ctx.font = `700 110px ${SERIF}`
+  ctx.fillText(String(score), cx, y + 160)
+
+  // Footer
+  try {
+    ctx.letterSpacing = '4px'
+  } catch {
+    /* ignore */
+  }
+  ctx.fillStyle = 'rgba(239,232,211,0.5)'
+  ctx.font = `500 26px ${SANS}`
+  ctx.fillText(
+    gardenerName ? `MOONLIT SERPENT · INKED BY ${gardenerName.toUpperCase()}` : 'MOONLIT SERPENT',
+    cx,
+    H - 72,
+  )
+  try {
+    ctx.letterSpacing = '0px'
+  } catch {
+    /* ignore */
+  }
+  ctx.textAlign = 'left'
+}
+
+export function composeHighlightCard({ highlights, night, score, modeName, phaseName, gardenerName }) {
+  return new Promise((resolve) => {
+    const canvas = document.createElement('canvas')
+    canvas.width = W
+    canvas.height = H
+    const ctx = canvas.getContext('2d')
+    const seed = highlights.reduce((a, h) => a + h.text.split('').reduce((x, c) => x + c.charCodeAt(0), 0), night * 131)
+    paintBackground(ctx, (seed >>> 0) || 1)
+    paintHighlightText(ctx, { highlights: highlights.slice(0, 3), night, score, modeName, phaseName, gardenerName })
+    resolve(canvas)
+  })
+}
+
 // verse: { lines: [a, b], id }. Returns a Promise<canvas>.
-export function composeVerseCard({ verse, night }) {
+export function composeVerseCard({ verse, night, gardenerName }) {
   return new Promise((resolve) => {
     const canvas = document.createElement('canvas')
     canvas.width = W
@@ -286,12 +398,12 @@ export function composeVerseCard({ verse, night }) {
     const seed = verse.id.split('').reduce((a, c) => a + c.charCodeAt(0), 0) * 7919
     paintBackground(ctx, seed >>> 0)
     const title = verse.id.replace(/^verse-/, '').replace(/-/g, ' ')
-    paintVerseText(ctx, { lines: verse.lines, night, title })
+    paintVerseText(ctx, { lines: verse.lines, night, title, gardenerName })
     resolve(canvas)
   })
 }
 
-export function composeMoonCard({ snapshotDataURL, score, best, length, phaseName, modeName, dateLabel }) {
+export function composeMoonCard({ snapshotDataURL, score, best, length, phaseName, modeName, dateLabel, gardenerName }) {
   return new Promise((resolve) => {
     const canvas = document.createElement('canvas')
     canvas.width = W
@@ -303,7 +415,7 @@ export function composeMoonCard({ snapshotDataURL, score, best, length, phaseNam
     const finish = (img) => {
       const hasSnapshot = !!img
       if (img) paintSnapshot(ctx, img)
-      paintText(ctx, { score, best, length, phaseName, modeName, dateLabel, hasSnapshot })
+      paintText(ctx, { score, best, length, phaseName, modeName, dateLabel, hasSnapshot, gardenerName })
       resolve(canvas)
     }
 

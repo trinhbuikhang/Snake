@@ -55,13 +55,19 @@ export function nightEventById(id) {
 }
 
 // Weighted roll: ~28% of nights are special. `random` is injectable for tests.
-export function rollNightEvent(random = Math.random) {
-  const total = NIGHT_EVENTS.reduce((sum, e) => sum + e.weight, 0)
+// `extraWeights` (P5 Shared Skies) adds bonus weight to chosen event ids —
+// used to boost the week's community event so every gardener is more likely
+// to meet the same sky. Moonrise keeps weight 0 and is never rolled.
+export function rollNightEvent(random = Math.random, extraWeights = null) {
+  const weights = NIGHT_EVENTS.map((e) =>
+    e.weight + (extraWeights && extraWeights[e.id] ? extraWeights[e.id] : 0),
+  )
+  const total = weights.reduce((sum, w) => sum + w, 0)
   if (random() * 100 >= total) return 'none'
   let r = random() * total
-  for (const e of NIGHT_EVENTS) {
-    r -= e.weight
-    if (r < 0) return e.id
+  for (let i = 0; i < NIGHT_EVENTS.length; i++) {
+    r -= weights[i]
+    if (r < 0) return NIGHT_EVENTS[i].id
   }
   return 'none'
 }
