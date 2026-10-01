@@ -1,9 +1,9 @@
-// The Lunar Chronicle — 30 two-line moon verses ("Biên niên trăng").
+// The Lunar Chronicle — 33 two-line moon verses ("Biên niên trăng").
 //
 // Unlike whispers (one-line, event-driven), verses are *earned* through
 // deliberate feats and assemble the myth of the Ink Serpent out of order —
 // sculptural narrative: the player pieces the story together themselves.
-// The final verse unlocks only when the other 29 are heard.
+// The final verse unlocks only when all the others are heard.
 //
 // Pure data + pure trigger predicates: no React/Three/DOM, unit-testable.
 // ctx shape (built by the store): whispers-style ctx plus
@@ -78,6 +78,10 @@ export const VERSES = [
     when: (c) => c.event === 'nightStart' && c.nightEvent === 'moonrise' },
   { id: 'verse-garden-awakens', lines: ['You hung a lantern', 'where the dark used to be.'],
     when: (c) => c.event === 'garden' },
+  // P5 — Shared Skies: one verse the whole world can earn together. It
+  // unlocks when you complete a night played under the week's community sky.
+  { id: 'verse-shared-sky', lines: ['Under one sky, a thousand gardeners —', 'and the same moon for everyone.'],
+    when: (c) => END(c) && c.communityEvent && c.communityEvent !== 'none' && c.nightEvent === c.communityEvent },
   // The final verse: only when every other verse has been heard.
   { id: 'verse-ink-legend', lines: ['You are the story', 'the lake has been telling.'],
     when: (c) => c.unlocked.length >= VERSES.length - 1 },
