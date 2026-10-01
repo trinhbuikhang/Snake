@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { MOON_IDS, MODE_IDS } from './logic.js'
+import { evaluateWhispers } from './whispers.js'
 
 export const BEST_KEY = 'ran-xinh-best' // legacy single best, migrated into BESTS_KEY
 export const BESTS_KEY = 'ran-xinh-bests'
@@ -8,6 +9,10 @@ export const CAM_KEY = 'ran-xinh-cam'
 export const CTRLS_KEY = 'ran-xinh-ctrls'
 export const MOON_KEY = 'ran-xinh-moon'
 export const MODE_KEY = 'ran-xinh-mode'
+export const NIGHT_KEY = 'ran-xinh-night'
+export const TOTALS_KEY = 'ran-xinh-totals'
+export const WHISPERS_KEY = 'ran-xinh-whispers'
+export const SEEN_KEY = 'ran-xinh-seen'
 
 function readJSON(key) {
   try {
@@ -60,6 +65,42 @@ export const readMoon = () => {
 export const readMode = () => {
   const v = readJSON(MODE_KEY)
   return MODE_IDS.includes(v) ? v : 'classic'
+}
+export const readNight = () => Math.max(0, parseInt(readJSON(NIGHT_KEY) || '0', 10) || 0)
+// Lifetime counters: { supernovas, planets, deaths }. Missing/corrupt → zeros.
+export const readTotals = () => {
+  const fresh = { supernovas: 0, planets: 0, deaths: 0 }
+  try {
+    const parsed = JSON.parse(readJSON(TOTALS_KEY) || 'null')
+    for (const k of Object.keys(fresh)) {
+      const v = parseInt(parsed?.[k], 10)
+      if (Number.isFinite(v) && v > 0) fresh[k] = v
+    }
+  } catch {
+    /* corrupted JSON — fall through with zeros */
+  }
+  return fresh
+}
+// Unlocked whisper ids (array of strings).
+export const readWhispers = () => {
+  try {
+    const parsed = JSON.parse(readJSON(WHISPERS_KEY) || 'null')
+    return Array.isArray(parsed) ? parsed.filter((v) => typeof v === 'string') : []
+  } catch {
+    return []
+  }
+}
+// Seen run contexts: { modes: [...], phases: [...] }.
+export const readSeen = () => {
+  const fresh = { modes: [], phases: [] }
+  try {
+    const parsed = JSON.parse(readJSON(SEEN_KEY) || 'null')
+    if (Array.isArray(parsed?.modes)) fresh.modes = parsed.modes.filter((v) => MODE_IDS.includes(v))
+    if (Array.isArray(parsed?.phases)) fresh.phases = parsed.phases.filter((v) => MOON_IDS.includes(v))
+  } catch {
+    /* corrupted JSON — fall through with empties */
+  }
+  return fresh
 }
 
 // Shared finish logic for gameOver() and endZenSession(): records the run,
@@ -125,9 +166,29 @@ export const useGame = create((set, get) => ({
   // Floating notifications / score popups
   floatingTexts: [],
 
+  // Whispers of the Night (P2 storytelling): collectible one-line poems.
+  // night: how many runs have begun (each run is one "Night")
+  night: 0,
+  // totals: lifetime counters { supernovas, planets, deaths }
+  totals: { supernovas: 0, planets: 0, deaths: 0 },
+  // nightStats: counters for the current night only { supernovas, planets }
+  nightStats: { supernovas: 0, planets: 0 },
+  // seenModes / seenPhases: mode & moon-phase ids ever played
+  seenModes: [],
+  seenPhases: [],
+  // unlockedWhispers: whisper ids the player has heard
+  unlockedWhispers: [],
+  // whisperToasts: queued toast notifications for freshly unlocked whispers
+  whisperToasts: [],
+  // nightBanner: { night, modeLabel, phaseLabel } shown briefly when a run starts
+  nightBanner: null,
+  // showJournal: the collection overlay is open
+  showJournal: false,
+
   hydrate() {
     const bests = readBests()
     const gameMode = readMode()
+    const seen = readSeen()
     set({
       bests,
       best: bests[gameMode] || 0,
@@ -136,10 +197,23 @@ export const useGame = create((set, get) => ({
       showControls: readCtrls(),
       moonPhase: readMoon(),
       gameMode,
+      night: readNight(),
+      totals: readTotals(),
+      unlockedWhispers: readWhispers(),
+      seenModes: seen.modes,
+      seenPhases: seen.phases,
     })
   },
 
   start() {
+    const prev = get()
+    const night = prev.night + 1
+    const isFirstMode = !prev.seenModes.includes(prev.gameMode)
+    const isFirstPhase = !prev.seenPhases.includes(prev.moonPhase)
+    const seenModes = isFirstMode ? [...prev.seenModes, prev.gameMode] : prev.seenModes
+    const seenPhases = isFirstPhase ? [...prev.seenPhases, prev.moonPhase] : prev.seenPhases
+    writeJSON(NIGHT_KEY, String(night))
+    writeJSON(SEEN_KEY, JSON.stringify({ modes: seenModes, phases: seenPhases }))
     set({
       status: 'playing',
       score: 0,
@@ -153,7 +227,13 @@ export const useGame = create((set, get) => ({
       deathSnapshot: null,
       timeLeft: null,
       deathCause: null,
+      night,
+      seenModes,
+      seenPhases,
+      nightStats: { supernovas: 0, planets: 0 },
+      nightBanner: { night },
     })
+    get().checkWhispers('nightStart', { isFirstMode, isFirstPhase })
   },
   pause() {
     if (get().status === 'playing') set({ status: 'paused', isBoosting: false })
@@ -182,6 +262,7 @@ export const useGame = create((set, get) => ({
   setBoosting(isBoosting) {
     if (get().isBoosting !== isBoosting) {
       set({ isBoosting })
+      if (isBoosting) get().checkWhispers('dash')
     }
   },
 
@@ -245,8 +326,17 @@ export const useGame = create((set, get) => ({
   },
 
   gameOver(result) {
+    const cause = result.cause || 'unknown'
+    const totals = { ...get().totals }
+    if (cause === 'wall' || cause === 'self' || cause === 'time') {
+      totals.deaths += 1
+      writeJSON(TOTALS_KEY, JSON.stringify(totals))
+      set({ totals })
+    }
     set({ score: result.score, length: result.length })
-    completeRun(get, set, result.cause || 'unknown')
+    completeRun(get, set, cause)
+    get().checkWhispers('death', { cause })
+    if (get().isNewBest) get().checkWhispers('newBest')
   },
 
   // Zen Garden has no death: the player ends the session from the pause menu.
@@ -255,6 +345,75 @@ export const useGame = create((set, get) => ({
     if (st.gameMode !== 'zen') return
     if (st.status !== 'playing' && st.status !== 'paused') return
     completeRun(get, set, 'zen')
+    get().checkWhispers('zenEnd')
+    if (get().isNewBest) get().checkWhispers('newBest')
+  },
+
+  // Whisper engine: evaluate trigger predicates against current run context.
+  // Loops so chained unlocks (e.g. mode-zen + all-modes) resolve in one pass.
+  checkWhispers(event, extra = {}) {
+    const s = get()
+    let unlocked = [...s.unlockedWhispers]
+    const freshAll = []
+    for (let i = 0; i < 5; i += 1) {
+      const ctx = {
+        event,
+        night: get().night,
+        score: get().score,
+        length: get().length,
+        mode: get().gameMode,
+        moonPhase: get().moonPhase,
+        totals: get().totals,
+        nightStats: get().nightStats,
+        seenModes: get().seenModes,
+        seenPhases: get().seenPhases,
+        unlocked,
+        ...extra,
+      }
+      const fresh = evaluateWhispers(ctx)
+      if (fresh.length === 0) break
+      freshAll.push(...fresh)
+      unlocked = [...unlocked, ...fresh.map((w) => w.id)]
+    }
+    if (freshAll.length === 0) return
+    writeJSON(WHISPERS_KEY, JSON.stringify(unlocked))
+    const toasts = freshAll.map((w) => ({ ...w, toastId: `w${Date.now()}-${Math.random().toString(36).slice(2, 8)}` }))
+    set((prev) => ({
+      unlockedWhispers: unlocked,
+      whisperToasts: [...prev.whisperToasts, ...toasts].slice(-6),
+    }))
+  },
+
+  // Called by the engine right after addScore(): updates per-night + lifetime
+  // food counters, then evaluates whisper triggers for the eat.
+  registerEat({ bloom = false } = {}) {
+    const totals = { ...get().totals }
+    const nightStats = { ...get().nightStats }
+    if (bloom) {
+      totals.supernovas += 1
+      nightStats.supernovas += 1
+    } else {
+      totals.planets += 1
+      nightStats.planets += 1
+    }
+    writeJSON(TOTALS_KEY, JSON.stringify(totals))
+    set({ totals, nightStats })
+    get().checkWhispers(bloom ? 'supernova' : 'eat')
+  },
+
+  dismissWhisperToast(toastId) {
+    set((s) => ({ whisperToasts: s.whisperToasts.filter((t) => t.toastId !== toastId) }))
+  },
+
+  clearNightBanner() {
+    set({ nightBanner: null })
+  },
+
+  openJournal() {
+    set({ showJournal: true })
+  },
+  closeJournal() {
+    set({ showJournal: false })
   },
 
   setMuted(m) {

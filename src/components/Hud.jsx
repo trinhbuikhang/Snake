@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useGame } from '../game/store.js'
 import { inputBus } from '../game/inputBus.js'
 import { MOON_PHASES, moonPhaseById, GAME_MODES, gameModeById } from '../game/logic.js'
+import { WHISPERS, WHISPER_COUNT } from '../game/whispers.js'
 import { composeMoonCard } from '../game/moonCard.js'
 
 const arr = (d) => (
@@ -146,8 +147,10 @@ export function TitleOverlay() {
   const gameMode = useGame((s) => s.gameMode)
   const start = useGame((s) => s.start)
   const openHowTo = useGame((s) => s.openHowTo)
+  const openJournal = useGame((s) => s.openJournal)
   const cameraMode = useGame((s) => s.cameraMode)
   const toggleCameraMode = useGame((s) => s.toggleCameraMode)
+  const unlockedWhispers = useGame((s) => s.unlockedWhispers)
 
   return (
     <div className="sheet" role="dialog" aria-label="Moonlit Serpent title">
@@ -181,6 +184,9 @@ export function TitleOverlay() {
             best · {best} pts{gameMode !== 'classic' ? ` · ${gameModeById(gameMode).name}` : ''}
           </p>
         )}
+        <button type="button" className="btn btn--ghost journal-link" onClick={openJournal}>
+          📖 Journal · {unlockedWhispers.length}/{WHISPER_COUNT} whispers
+        </button>
       </div>
     </div>
   )
@@ -228,6 +234,12 @@ export function HowToOverlay() {
             <span className="num">6</span>
             <span>
               <b>Three ways to play</b>: <b>Classic</b> (survive &amp; thrive), <b>Lantern Rush</b> (a 60-second feast against the clock), or <b>Zen Garden</b> (no death — drift and grow in peace). Choose on the title screen; each mode keeps its own best score.
+            </span>
+          </p>
+          <p>
+            <span className="num">7</span>
+            <span>
+              Every run is one <b>Night</b>. Listen for <b>whispers</b> — one-line poems the garden reveals as you play — and collect them all in your <b>Journal</b>.
             </span>
           </p>
           <p className="small">On mobile: swipe across the lake or use the virtual buttons below.</p>
@@ -376,6 +388,101 @@ export function GameOverOverlay() {
         <p className="hint">
           Press <kbd>Space</kbd> to glide again
         </p>
+      </div>
+    </div>
+  )
+}
+
+// P2 storytelling — a brief poetic banner naming each run as a "Night".
+function NightBanner() {
+  const nightBanner = useGame((s) => s.nightBanner)
+  const clearNightBanner = useGame((s) => s.clearNightBanner)
+  const moonPhase = useGame((s) => s.moonPhase)
+  const gameMode = useGame((s) => s.gameMode)
+
+  useEffect(() => {
+    if (!nightBanner) return undefined
+    const t = setTimeout(clearNightBanner, 2600)
+    return () => clearTimeout(t)
+  }, [nightBanner, clearNightBanner])
+
+  if (!nightBanner) return null
+  const phaseName = moonPhaseById(moonPhase)?.name || moonPhase
+  const modeName = gameModeById(gameMode)?.name || gameMode
+  return (
+    <div className="night-banner" role="status" aria-live="polite">
+      <p className="night-banner__kicker">Night {nightBanner.night}</p>
+      <p className="night-banner__sub">
+        {phaseName} · {modeName}
+      </p>
+    </div>
+  )
+}
+
+function WhisperToast({ toast, onDone }) {
+  useEffect(() => {
+    const t = setTimeout(onDone, 4500)
+    return () => clearTimeout(t)
+  }, [onDone])
+  return (
+    <div className="whisper-toast" role="status">
+      <span className="whisper-toast__mark" aria-hidden="true">
+        ✦
+      </span>
+      <p>{toast.text}</p>
+    </div>
+  )
+}
+
+// P2 storytelling — floating one-line poems when a whisper unlocks.
+function WhisperToasts() {
+  const toasts = useGame((s) => s.whisperToasts)
+  const dismissWhisperToast = useGame((s) => s.dismissWhisperToast)
+  if (toasts.length === 0) return null
+  return (
+    <div className="whisper-toasts" aria-live="polite">
+      {toasts.map((t) => (
+        <WhisperToast key={t.toastId} toast={t} onDone={() => dismissWhisperToast(t.toastId)} />
+      ))}
+    </div>
+  )
+}
+
+// P2 storytelling — the collection overlay: every whisper heard or yet to hear.
+export function JournalOverlay() {
+  const closeJournal = useGame((s) => s.closeJournal)
+  const unlockedWhispers = useGame((s) => s.unlockedWhispers)
+  const night = useGame((s) => s.night)
+  const totals = useGame((s) => s.totals)
+  const heard = new Set(unlockedWhispers)
+
+  return (
+    <div className="sheet" role="dialog" aria-label="Journal of whispers">
+      <div className="sheet-card journal">
+        <p className="overline">the journal</p>
+        <h2>Whispers of the Night</h2>
+        <p className="journal__stats">
+          Night {night} · {unlockedWhispers.length}/{WHISPER_COUNT} whispers heard · {totals.planets}{' '}
+          stars gathered · {totals.supernovas} last lights
+        </p>
+        <div className="journal__grid">
+          {WHISPERS.map((w) =>
+            heard.has(w.id) ? (
+              <div key={w.id} className="journal__entry is-heard">
+                <p>“{w.text}”</p>
+              </div>
+            ) : (
+              <div key={w.id} className="journal__entry is-unheard">
+                <p className="journal__locked">a whisper not yet heard…</p>
+              </div>
+            ),
+          )}
+        </div>
+        <div className="actions">
+          <button type="button" className="btn btn--primary" onClick={closeJournal}>
+            Back to the garden
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -560,24 +667,33 @@ function OnScreenControls() {
 export default function Hud() {
   const status = useGame((s) => s.status)
   const showHowTo = useGame((s) => s.showHowTo)
+  const showJournal = useGame((s) => s.showJournal)
   const showControls = useGame((s) => s.showControls)
 
   return (
     <>
       <div className="vignette" />
       <Corners />
-      {status === 'title' && !showHowTo && <TitleOverlay />}
+      {status === 'title' && !showHowTo && !showJournal && <TitleOverlay />}
       {status === 'title' && showHowTo && <HowToOverlay />}
+      {status === 'title' && showJournal && !showHowTo && <JournalOverlay />}
       {status === 'playing' && (
         <>
           <PlayingHud />
+          <NightBanner />
+          <WhisperToasts />
           <div className={showControls ? 'force-show-controls' : 'responsive-controls'}>
             <OnScreenControls />
           </div>
         </>
       )}
       {status === 'paused' && <PauseOverlay />}
-      {status === 'dead' && <GameOverOverlay />}
+      {status === 'dead' && (
+        <>
+          <GameOverOverlay />
+          <WhisperToasts />
+        </>
+      )}
     </>
   )
 }
