@@ -116,6 +116,7 @@ body {
   align-items: center;
   justify-content: center;
   padding: 24px;
+  overflow-y: auto;
   background: radial-gradient(120% 92% at 50% 32%, rgba(8, 18, 14, 0.4), rgba(6, 14, 11, 0.88));
   animation: sheet-in 0.45s cubic-bezier(0.22, 1, 0.36, 1);
   backdrop-filter: blur(6px);
@@ -134,12 +135,13 @@ body {
 
 .lockup {
   text-align: center;
-  max-width: 580px;
+  max-width: 720px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0;
   padding: 10px;
+  margin: auto;
 }
 
 .lockup .overline {
@@ -157,8 +159,9 @@ body {
 .lockup h1 {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: var(--fs-display);
-  line-height: 0.95;
+  font-size: clamp(2rem, 6vw, 3.4rem);
+  line-height: 1.08;
+  white-space: nowrap;
   margin: 0;
   letter-spacing: 0.02em;
   color: #ffffff;
