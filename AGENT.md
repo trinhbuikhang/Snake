@@ -42,7 +42,7 @@ src/
     garden.js           # night-garden scene (ground, props, lighting feel)
     snakeRig.js         # snake mesh / animation on the grid path
   audio/
-    sound.js            # SFX (respects mute)
+    sound.js            # procedural SFX + pad/water ambience (respects mute)
 ```
 
 ### Separation of concerns (keep this)
@@ -99,3 +99,5 @@ React draws the HUD. Zustand holds “what the player sees about the run.” Pur
 Run statuses: `title → prologue → playing ⇄ paused → dead`. `start()` sets `prologue` (not `playing`): the night's fresh whispers/verses are collected into `prologueQueue` and shown one at a time on the prologue screen so the player can read them before the run. `beginNight()` (button, tap, Space/Enter) moves to `playing`, where the engine's `resetGame()` runs. The demo garden keeps drifting behind the prologue. In-play whispers/verses still use floating toasts, rendered in a single `.toast-stack` column so they can never overlap.
 
 P5 "Shared Skies": `src/game/community.js` (pure) derives the week's shared sky from the ISO week id — every gardener worldwide gets the same event each week, no server. `rollNightEvent(random, extraWeights)` boosts the community event's weight (+10). `verse-shared-sky` unlocks when a run ends under the week's shared sky. Tonight's Highlights: `noteHighlight(kind, text, priority)` collects moments during a run (first supernova, score milestones 25/50/100, spirit catch, lantern feast); `completeRun()` adds moonrise/new-best and finalizes the top 3 by priority into `highlights`, shown as a staggered reel on the game-over sheet and shareable via `composeHighlightCard()`. Shared cards carry the gardener's signature (`ran-xinh-name`, set in the Journal) plus a caption in the Web Share payload.
+
+P6 "First Light" (launch polish): PWA via `public/manifest.webmanifest` + `public/sw.js` (offline-first, versioned cache, registered from `main.jsx` in PROD only) + icons in `public/icons/` (192/512/maskable, generated from the ink-serpent key art); `index.html` carries manifest/apple-touch/OG/Twitter meta and `public/og-image.png` (1200×630, rendered by `/tmp/uitest/render_og.py`). `GameCanvas` lazy-loads `three/engine.js` via dynamic `import()` so three.js ships as a separate chunk and first paint never waits on it (canvas fades in via `.garden-canvas--ready`). Audio: `setWaterOn()` in `src/audio/sound.js` (looped water + droplet plinks) plays instead of the pad on Silent Night — the engine picks ambience from `nightEventById(st.nightEvent)` when a run starts; `playVerse()` chimes when `checkVerses()` unlocks fresh verses. First-night onboarding: `beginNight()` sets `coachStep: 0` when `night === 1` and `ran-xinh-onboarded` is unset; `CoachMarks` in `Hud.jsx` shows 3 auto-advancing hints (tap to skip), `completeRun()`/`dismissCoach()` persist the flag.

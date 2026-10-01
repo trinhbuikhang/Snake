@@ -14,6 +14,9 @@ let eatStep = 0
 
 function ensureCtx() {
   if (ctx) return ctx
+  // P6: the store imports this module, and the store also runs in non-browser
+  // contexts (tests, SSR) — audio simply stays silent there.
+  if (typeof window === 'undefined') return null
   const AC = window.AudioContext || window.webkitAudioContext
   if (!AC) return null
   ctx = new AC()
@@ -117,6 +120,18 @@ export function playBloom() {
   pluck(659.25, t + 0.12, 0.38) // E5
   pluck(880, t + 0.18, 0.32) // A5
   tickNoise(t, 0.07, 7200)
+}
+
+// P6 "First Light": a slow moon-chime when a verse of the chronicle is unlocked.
+// Sparser and higher than the bloom arpeggio so the two never blur together.
+export function playVerse() {
+  unlockAudio()
+  if (!ctx || !master) return
+  const t = ctx.currentTime + 0.01
+  pluck(1046.5, t, 0.3) // C6
+  pluck(784.0, t + 0.22, 0.24) // G5
+  pluck(1318.5, t + 0.46, 0.2) // E6
+  tickNoise(t + 0.46, 0.03, 8000)
 }
 
 export function playTurn() {
@@ -257,5 +272,86 @@ export function setPadOn(on) {
   }
 }
 
-export const audio = { unlockAudio, setMuted, playEat, playBloom, playTurn, playDeath, setPadOn }
+// P6 "First Light": Silent Night keeps its promise — no music, only water.
+// A soft looping lap of filtered noise with a slow swell and the occasional
+// droplet plink. Mirrors setPadOn's fade structure.
+let waterOn = false
+let waterNodes = null
+
+export function setWaterOn(on) {
+  if (on === waterOn) return
+  waterOn = on
+  if (!ctx || !master || !noiseBuf) return
+  const c = ctx
+  if (on && !waterNodes) {
+    const gain = c.createGain()
+    gain.gain.value = 0
+    gain.connect(master)
+    const src = c.createBufferSource()
+    src.buffer = noiseBuf
+    src.loop = true
+    src.playbackRate.value = 0.5
+    const lp = c.createBiquadFilter()
+    lp.type = 'lowpass'
+    lp.frequency.value = 320
+    lp.Q.value = 0.6
+    const ng = c.createGain()
+    ng.gain.value = 0.5
+    src.connect(lp)
+    lp.connect(ng)
+    ng.connect(gain)
+    src.start()
+    // Slow swell on the filter so the water breathes.
+    const lfo = c.createOscillator()
+    lfo.frequency.value = 0.11
+    const lfoG = c.createGain()
+    lfoG.gain.value = 140
+    lfo.connect(lfoG)
+    lfoG.connect(lp.frequency)
+    lfo.start()
+    gain.gain.setTargetAtTime(0.05, c.currentTime, 1.2)
+    const droplet = () => {
+      if (!waterOn || !ctx || !master) return
+      const t = c.currentTime + 0.02
+      const o = c.createOscillator()
+      o.type = 'sine'
+      o.frequency.setValueAtTime(1500 + Math.random() * 600, t)
+      o.frequency.exponentialRampToValueAtTime(620, t + 0.18)
+      const g = c.createGain()
+      g.gain.setValueAtTime(0.0001, t)
+      g.gain.linearRampToValueAtTime(0.055, t + 0.012)
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.32)
+      o.connect(g)
+      g.connect(master)
+      o.start(t)
+      o.stop(t + 0.36)
+    }
+    const timer = setInterval(() => {
+      if (Math.random() < 0.75) droplet()
+    }, 2600)
+    waterNodes = { src, lfo, gain, timer }
+  }
+  if (!on && waterNodes) {
+    const nodes = waterNodes
+    clearInterval(nodes.timer)
+    nodes.gain.gain.setTargetAtTime(0, c.currentTime, 0.4)
+    setTimeout(() => {
+      if (waterOn) return
+      try {
+        nodes.src.stop()
+        nodes.lfo.stop()
+      } catch {
+        /* already stopped */
+      }
+      try {
+        nodes.gain.disconnect()
+      } catch {
+        /* already disconnected */
+      }
+      waterNodes = null
+    }, 1500)
+  }
+}
+
+export const audio = { unlockAudio, setMuted, playEat, playBloom, playVerse, playTurn, playDeath, setPadOn, setWaterOn }
 export default audio
