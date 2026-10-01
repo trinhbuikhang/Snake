@@ -116,9 +116,10 @@ function placeFood(game) {
   const cell = cells[(Math.random() * cells.length) | 0]
   game.food = cell
   // Night events bend the supernova cadence: meteor nights bloom twice as
-  // often, silent nights never bloom (each small light matters more).
+  // often, silent nights never bloom (each small light matters more), and
+  // the Moonrise Night rains dying stars (every food blooms).
   const ev = nightEventById(game.event)
-  const every = ev.supernovaMult === 0 ? Infinity : ev.supernovaMult >= 2 ? 2 : 5
+  const every = ev.supernovaMult === 0 ? Infinity : ev.supernovaMult >= 4 ? 1 : ev.supernovaMult >= 2 ? 2 : 5
   game.foodIsBloom = game.foodsEaten > 0 && game.foodsEaten % every === 0
   if (game.foodIsBloom) {
     game.foodPlanet = SUPERNOVA
