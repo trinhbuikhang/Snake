@@ -3,7 +3,9 @@ import { useGame } from '../game/store.js'
 import { inputBus } from '../game/inputBus.js'
 import { MOON_PHASES, moonPhaseById, GAME_MODES, gameModeById } from '../game/logic.js'
 import { WHISPERS, WHISPER_COUNT } from '../game/whispers.js'
-import { composeMoonCard } from '../game/moonCard.js'
+import { VERSES, VERSE_COUNT } from '../game/verses.js'
+import { nightEventById } from '../game/nightEvents.js'
+import { composeMoonCard, composeVerseCard } from '../game/moonCard.js'
 
 const arr = (d) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -151,6 +153,9 @@ export function TitleOverlay() {
   const cameraMode = useGame((s) => s.cameraMode)
   const toggleCameraMode = useGame((s) => s.toggleCameraMode)
   const unlockedWhispers = useGame((s) => s.unlockedWhispers)
+  const unlockedVerses = useGame((s) => s.unlockedVerses)
+  const tonightEvent = useGame((s) => s.tonightEvent)
+  const tonight = nightEventById(tonightEvent)
 
   return (
     <div className="sheet" role="dialog" aria-label="Moonlit Serpent title">
@@ -184,8 +189,13 @@ export function TitleOverlay() {
             best · {best} pts{gameMode !== 'classic' ? ` · ${gameModeById(gameMode).name}` : ''}
           </p>
         )}
+        <p className="tonight-note" aria-live="polite">
+          <span className="tonight-note__label">Tonight:</span> {tonight.name}
+          <span className="tonight-note__line"> — “{tonight.line}”</span>
+        </p>
         <button type="button" className="btn btn--ghost journal-link" onClick={openJournal}>
-          📖 Journal · {unlockedWhispers.length}/{WHISPER_COUNT} whispers
+          📖 Journal · {unlockedWhispers.length}/{WHISPER_COUNT} whispers ·{' '}
+          {unlockedVerses.length}/{VERSE_COUNT} verses
         </button>
       </div>
     </div>
@@ -239,7 +249,13 @@ export function HowToOverlay() {
           <p>
             <span className="num">7</span>
             <span>
-              Every run is one <b>Night</b>. Listen for <b>whispers</b> — one-line poems the garden reveals as you play — and collect them all in your <b>Journal</b>.
+              Every run is one <b>Night</b>. Listen for <b>whispers</b> — one-line poems the garden reveals as you play — earn <b>moon verses</b> through great feats, and collect them all in your <b>Journal</b>.
+            </span>
+          </p>
+          <p>
+            <span className="num">8</span>
+            <span>
+              Some nights are <b>special</b> — meteor showers, thick fog, high tides — announced on the title screen. And on rare nights, the <b>Jade Carp</b> crosses the lake: catch it with your head for +10.
             </span>
           </p>
           <p className="small">On mobile: swipe across the lake or use the virtual buttons below.</p>
@@ -399,6 +415,7 @@ function NightBanner() {
   const clearNightBanner = useGame((s) => s.clearNightBanner)
   const moonPhase = useGame((s) => s.moonPhase)
   const gameMode = useGame((s) => s.gameMode)
+  const nightEvent = useGame((s) => s.nightEvent)
 
   useEffect(() => {
     if (!nightBanner) return undefined
@@ -409,11 +426,13 @@ function NightBanner() {
   if (!nightBanner) return null
   const phaseName = moonPhaseById(moonPhase)?.name || moonPhase
   const modeName = gameModeById(gameMode)?.name || gameMode
+  const eventName = nightEventById(nightEvent)?.name
   return (
     <div className="night-banner" role="status" aria-live="polite">
       <p className="night-banner__kicker">Night {nightBanner.night}</p>
       <p className="night-banner__sub">
         {phaseName} · {modeName}
+        {nightEvent !== 'none' && eventName ? ` · ${eventName}` : ''}
       </p>
     </div>
   )
@@ -448,36 +467,161 @@ function WhisperToasts() {
   )
 }
 
-// P2 storytelling — the collection overlay: every whisper heard or yet to hear.
+function VerseToast({ toast, onDone }) {
+  useEffect(() => {
+    const t = setTimeout(onDone, 5500)
+    return () => clearTimeout(t)
+  }, [onDone])
+  return (
+    <div className="verse-toast" role="status">
+      <p className="verse-toast__overline">a verse of the chronicle</p>
+      <p className="verse-toast__line">“{toast.lines[0]}”</p>
+      <p className="verse-toast__line">“{toast.lines[1]}”</p>
+    </div>
+  )
+}
+
+// P3 storytelling — floating two-line verses when a moon verse unlocks.
+function VerseToasts() {
+  const toasts = useGame((s) => s.verseToasts)
+  const dismissVerseToast = useGame((s) => s.dismissVerseToast)
+  if (toasts.length === 0) return null
+  return (
+    <div className="verse-toasts" aria-live="polite">
+      {toasts.map((t) => (
+        <VerseToast key={t.toastId} toast={t} onDone={() => dismissVerseToast(t.toastId)} />
+      ))}
+    </div>
+  )
+}
+
+// P3 — share one moon verse as a 1080x1350 card (Web Share, download fallback).
+function VerseShareButton({ verse }) {
+  const night = useGame((s) => s.night)
+  const [sharing, setSharing] = useState(false)
+
+  async function handleShare() {
+    if (sharing) return
+    setSharing(true)
+    try {
+      const card = await composeVerseCard({ verse, night })
+      const blob = await new Promise((resolve) => card.toBlob(resolve, 'image/png'))
+      if (!blob) return
+      const file = new File([blob], `moonlit-serpent-verse-${verse.id}.png`, { type: 'image/png' })
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file], title: 'Moonlit Serpent — a verse of the chronicle' })
+      } else {
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = file.name
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        setTimeout(() => URL.revokeObjectURL(url), 5000)
+      }
+    } catch {
+      // Share sheet dismissed — nothing to do
+    } finally {
+      setSharing(false)
+    }
+  }
+
+  return (
+    <button
+      type="button"
+      className="btn btn--ghost verse-share"
+      onClick={handleShare}
+      disabled={sharing}
+      title="Share this verse as a card"
+    >
+      {sharing ? '…' : '⤴ Share'}
+    </button>
+  )
+}
+
+// P2+P3 storytelling — the collection overlay: whispers and moon verses,
+// each with a tab. Heard verses can be shared as verse cards.
 export function JournalOverlay() {
   const closeJournal = useGame((s) => s.closeJournal)
   const unlockedWhispers = useGame((s) => s.unlockedWhispers)
+  const unlockedVerses = useGame((s) => s.unlockedVerses)
   const night = useGame((s) => s.night)
   const totals = useGame((s) => s.totals)
-  const heard = new Set(unlockedWhispers)
+  const [tab, setTab] = useState('whispers')
+  const heardWhispers = new Set(unlockedWhispers)
+  const heardVerses = new Set(unlockedVerses)
+  const verseById = Object.fromEntries(VERSES.map((v) => [v.id, v]))
 
   return (
-    <div className="sheet" role="dialog" aria-label="Journal of whispers">
+    <div className="sheet" role="dialog" aria-label="Journal of whispers and verses">
       <div className="sheet-card journal">
         <p className="overline">the journal</p>
-        <h2>Whispers of the Night</h2>
-        <p className="journal__stats">
-          Night {night} · {unlockedWhispers.length}/{WHISPER_COUNT} whispers heard · {totals.planets}{' '}
-          stars gathered · {totals.supernovas} last lights
-        </p>
-        <div className="journal__grid">
-          {WHISPERS.map((w) =>
-            heard.has(w.id) ? (
-              <div key={w.id} className="journal__entry is-heard">
-                <p>“{w.text}”</p>
-              </div>
-            ) : (
-              <div key={w.id} className="journal__entry is-unheard">
-                <p className="journal__locked">a whisper not yet heard…</p>
-              </div>
-            ),
-          )}
+        <div className="journal__tabs" role="tablist" aria-label="Journal sections">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'whispers'}
+            className={`journal__tab${tab === 'whispers' ? ' is-active' : ''}`}
+            onClick={() => setTab('whispers')}
+          >
+            Whispers · {unlockedWhispers.length}/{WHISPER_COUNT}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'verses'}
+            className={`journal__tab${tab === 'verses' ? ' is-active' : ''}`}
+            onClick={() => setTab('verses')}
+          >
+            Verses · {unlockedVerses.length}/{VERSE_COUNT}
+          </button>
         </div>
+        {tab === 'whispers' ? (
+          <>
+            <h2>Whispers of the Night</h2>
+            <p className="journal__stats">
+              Night {night} · {unlockedWhispers.length}/{WHISPER_COUNT} whispers heard ·{' '}
+              {totals.planets} stars gathered · {totals.supernovas} last lights
+            </p>
+            <div className="journal__grid">
+              {WHISPERS.map((w) =>
+                heardWhispers.has(w.id) ? (
+                  <div key={w.id} className="journal__entry is-heard">
+                    <p>“{w.text}”</p>
+                  </div>
+                ) : (
+                  <div key={w.id} className="journal__entry is-unheard">
+                    <p className="journal__locked">a whisper not yet heard…</p>
+                  </div>
+                ),
+              )}
+            </div>
+          </>
+        ) : (
+          <>
+            <h2>The Lunar Chronicle</h2>
+            <p className="journal__stats">
+              {unlockedVerses.length}/{VERSE_COUNT} verses earned · {totals.spiritCatches} carp
+              caught · Night {night}
+            </p>
+            <div className="journal__grid journal__grid--verses">
+              {VERSES.map((v) =>
+                heardVerses.has(v.id) ? (
+                  <div key={v.id} className="journal__entry is-heard">
+                    <p>“{v.lines[0]}”</p>
+                    <p>“{v.lines[1]}”</p>
+                    <VerseShareButton verse={verseById[v.id]} />
+                  </div>
+                ) : (
+                  <div key={v.id} className="journal__entry is-unheard">
+                    <p className="journal__locked">a verse not yet earned…</p>
+                  </div>
+                ),
+              )}
+            </div>
+          </>
+        )}
         <div className="actions">
           <button type="button" className="btn btn--primary" onClick={closeJournal}>
             Back to the garden
@@ -682,6 +826,7 @@ export default function Hud() {
           <PlayingHud />
           <NightBanner />
           <WhisperToasts />
+          <VerseToasts />
           <div className={showControls ? 'force-show-controls' : 'responsive-controls'}>
             <OnScreenControls />
           </div>
@@ -692,6 +837,7 @@ export default function Hud() {
         <>
           <GameOverOverlay />
           <WhisperToasts />
+          <VerseToasts />
         </>
       )}
     </>
