@@ -18,12 +18,14 @@ import {
   LANTERN_DURATION,
   BASE_INTERVAL,
   gridToWorld,
+  N,
 } from '../game/logic.js'
 import { useGame } from '../game/store.js'
 import { inputBus } from '../game/inputBus.js'
 import audio from '../audio/sound.js'
 import { buildGarden } from './garden.js'
 import { createSnakeRig } from './snakeRig.js'
+import { nightEventById } from '../game/nightEvents.js'
 
 const FOV = 42
 const FIT_HALF = 11.8
@@ -120,21 +122,73 @@ export function createEngine(canvas, { reduced } = {}) {
   let isBoosting = false
   let moonSpeedMult = 1 // moon-phase speed modifier for this run
   let modeSpeedMult = 1 // game-mode speed modifier for this run
+  let eventSpeedMult = 1 // night-event speed modifier for this run
   let lastTimeSec = -1 // last Lantern Rush second pushed to the store
+
+  // The Jade Carp — a rare garden spirit (~1/15 nights) that swims across the
+  // lake on a straight path. Catch it with the snake's head for +10.
+  let spirit = null // { x, y, dx, accum } in grid cells
+  let spiritMesh = null
+  const SPIRIT_STEP = 0.42 // seconds per carp cell
+
+  function clearSpirit() {
+    if (spiritMesh) {
+      scene.remove(spiritMesh)
+      spiritMesh.geometry.dispose()
+      spiritMesh.material.dispose()
+      spiritMesh = null
+    }
+    spirit = null
+  }
+
+  function spawnSpirit() {
+    clearSpirit()
+    const y = 2 + Math.floor(Math.random() * (N - 4))
+    const dx = Math.random() < 0.5 ? 1 : -1
+    spirit = { x: dx === 1 ? 0 : N - 1, y, dx, accum: 0 }
+    spiritMesh = new THREE.Mesh(
+      new THREE.SphereGeometry(0.32, 20, 14),
+      new THREE.MeshStandardMaterial({
+        color: 0x2fbf8f,
+        emissive: 0x1a7a58,
+        emissiveIntensity: 1.6,
+        roughness: 0.35,
+      }),
+    )
+    const w = gridToWorld(spirit.x, spirit.y)
+    spiritMesh.position.set(w.x, 0.45, w.z)
+    scene.add(spiritMesh)
+  }
+
+  function catchSpirit() {
+    const w = gridToWorld(spirit.x, spirit.y)
+    clearSpirit()
+    const st = useGame.getState()
+    garden.burstAt(w.x, 0.85, w.z, false, 'carp', 10)
+    st.addScore(10, logic.snake.length, false, 'carp')
+    st.registerSpiritCatch()
+    audio.playBloom()
+    pulse = 1.15
+    camShake = 0.18
+  }
 
   const worldCells = (snake) => snake.map((c) => gridToWorld(c.x, c.y))
 
-  // Run modifiers ("Tuần trăng" + game mode): light intensity, food glow, speed
+  // Run modifiers ("Tuần trăng" + game mode + night event): light intensity,
+  // food glow, fog density, speed
   function applyRunModifiers() {
     const st = useGame.getState()
     const phase = moonPhaseById(st.moonPhase)
     const mode = gameModeById(st.gameMode)
+    const ev = nightEventById(st.nightEvent)
     moon.intensity = 2.1 * phase.light
     hemi.intensity = 0.65 * (0.55 + 0.45 * phase.light)
     amb.intensity = 0.28 * (0.6 + 0.4 * phase.light)
     garden.setFoodGlow(phase.foodGlow)
+    scene.fog.density = 0.012 * ev.fogMult
     moonSpeedMult = phase.speedMult
     modeSpeedMult = mode.speedMult
+    eventSpeedMult = ev.speedMult
   }
 
   function updateDirectionStore() {
@@ -145,9 +199,12 @@ export function createEngine(canvas, { reduced } = {}) {
 
   function resetGame() {
     const st = useGame.getState()
-    logic = createGame(st.moonPhase, st.gameMode)
+    logic = createGame(st.moonPhase, st.gameMode, st.nightEvent)
     applyRunModifiers()
     lastTimeSec = -1
+    clearSpirit()
+    // A rare garden spirit visits roughly 1 in 15 nights.
+    if (Math.random() < 1 / 15) spawnSpirit()
     st.setTimeLeft(logic.mode === 'lantern' ? LANTERN_DURATION : null)
     curCells = worldCells(logic.snake)
     prevCells = cloneXZ(curCells)
@@ -245,6 +302,7 @@ export function createEngine(canvas, { reduced } = {}) {
     dying = true
     deathT = 0
     accum = 0
+    clearSpirit() // the spirit leaves when the night ends
     camShake = timeUp ? 0 : 0.38 // a finished feast needs no screen impact
     logic.deathCause = ev.cause || 'unknown'
     if (logic.mode === 'lantern') useGame.getState().setTimeLeft(0)
@@ -306,7 +364,7 @@ export function createEngine(canvas, { reduced } = {}) {
     if (st.status === 'playing' && !dying) {
       isBoosting = boosting
       st.setBoosting(boosting)
-      interval.v = speedInterval(logic.foodsEaten, isBoosting, moonSpeedMult, modeSpeedMult)
+      interval.v = speedInterval(logic.foodsEaten, isBoosting, moonSpeedMult, modeSpeedMult, eventSpeedMult)
     }
   }
 
@@ -548,7 +606,7 @@ export function createEngine(canvas, { reduced } = {}) {
 
     if (st.status === 'playing' && !dying) {
       accum += dt
-      interval.v = speedInterval(logic.foodsEaten, isBoosting, moonSpeedMult, modeSpeedMult)
+      interval.v = speedInterval(logic.foodsEaten, isBoosting, moonSpeedMult, modeSpeedMult, eventSpeedMult)
       let guard = 0
       while (accum >= interval.v) {
         const tickDt = interval.v // seconds this tick consumes (drives the lantern clock)
@@ -559,11 +617,26 @@ export function createEngine(canvas, { reduced } = {}) {
         }
         commitTick()
         if (ev.ate) handleEat(ev)
-        interval.v = speedInterval(logic.foodsEaten, isBoosting, moonSpeedMult, modeSpeedMult)
+        // The Jade Carp: caught when the snake's head enters its cell.
+        if (spirit && logic.snake[0].x === spirit.x && logic.snake[0].y === spirit.y) catchSpirit()
+        interval.v = speedInterval(logic.foodsEaten, isBoosting, moonSpeedMult, modeSpeedMult, eventSpeedMult)
         accum -= interval.v
         if (++guard > 6) {
           accum = 0
           break
+        }
+      }
+      // The carp swims on its own clock, independent of the snake's ticks.
+      if (spirit) {
+        spirit.accum += dt
+        while (spirit && spirit.accum >= SPIRIT_STEP) {
+          spirit.accum -= SPIRIT_STEP
+          spirit.x += spirit.dx
+          if (spirit.x < 0 || spirit.x >= N) clearSpirit()
+        }
+        if (spiritMesh && spirit) {
+          const w = gridToWorld(spirit.x, spirit.y)
+          spiritMesh.position.set(w.x, 0.45 + Math.sin(animT * 6) * 0.06, w.z)
         }
       }
     } else if (st.status === 'title' && !dying) {

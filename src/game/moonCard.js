@@ -221,6 +221,76 @@ function paintText(ctx, { score, best, length, phaseName, modeName, dateLabel, h
   ctx.fillText('a night in the ink garden', W / 2, H - 72)
 }
 
+// ---------------------------------------------------------------------------
+// Verse cards ("Biên niên trăng"): a shareable 1080x1350 card for one moon
+// verse — same ink-night look as the score card, no snapshot needed.
+// ---------------------------------------------------------------------------
+
+function paintVerseText(ctx, { lines, night, title }) {
+  const cx = W / 2
+
+  // Overline
+  try {
+    ctx.letterSpacing = '6px'
+  } catch {
+    /* ignore */
+  }
+  ctx.textAlign = 'center'
+  ctx.fillStyle = 'rgba(217,185,106,0.9)'
+  ctx.font = `600 30px ${SANS}`
+  ctx.fillText('THE LUNAR CHRONICLE', cx, H * 0.3)
+  try {
+    ctx.letterSpacing = '0px'
+  } catch {
+    /* ignore */
+  }
+
+  // The verse, centered, in large italic serif
+  ctx.fillStyle = CREAM
+  ctx.font = `italic 500 62px ${SERIF}`
+  const lineH = 92
+  const startY = H * 0.5 - ((lines.length - 1) * lineH) / 2
+  lines.forEach((line, i) => {
+    ctx.fillText(line, cx, startY + i * lineH)
+  })
+
+  // Verse title (its id made readable) — small caps-ish label
+  ctx.fillStyle = 'rgba(239,232,211,0.55)'
+  ctx.font = `italic 500 34px ${SERIF}`
+  ctx.fillText(title, cx, H * 0.66)
+
+  // Footer
+  try {
+    ctx.letterSpacing = '4px'
+  } catch {
+    /* ignore */
+  }
+  ctx.fillStyle = 'rgba(239,232,211,0.5)'
+  ctx.font = `500 26px ${SANS}`
+  ctx.fillText(`MOONLIT SERPENT · NIGHT ${night}`, cx, H - 72)
+  try {
+    ctx.letterSpacing = '0px'
+  } catch {
+    /* ignore */
+  }
+  ctx.textAlign = 'left'
+}
+
+// verse: { lines: [a, b], id }. Returns a Promise<canvas>.
+export function composeVerseCard({ verse, night }) {
+  return new Promise((resolve) => {
+    const canvas = document.createElement('canvas')
+    canvas.width = W
+    canvas.height = H
+    const ctx = canvas.getContext('2d')
+    const seed = verse.id.split('').reduce((a, c) => a + c.charCodeAt(0), 0) * 7919
+    paintBackground(ctx, seed >>> 0)
+    const title = verse.id.replace(/^verse-/, '').replace(/-/g, ' ')
+    paintVerseText(ctx, { lines: verse.lines, night, title })
+    resolve(canvas)
+  })
+}
+
 export function composeMoonCard({ snapshotDataURL, score, best, length, phaseName, modeName, dateLabel }) {
   return new Promise((resolve) => {
     const canvas = document.createElement('canvas')
