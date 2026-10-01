@@ -913,7 +913,9 @@ kbd {
   100% { opacity: 0; transform: translateX(-50%) translateY(8px); }
 }
 
-.whisper-toasts {
+/* Whispers + verses share one anchored column so the two stacks can never
+   overlap each other the way two separate fixed containers did. */
+.toast-stack {
   position: fixed;
   bottom: 9rem;
   left: 50%;
@@ -924,7 +926,16 @@ kbd {
   gap: 0.5rem;
   z-index: 45;
   pointer-events: none;
-  width: min(92vw, 34rem);
+  width: min(92vw, 36rem);
+}
+
+.whisper-toasts {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  pointer-events: none;
+  width: 100%;
 }
 
 .whisper-toast {
@@ -1059,17 +1070,12 @@ kbd {
 }
 
 .verse-toasts {
-  position: fixed;
-  bottom: 13.5rem;
-  left: 50%;
-  transform: translateX(-50%);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.5rem;
-  z-index: 46;
   pointer-events: none;
-  width: min(92vw, 36rem);
+  width: 100%;
 }
 
 .verse-toast {
@@ -1107,6 +1113,152 @@ kbd {
   7% { opacity: 1; transform: translateY(0) scale(1); }
   84% { opacity: 1; }
   100% { opacity: 0; transform: translateY(-10px); }
+}
+
+/* ---- Night prologue: read the night's new poems before playing ---- */
+
+.prologue-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse at center, rgba(4, 6, 12, 0.55) 0%, rgba(4, 6, 12, 0.85) 100%);
+  cursor: pointer;
+  animation: prologueIn 0.6s ease both;
+}
+
+.prologue-inner {
+  text-align: center;
+  padding: 0 1.5rem;
+  max-width: 36rem;
+}
+
+.prologue-kicker {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(2rem, 6vw, 3rem);
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  color: #f4e9c8;
+  text-shadow: 0 0 18px rgba(244, 233, 200, 0.45), 0 2px 8px rgba(0, 0, 0, 0.7);
+  margin: 0 0 0.4rem;
+}
+
+.prologue-sub {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-size: clamp(0.95rem, 2.6vw, 1.15rem);
+  letter-spacing: 0.12em;
+  color: rgba(214, 226, 240, 0.8);
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
+  margin: 0 0 2rem;
+}
+
+.prologue-card {
+  padding: 1.5rem 2.2rem;
+  border: 1px solid rgba(217, 185, 106, 0.5);
+  border-radius: 1rem;
+  background: rgba(10, 14, 22, 0.88);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 0 32px rgba(217, 185, 106, 0.16);
+  animation: prologueCardIn 0.7s ease both;
+}
+
+.prologue-card__overline {
+  margin: 0 0 0.7rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: rgba(217, 185, 106, 0.9);
+}
+
+.prologue-card__line {
+  margin: 0.25rem 0;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-size: clamp(1.15rem, 3.4vw, 1.5rem);
+  line-height: 1.6;
+  letter-spacing: 0.04em;
+  color: #f4e9c8;
+}
+
+.prologue-quiet {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-size: clamp(1.05rem, 3vw, 1.3rem);
+  color: rgba(214, 226, 240, 0.6);
+  letter-spacing: 0.06em;
+  margin: 0;
+  animation: prologueCardIn 0.7s ease both;
+}
+
+.prologue-dots {
+  display: flex;
+  gap: 0.55rem;
+  justify-content: center;
+  margin: 1.5rem 0 0;
+}
+
+.prologue-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: rgba(214, 226, 240, 0.22);
+}
+
+.prologue-dot.is-done {
+  background: rgba(217, 185, 106, 0.55);
+}
+
+.prologue-dot.is-active {
+  background: #f4e9c8;
+  box-shadow: 0 0 8px rgba(244, 233, 200, 0.8);
+}
+
+.prologue-begin {
+  margin-top: 2.1rem;
+  padding: 0.75rem 2.2rem;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 1.05rem;
+  letter-spacing: 0.14em;
+  color: #f4e9c8;
+  background: rgba(217, 185, 106, 0.1);
+  border: 1px solid rgba(217, 185, 106, 0.65);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.25s ease, box-shadow 0.25s ease;
+}
+
+.prologue-begin:hover {
+  background: rgba(217, 185, 106, 0.22);
+  box-shadow: 0 0 18px rgba(217, 185, 106, 0.35);
+}
+
+.prologue-hint {
+  margin: 0.8rem 0 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(214, 226, 240, 0.4);
+}
+
+@keyframes prologueIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes prologueCardIn {
+  0% { opacity: 0; transform: translateY(16px) scale(0.97); }
+  100% { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .prologue-overlay,
+  .prologue-card,
+  .prologue-quiet {
+    animation-duration: 0.01s;
+  }
 }
 
 .journal__tabs {

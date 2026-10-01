@@ -249,7 +249,7 @@ export function HowToOverlay() {
           <p>
             <span className="num">7</span>
             <span>
-              Every run is one <b>Night</b>. Listen for <b>whispers</b> — one-line poems the garden reveals as you play — earn <b>moon verses</b> through great feats, and collect them all in your <b>Journal</b>.
+              Every run is one <b>Night</b>. Listen for <b>whispers</b> — one-line poems the garden reveals as you play — earn <b>moon verses</b> through great feats, and collect them all in your <b>Journal</b>. Each night opens with a quiet moment to read the night's new poems before you begin.
             </span>
           </p>
           <p>
@@ -491,6 +491,89 @@ function VerseToasts() {
       {toasts.map((t) => (
         <VerseToast key={t.toastId} toast={t} onDone={() => dismissVerseToast(t.toastId)} />
       ))}
+    </div>
+  )
+}
+
+// The night opens with a quiet moment: the night's new whispers and verses
+// are read one at a time BEFORE gameplay begins, instead of bursting over
+// the live garden in unreadable stacks.
+export function PrologueOverlay() {
+  const night = useGame((s) => s.night)
+  const queue = useGame((s) => s.prologueQueue)
+  const moonPhase = useGame((s) => s.moonPhase)
+  const gameMode = useGame((s) => s.gameMode)
+  const nightEvent = useGame((s) => s.nightEvent)
+  const beginNight = useGame((s) => s.beginNight)
+  const [index, setIndex] = useState(0)
+
+  const phase = moonPhaseById(moonPhase)
+  const mode = gameModeById(gameMode)
+  const event = nightEventById(nightEvent)
+
+  // Walk through the night's new poems, then begin the run on its own.
+  // Any tap or keypress skips straight to gameplay.
+  useEffect(() => {
+    const last = index >= queue.length
+    const wait = queue.length === 0 ? 2200 : last ? 2600 : 3600
+    const t = setTimeout(() => {
+      if (last) beginNight()
+      else setIndex((i) => i + 1)
+    }, wait)
+    return () => clearTimeout(t)
+  }, [index, queue.length, beginNight])
+
+  const item = index < queue.length ? queue[index] : null
+  return (
+    <div className="prologue-overlay" onClick={beginNight} role="dialog" aria-label="The night begins">
+      <div className="prologue-inner">
+        <p className="prologue-kicker">Night {night}</p>
+        <p className="prologue-sub">
+          {phase?.name} · {mode?.name}
+          {event && event.id !== 'none' ? ` · ${event.name}` : ''}
+        </p>
+        {item ? (
+          <div className="prologue-card" key={`${item.kind}-${item.id}-${index}`}>
+            {item.kind === 'verse' ? (
+              <>
+                <p className="prologue-card__overline">a verse of the chronicle</p>
+                <p className="prologue-card__line">“{item.lines[0]}”</p>
+                <p className="prologue-card__line">“{item.lines[1]}”</p>
+              </>
+            ) : (
+              <>
+                <p className="prologue-card__overline">a whisper of the night</p>
+                <p className="prologue-card__line prologue-card__line--whisper">
+                  <span aria-hidden="true">✦ </span>{item.text}
+                </p>
+              </>
+            )}
+          </div>
+        ) : (
+          <p className="prologue-quiet">The lake is quiet tonight.</p>
+        )}
+        {queue.length > 1 && (
+          <div className="prologue-dots" aria-hidden="true">
+            {queue.map((q, i) => (
+              <span
+                key={`${q.kind}-${q.id}`}
+                className={i === index ? 'prologue-dot is-active' : i < index ? 'prologue-dot is-done' : 'prologue-dot'}
+              />
+            ))}
+          </div>
+        )}
+        <button
+          type="button"
+          className="prologue-begin"
+          onClick={(e) => {
+            e.stopPropagation()
+            beginNight()
+          }}
+        >
+          Begin the night ▸
+        </button>
+        <p className="prologue-hint">tap anywhere to begin</p>
+      </div>
     </div>
   )
 }
@@ -821,12 +904,15 @@ export default function Hud() {
       {status === 'title' && !showHowTo && !showJournal && <TitleOverlay />}
       {status === 'title' && showHowTo && <HowToOverlay />}
       {status === 'title' && showJournal && !showHowTo && <JournalOverlay />}
+      {status === 'prologue' && <PrologueOverlay />}
       {status === 'playing' && (
         <>
           <PlayingHud />
           <NightBanner />
-          <WhisperToasts />
-          <VerseToasts />
+          <div className="toast-stack">
+            <VerseToasts />
+            <WhisperToasts />
+          </div>
           <div className={showControls ? 'force-show-controls' : 'responsive-controls'}>
             <OnScreenControls />
           </div>
@@ -836,8 +922,10 @@ export default function Hud() {
       {status === 'dead' && (
         <>
           <GameOverOverlay />
-          <WhisperToasts />
-          <VerseToasts />
+          <div className="toast-stack">
+            <VerseToasts />
+            <WhisperToasts />
+          </div>
         </>
       )}
     </>
