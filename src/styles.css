@@ -872,3 +872,165 @@ kbd {
   color: rgba(127, 231, 195, 0.8);
   margin: -1rem 0 1.5rem;
 }
+
+/* ---- P2 storytelling: Whispers of the Night ---- */
+
+.night-banner {
+  position: fixed;
+  top: 12%;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  pointer-events: none;
+  z-index: 40;
+  animation: nightBannerIn 2.6s ease forwards;
+}
+
+.night-banner__kicker {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(1.6rem, 4vw, 2.4rem);
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  color: #f4e9c8;
+  text-shadow: 0 0 18px rgba(244, 233, 200, 0.45), 0 2px 8px rgba(0, 0, 0, 0.7);
+  margin: 0 0 0.35rem;
+}
+
+.night-banner__sub {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-size: clamp(0.95rem, 2.4vw, 1.15rem);
+  letter-spacing: 0.12em;
+  color: rgba(214, 226, 240, 0.85);
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
+  margin: 0;
+}
+
+@keyframes nightBannerIn {
+  0% { opacity: 0; transform: translateX(-50%) translateY(-14px); }
+  12% { opacity: 1; transform: translateX(-50%) translateY(0); }
+  78% { opacity: 1; }
+  100% { opacity: 0; transform: translateX(-50%) translateY(8px); }
+}
+
+.whisper-toasts {
+  position: fixed;
+  bottom: 9rem;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  z-index: 45;
+  pointer-events: none;
+  width: min(92vw, 34rem);
+}
+
+.whisper-toast {
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding: 0.6rem 1.1rem;
+  border: 1px solid rgba(244, 233, 200, 0.35);
+  border-radius: 999px;
+  background: rgba(8, 12, 20, 0.78);
+  backdrop-filter: blur(6px);
+  animation: whisperToastIn 4.5s ease forwards;
+  max-width: 100%;
+}
+
+.whisper-toast__mark {
+  color: #f4e9c8;
+  font-size: 0.9em;
+  flex-shrink: 0;
+}
+
+.whisper-toast p {
+  margin: 0;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  color: #eef1e6;
+  text-align: center;
+}
+
+@keyframes whisperToastIn {
+  0% { opacity: 0; transform: translateY(12px) scale(0.96); }
+  8% { opacity: 1; transform: translateY(0) scale(1); }
+  82% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-8px); }
+}
+
+/* Journal */
+.btn--ghost {
+  background: transparent;
+  border: 1px solid rgba(214, 226, 240, 0.25);
+  color: rgba(214, 226, 240, 0.85);
+}
+
+.btn--ghost:hover {
+  border-color: rgba(244, 233, 200, 0.6);
+  color: #f4e9c8;
+}
+
+.journal-link {
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.journal {
+  max-height: 86vh;
+  overflow-y: auto;
+}
+
+.journal__stats {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-size: 0.95rem;
+  letter-spacing: 0.06em;
+  color: rgba(214, 226, 240, 0.8);
+  margin: 0 0 1.1rem;
+}
+
+.journal__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr));
+  gap: 0.6rem;
+  margin-bottom: 1.25rem;
+  text-align: left;
+}
+
+.journal__entry {
+  border: 1px solid rgba(214, 226, 240, 0.14);
+  border-radius: 0.6rem;
+  padding: 0.7rem 0.9rem;
+  background: rgba(10, 16, 26, 0.5);
+}
+
+.journal__entry.is-heard {
+  border-color: rgba(244, 233, 200, 0.35);
+}
+
+.journal__entry p {
+  margin: 0;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  color: #eef1e6;
+}
+
+.journal__locked {
+  color: rgba(214, 226, 240, 0.35) !important;
+  font-style: normal !important;
+  letter-spacing: 0.08em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .night-banner,
+  .whisper-toast {
+    animation-duration: 0.01s;
+  }
+}

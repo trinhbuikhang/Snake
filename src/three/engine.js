@@ -263,6 +263,8 @@ export function createEngine(canvas, { reduced } = {}) {
     const hw = curCells[0]
     garden.burstAt(hw.x, 0.85, hw.z, ev.bloom, ev.planet, ev.gained)
     useGame.getState().addScore(ev.gained, ev.length, ev.bloom, ev.planet)
+    // Whisper counters (per-night + lifetime food stats, then trigger check)
+    useGame.getState().registerEat({ bloom: ev.bloom })
     rig.onEat()
     pulse = 1.15
     camShake = ev.bloom ? 0.22 : 0.08
