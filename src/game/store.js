@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { MOON_IDS, MODE_IDS } from './logic.js'
 import { evaluateWhispers } from './whispers.js'
+import { evaluateVerses } from './verses.js'
+import { EVENT_IDS, rollNightEvent } from './nightEvents.js'
 
 export const BEST_KEY = 'ran-xinh-best' // legacy single best, migrated into BESTS_KEY
 export const BESTS_KEY = 'ran-xinh-bests'
@@ -13,6 +15,8 @@ export const NIGHT_KEY = 'ran-xinh-night'
 export const TOTALS_KEY = 'ran-xinh-totals'
 export const WHISPERS_KEY = 'ran-xinh-whispers'
 export const SEEN_KEY = 'ran-xinh-seen'
+export const VERSES_KEY = 'ran-xinh-verses'
+export const TONIGHT_KEY = 'ran-xinh-tonight'
 
 function readJSON(key) {
   try {
@@ -67,9 +71,10 @@ export const readMode = () => {
   return MODE_IDS.includes(v) ? v : 'classic'
 }
 export const readNight = () => Math.max(0, parseInt(readJSON(NIGHT_KEY) || '0', 10) || 0)
-// Lifetime counters: { supernovas, planets, deaths }. Missing/corrupt → zeros.
+// Lifetime counters: { supernovas, planets, deaths, spiritCatches, zenSessions,
+// lanternFeasts }. Missing/corrupt → zeros.
 export const readTotals = () => {
-  const fresh = { supernovas: 0, planets: 0, deaths: 0 }
+  const fresh = { supernovas: 0, planets: 0, deaths: 0, spiritCatches: 0, zenSessions: 0, lanternFeasts: 0 }
   try {
     const parsed = JSON.parse(readJSON(TOTALS_KEY) || 'null')
     for (const k of Object.keys(fresh)) {
@@ -89,6 +94,20 @@ export const readWhispers = () => {
   } catch {
     return []
   }
+}
+// Unlocked verse ids (array of strings) — "Biên niên trăng" collection.
+export const readVerses = () => {
+  try {
+    const parsed = JSON.parse(readJSON(VERSES_KEY) || 'null')
+    return Array.isArray(parsed) ? parsed.filter((v) => typeof v === 'string') : []
+  } catch {
+    return []
+  }
+}
+// The event rolled for the upcoming night ('none' = quiet night).
+export const readTonight = () => {
+  const v = readJSON(TONIGHT_KEY)
+  return v === 'none' || EVENT_IDS.includes(v) ? v : null
 }
 // Seen run contexts: { modes: [...], phases: [...] }.
 export const readSeen = () => {
@@ -185,6 +204,16 @@ export const useGame = create((set, get) => ({
   // showJournal: the collection overlay is open
   showJournal: false,
 
+  // The Lunar Chronicle (P3 storytelling): 30 two-line moon verses, earned
+  // through deliberate feats and collected out of order.
+  unlockedVerses: [],
+  verseToasts: [],
+  // tonightEvent: the special event rolled for the upcoming night ('none' =
+  // quiet night), announced on the title screen. nightEvent: the event active
+  // during the current run.
+  tonightEvent: 'none',
+  nightEvent: 'none',
+
   hydrate() {
     const bests = readBests()
     const gameMode = readMode()
@@ -200,6 +229,8 @@ export const useGame = create((set, get) => ({
       night: readNight(),
       totals: readTotals(),
       unlockedWhispers: readWhispers(),
+      unlockedVerses: readVerses(),
+      tonightEvent: readTonight() || rollNightEvent(),
       seenModes: seen.modes,
       seenPhases: seen.phases,
     })
@@ -212,8 +243,11 @@ export const useGame = create((set, get) => ({
     const isFirstPhase = !prev.seenPhases.includes(prev.moonPhase)
     const seenModes = isFirstMode ? [...prev.seenModes, prev.gameMode] : prev.seenModes
     const seenPhases = isFirstPhase ? [...prev.seenPhases, prev.moonPhase] : prev.seenPhases
+    const nightEvent = prev.tonightEvent || 'none'
+    const tonightEvent = rollNightEvent()
     writeJSON(NIGHT_KEY, String(night))
     writeJSON(SEEN_KEY, JSON.stringify({ modes: seenModes, phases: seenPhases }))
+    writeJSON(TONIGHT_KEY, tonightEvent)
     set({
       status: 'playing',
       score: 0,
@@ -230,10 +264,13 @@ export const useGame = create((set, get) => ({
       night,
       seenModes,
       seenPhases,
-      nightStats: { supernovas: 0, planets: 0 },
+      nightStats: { supernovas: 0, planets: 0, boostEats: 0 },
       nightBanner: { night },
+      tonightEvent,
+      nightEvent,
     })
     get().checkWhispers('nightStart', { isFirstMode, isFirstPhase })
+    get().checkVerses('nightStart', { isFirstMode, isFirstPhase })
   },
   pause() {
     if (get().status === 'playing') set({ status: 'paused', isBoosting: false })
@@ -308,7 +345,7 @@ export const useGame = create((set, get) => ({
   addScore(delta, length, isBloom = false, planet = '') {
     const newScore = get().score + delta
     const id = Date.now() + Math.random()
-    const name = planet === 'sun' || isBloom ? 'SUPERNOVA!' : (planet === 'earth' ? 'EARTH' : planet === 'mars' ? 'MARS' : planet === 'saturn' ? 'SATURN' : planet === 'jupiter' ? 'JUPITER' : planet === 'neptune' ? 'NEPTUNE' : '')
+    const name = planet === 'sun' || isBloom ? 'SUPERNOVA!' : (planet === 'carp' ? 'JADE CARP' : planet === 'earth' ? 'EARTH' : planet === 'mars' ? 'MARS' : planet === 'saturn' ? 'SATURN' : planet === 'jupiter' ? 'JUPITER' : planet === 'neptune' ? 'NEPTUNE' : '')
     const text = name ? `+${delta} ${name}` : `+${delta}`
 
     set((s) => ({
@@ -330,13 +367,18 @@ export const useGame = create((set, get) => ({
     const totals = { ...get().totals }
     if (cause === 'wall' || cause === 'self' || cause === 'time') {
       totals.deaths += 1
-      writeJSON(TOTALS_KEY, JSON.stringify(totals))
-      set({ totals })
     }
+    if (cause === 'time') totals.lanternFeasts += 1
+    writeJSON(TOTALS_KEY, JSON.stringify(totals))
+    set({ totals })
     set({ score: result.score, length: result.length })
     completeRun(get, set, cause)
     get().checkWhispers('death', { cause })
-    if (get().isNewBest) get().checkWhispers('newBest')
+    get().checkVerses('death', { cause })
+    if (get().isNewBest) {
+      get().checkWhispers('newBest')
+      get().checkVerses('newBest')
+    }
   },
 
   // Zen Garden has no death: the player ends the session from the pause menu.
@@ -344,9 +386,16 @@ export const useGame = create((set, get) => ({
     const st = get()
     if (st.gameMode !== 'zen') return
     if (st.status !== 'playing' && st.status !== 'paused') return
+    const totals = { ...get().totals, zenSessions: get().totals.zenSessions + 1 }
+    writeJSON(TOTALS_KEY, JSON.stringify(totals))
+    set({ totals })
     completeRun(get, set, 'zen')
     get().checkWhispers('zenEnd')
-    if (get().isNewBest) get().checkWhispers('newBest')
+    get().checkVerses('zenEnd')
+    if (get().isNewBest) {
+      get().checkWhispers('newBest')
+      get().checkVerses('newBest')
+    }
   },
 
   // Whisper engine: evaluate trigger predicates against current run context.
@@ -396,13 +445,64 @@ export const useGame = create((set, get) => ({
       totals.planets += 1
       nightStats.planets += 1
     }
+    if (get().isBoosting) nightStats.boostEats = (nightStats.boostEats || 0) + 1
     writeJSON(TOTALS_KEY, JSON.stringify(totals))
     set({ totals, nightStats })
     get().checkWhispers(bloom ? 'supernova' : 'eat')
+    get().checkVerses(bloom ? 'supernova' : 'eat')
+  },
+
+  // The Lunar Chronicle (P3): evaluate moon-verse triggers against run
+  // context. Same chaining loop as whispers so verse-ink-legend (all 29
+  // others heard) resolves in the same pass.
+  checkVerses(event, extra = {}) {
+    const s = get()
+    let unlocked = [...s.unlockedVerses]
+    const freshAll = []
+    for (let i = 0; i < 5; i += 1) {
+      const ctx = {
+        event,
+        night: get().night,
+        score: get().score,
+        length: get().length,
+        mode: get().gameMode,
+        moonPhase: get().moonPhase,
+        nightEvent: get().nightEvent,
+        bests: get().bests,
+        totals: get().totals,
+        nightStats: get().nightStats,
+        unlocked,
+        unlockedWhispers: get().unlockedWhispers,
+        ...extra,
+      }
+      const fresh = evaluateVerses(ctx)
+      if (fresh.length === 0) break
+      freshAll.push(...fresh)
+      unlocked = [...unlocked, ...fresh.map((v) => v.id)]
+    }
+    if (freshAll.length === 0) return
+    writeJSON(VERSES_KEY, JSON.stringify(unlocked))
+    const toasts = freshAll.map((v) => ({ ...v, toastId: `v${Date.now()}-${Math.random().toString(36).slice(2, 8)}` }))
+    set((prev) => ({
+      unlockedVerses: unlocked,
+      verseToasts: [...prev.verseToasts, ...toasts].slice(-4),
+    }))
+  },
+
+  dismissVerseToast(toastId) {
+    set((s) => ({ verseToasts: s.verseToasts.filter((t) => t.toastId !== toastId) }))
   },
 
   dismissWhisperToast(toastId) {
     set((s) => ({ whisperToasts: s.whisperToasts.filter((t) => t.toastId !== toastId) }))
+  },
+
+  // Called by the engine when the snake catches the Jade Carp spirit.
+  registerSpiritCatch() {
+    const totals = { ...get().totals, spiritCatches: get().totals.spiritCatches + 1 }
+    writeJSON(TOTALS_KEY, JSON.stringify(totals))
+    set({ totals })
+    get().checkVerses('spirit')
   },
 
   clearNightBanner() {

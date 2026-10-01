@@ -1,6 +1,8 @@
 // Pure snake logic — grid state, stepping, turning, food, and the title-screen orbit demo.
 // Everything here is framework-free so it can be unit-tested in node.
 
+import { nightEventById } from './nightEvents.js'
+
 export const N = 20
 export const INITIAL_LENGTH = 3
 export const BASE_INTERVAL = 0.165 // seconds per cell at start (responsive, smooth)
@@ -33,11 +35,11 @@ export const KEY_DIRS = {
 
 export const isOpposite = (a, b) => !!a && !!b && a.x === -b.x && a.y === -b.y
 
-export function speedInterval(foodsEaten, isBoosting = false, speedMult = 1, modeMult = 1) {
+export function speedInterval(foodsEaten, isBoosting = false, speedMult = 1, modeMult = 1, eventMult = 1) {
   const steps = Math.floor(foodsEaten / SPEED_STEP_EVERY)
   const iv = BASE_INTERVAL * Math.pow(SPEED_DECAY, steps)
   const clamped = Math.max(iv, MIN_INTERVAL)
-  const phased = clamped / speedMult / modeMult // moon phase & game mode: full moon runs faster, zen drifts slower
+  const phased = clamped / speedMult / modeMult / eventMult // moon phase, game mode & night event pace
   return isBoosting ? phased * BOOST_MULTIPLIER : phased
 }
 
@@ -113,7 +115,11 @@ function placeFood(game) {
   }
   const cell = cells[(Math.random() * cells.length) | 0]
   game.food = cell
-  game.foodIsBloom = game.foodsEaten > 0 && game.foodsEaten % 5 === 0
+  // Night events bend the supernova cadence: meteor nights bloom twice as
+  // often, silent nights never bloom (each small light matters more).
+  const ev = nightEventById(game.event)
+  const every = ev.supernovaMult === 0 ? Infinity : ev.supernovaMult >= 2 ? 2 : 5
+  game.foodIsBloom = game.foodsEaten > 0 && game.foodsEaten % every === 0
   if (game.foodIsBloom) {
     game.foodPlanet = SUPERNOVA
   } else {
@@ -123,7 +129,7 @@ function placeFood(game) {
   }
 }
 
-export function createGame(moonId = 'half', modeId = 'classic') {
+export function createGame(moonId = 'half', modeId = 'classic', eventId = 'none') {
   const cx = Math.floor(N / 2)
   const snake = []
   for (let i = 0; i < INITIAL_LENGTH; i++) snake.push({ x: cx - i, y: cx })
@@ -140,6 +146,7 @@ export function createGame(moonId = 'half', modeId = 'classic') {
     alive: true,
     moon: moonPhaseById(moonId).id,
     mode: mode.id,
+    event: nightEventById(eventId).id,
     // Lantern Rush only: seconds remaining. Null in other modes.
     timeLeft: mode.id === 'lantern' ? LANTERN_DURATION : null,
   }
@@ -224,7 +231,8 @@ export function step(game, dt = 0) {
     const bloom = game.foodIsBloom
     const planet = game.foodPlanet || (bloom ? SUPERNOVA : 'earth')
     const phase = moonPhaseById(game.moon)
-    const gained = bloom ? phase.bloomScore : phase.planetScore
+    const ev = nightEventById(game.event)
+    const gained = bloom ? phase.bloomScore : phase.planetScore + ev.planetBonus
     game.score += gained
     game.foodsEaten++
     placeFood(game)
