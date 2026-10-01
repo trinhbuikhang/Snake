@@ -1069,6 +1069,109 @@ kbd {
   color: rgba(214, 226, 240, 0.65);
 }
 
+/* P5 Shared Skies — the weekly community sky banner on the title */
+.community-sky {
+  margin: 0.55rem 0 0;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 0.88rem;
+  letter-spacing: 0.05em;
+  color: rgba(217, 185, 106, 0.9);
+}
+
+.community-sky__label {
+  text-transform: uppercase;
+  letter-spacing: 0.22em;
+  font-size: 0.74rem;
+  color: rgba(217, 185, 106, 0.75);
+}
+
+.community-sky__line {
+  font-style: italic;
+  color: rgba(217, 185, 106, 0.6);
+}
+
+/* P5 Shared Skies — gardener name row in the Journal */
+.name-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6rem;
+  margin: 0.4rem 0 0.9rem;
+  font-size: 0.85rem;
+  color: rgba(214, 226, 240, 0.7);
+}
+
+.name-row label {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.name-row__input {
+  background: rgba(10, 20, 16, 0.6);
+  border: 1px solid rgba(217, 185, 106, 0.35);
+  border-radius: 999px;
+  color: #efe8d3;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 0.9rem;
+  padding: 0.35rem 0.9rem;
+  width: 11rem;
+  outline: none;
+}
+
+.name-row__input::placeholder {
+  color: rgba(214, 226, 240, 0.35);
+  font-style: italic;
+}
+
+.name-row__input:focus {
+  border-color: rgba(217, 185, 106, 0.8);
+}
+
+/* P5 Shared Skies — Tonight's Highlights reel on the game-over sheet */
+.highlights {
+  margin: 1rem 0 0.25rem;
+  text-align: center;
+}
+
+.highlights__title {
+  text-transform: uppercase;
+  letter-spacing: 0.28em;
+  font-size: 0.72rem;
+  color: rgba(217, 185, 106, 0.8);
+  margin: 0 0 0.55rem;
+}
+
+.highlights ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.highlights__item {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-size: 0.98rem;
+  color: rgba(239, 232, 211, 0.92);
+  opacity: 0;
+  animation: highlight-rise 0.9s ease-out forwards;
+}
+
+@keyframes highlight-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .verse-toasts {
   display: flex;
   flex-direction: column;

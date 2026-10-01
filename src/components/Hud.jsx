@@ -12,7 +12,7 @@ import {
   lanternCount, bloomCount,
   journeyReady, JOURNEY_GOAL, MOONLIGHT_GLYPH,
 } from '../game/garden.js'
-import { composeMoonCard, composeVerseCard } from '../game/moonCard.js'
+import { composeMoonCard, composeVerseCard, composeHighlightCard } from '../game/moonCard.js'
 
 const arr = (d) => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -164,6 +164,9 @@ export function TitleOverlay() {
   const keepsakes = useGame((s) => s.keepsakes)
   const tonightEvent = useGame((s) => s.tonightEvent)
   const tonight = nightEventById(tonightEvent)
+  // P5 Shared Skies — this week's event, shared by every gardener.
+  const communityEvent = useGame((s) => s.communityEvent)
+  const sharedSky = nightEventById(communityEvent)
   const moonlight = useGame((s) => s.moonlight)
   const journey = useGame((s) => s.journey)
   const streak = useGame((s) => s.streak)
@@ -237,6 +240,15 @@ export function TitleOverlay() {
           <span className="tonight-note__label">Tonight:</span> {tonight.name}
           <span className="tonight-note__line"> — “{tonight.line}”</span>
         </p>
+        {communityEvent !== 'none' && (
+          <p
+            className="community-sky"
+            title="Shared Skies — every gardener plays under the same sky this week"
+          >
+            <span className="community-sky__label">This week's shared sky:</span> {sharedSky.name}
+            <span className="community-sky__line"> — “{sharedSky.line}”</span>
+          </p>
+        )}
         <button type="button" className="btn btn--ghost journal-link" onClick={openJournal}>
           📖 Journal · {unlockedWhispers.length}/{WHISPER_COUNT} whispers ·{' '}
           {unlockedVerses.length}/{VERSE_COUNT} verses
@@ -510,11 +522,36 @@ export function GameOverOverlay() {
   const deathSnapshot = useGame((s) => s.deathSnapshot)
   const isNewBest = useGame((s) => s.isNewBest)
   const lastMoonlight = useGame((s) => s.lastMoonlight)
+  const night = useGame((s) => s.night)
+  const highlights = useGame((s) => s.highlights)
+  const gardenerName = useGame((s) => s.gardenerName)
   const start = useGame((s) => s.start)
   const toTitle = useGame((s) => s.toTitle)
   const [sharing, setSharing] = useState(false)
+  const [sharingHighlights, setSharingHighlights] = useState(false)
 
   const endCopy = END_COPY[deathCause] || END_COPY.unknown
+  const phaseName = moonPhaseById(moonPhase).name
+  const modeName = gameModeById(gameMode).name
+
+  // P5 Shared Skies — one helper paints a canvas into a shared/downloaded file.
+  async function shareCanvas(canvas, fileName, title, caption) {
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/png'))
+    if (!blob) return
+    const file = new File([blob], fileName, { type: 'image/png' })
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title, text: caption })
+    } else {
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = fileName
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 5000)
+    }
+  }
 
   async function handleShare() {
     if (sharing) return
@@ -525,34 +562,47 @@ export function GameOverOverlay() {
         score,
         best,
         length,
-        phaseName: moonPhaseById(moonPhase).name,
-        modeName: gameModeById(gameMode).name,
+        phaseName,
+        modeName,
         dateLabel: new Date().toLocaleDateString('en-US', {
           month: 'short',
           day: 'numeric',
           year: 'numeric',
         }),
+        gardenerName,
       })
-      const blob = await new Promise((resolve) => card.toBlob(resolve, 'image/png'))
-      if (!blob) return
-      const file = new File([blob], 'moonlit-serpent-card.png', { type: 'image/png' })
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: 'Moonlit Serpent — my moon card' })
-      } else {
-        // Fallback: download the card image
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = 'moonlit-serpent-card.png'
-        document.body.appendChild(a)
-        a.click()
-        a.remove()
-        setTimeout(() => URL.revokeObjectURL(url), 5000)
-      }
+      await shareCanvas(
+        card,
+        'moonlit-serpent-card.png',
+        'Moonlit Serpent — my moon card',
+        `A night in the ink garden — ${score} pts under the ${phaseName} · Moonlit Serpent`,
+      )
     } catch {
       // Share sheet dismissed — nothing to do
     } finally {
       setSharing(false)
+    }
+  }
+
+  async function handleShareHighlights() {
+    if (sharingHighlights || highlights.length === 0) return
+    setSharingHighlights(true)
+    try {
+      const card = await composeHighlightCard({
+        highlights,
+        night,
+        score,
+        modeName,
+        phaseName,
+        gardenerName,
+      })
+      const caption =
+        highlights.map((h) => `“${h.text}”`).join('\n') + "\n— Tonight's highlights · Moonlit Serpent"
+      await shareCanvas(card, 'moonlit-serpent-highlights.png', 'Moonlit Serpent — tonight’s highlights', caption)
+    } catch {
+      // Share sheet dismissed — nothing to do
+    } finally {
+      setSharingHighlights(false)
     }
   }
 
@@ -576,6 +626,22 @@ export function GameOverOverlay() {
             {MOONLIGHT_GLYPH} +{lastMoonlight} moonlight for the garden
           </p>
         )}
+        {highlights.length > 0 && (
+          <div className="highlights" aria-label="Tonight's highlights">
+            <p className="highlights__title">Tonight's highlights</p>
+            <ul>
+              {highlights.map((h, i) => (
+                <li
+                  key={`${h.kind}-${i}`}
+                  className="highlights__item"
+                  style={{ animationDelay: `${0.35 + i * 0.45}s` }}
+                >
+                  “{h.text}”
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
         <div className="sheet-actions">
           <button type="button" className="btn btn--primary" onClick={start} autoFocus>
             Play again
@@ -592,6 +658,17 @@ export function GameOverOverlay() {
           >
             {sharing ? 'Painting your card…' : '🌙 Share moon card'}
           </button>
+          {highlights.length > 0 && (
+            <button
+              type="button"
+              className="btn btn--secondary"
+              onClick={handleShareHighlights}
+              disabled={sharingHighlights}
+              title="Share tonight's three most beautiful moments as a card"
+            >
+              {sharingHighlights ? 'Painting…' : '✨ Share highlights'}
+            </button>
+          )}
         </div>
         <p className="hint">
           Press <kbd>Space</kbd> to glide again
@@ -804,20 +881,23 @@ export function PrologueOverlay() {
 }
 
 // P3 — share one moon verse as a 1080x1350 card (Web Share, download fallback).
+// P5 Shared Skies — signed with the gardener's name, with a caption for posts.
 function VerseShareButton({ verse }) {
   const night = useGame((s) => s.night)
+  const gardenerName = useGame((s) => s.gardenerName)
   const [sharing, setSharing] = useState(false)
 
   async function handleShare() {
     if (sharing) return
     setSharing(true)
     try {
-      const card = await composeVerseCard({ verse, night })
+      const card = await composeVerseCard({ verse, night, gardenerName })
       const blob = await new Promise((resolve) => card.toBlob(resolve, 'image/png'))
       if (!blob) return
       const file = new File([blob], `moonlit-serpent-verse-${verse.id}.png`, { type: 'image/png' })
+      const caption = `“${verse.lines.join(' ')}”\n— The Lunar Chronicle · Moonlit Serpent`
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file], title: 'Moonlit Serpent — a verse of the chronicle' })
+        await navigator.share({ files: [file], title: 'Moonlit Serpent — a verse of the chronicle', text: caption })
       } else {
         const url = URL.createObjectURL(blob)
         const a = document.createElement('a')
@@ -857,6 +937,8 @@ export function JournalOverlay() {
   const keepsakes = useGame((s) => s.keepsakes)
   const night = useGame((s) => s.night)
   const totals = useGame((s) => s.totals)
+  const gardenerName = useGame((s) => s.gardenerName)
+  const setGardenerName = useGame((s) => s.setGardenerName)
   const [tab, setTab] = useState('whispers')
   const heardWhispers = new Set(unlockedWhispers)
   const heardVerses = new Set(unlockedVerses)
@@ -866,6 +948,18 @@ export function JournalOverlay() {
     <div className="sheet" role="dialog" aria-label="Journal of whispers and verses">
       <div className="sheet-card journal">
         <p className="overline">the journal</p>
+        <div className="name-row" title="Your signature on shared verse and highlight cards">
+          <label htmlFor="gardener-name">✒ Sign your shared cards</label>
+          <input
+            id="gardener-name"
+            className="name-row__input"
+            value={gardenerName}
+            onChange={(e) => setGardenerName(e.target.value)}
+            maxLength={24}
+            placeholder="the ink gardener"
+            autoComplete="off"
+          />
+        </div>
         <div className="journal__tabs" role="tablist" aria-label="Journal sections">
           <button
             type="button"
