@@ -208,6 +208,11 @@ export const useGame = create((set, get) => ({
   // through deliberate feats and collected out of order.
   unlockedVerses: [],
   verseToasts: [],
+  // prologueQueue: whispers + verses unlocked by the nightStart evaluation,
+  // shown one at a time on the pre-play prologue screen so the player can
+  // actually read them before the run begins. Each entry is
+  // { kind: 'whisper'|'verse', id, text? , lines? }.
+  prologueQueue: [],
   // tonightEvent: the special event rolled for the upcoming night ('none' =
   // quiet night), announced on the title screen. nightEvent: the event active
   // during the current run.
@@ -249,7 +254,7 @@ export const useGame = create((set, get) => ({
     writeJSON(SEEN_KEY, JSON.stringify({ modes: seenModes, phases: seenPhases }))
     writeJSON(TONIGHT_KEY, tonightEvent)
     set({
-      status: 'playing',
+      status: 'prologue',
       score: 0,
       length: 3,
       isNewBest: false,
@@ -268,9 +273,30 @@ export const useGame = create((set, get) => ({
       nightBanner: { night },
       tonightEvent,
       nightEvent,
+      whisperToasts: [],
+      verseToasts: [],
+      prologueQueue: [],
     })
     get().checkWhispers('nightStart', { isFirstMode, isFirstPhase })
     get().checkVerses('nightStart', { isFirstMode, isFirstPhase })
+    // The night's new poems belong to the prologue screen, not to floating
+    // toasts over live gameplay: collect them so they can be read one at a
+    // time before the run begins.
+    const afterStart = get()
+    set({
+      prologueQueue: [
+        ...afterStart.whisperToasts.map((t) => ({ kind: 'whisper', id: t.id, text: t.text })),
+        ...afterStart.verseToasts.map((t) => ({ kind: 'verse', id: t.id, lines: t.lines })),
+      ],
+      whisperToasts: [],
+      verseToasts: [],
+    })
+  },
+  // Called from the prologue screen (button, tap, or keypress) once the
+  // player has read the night's new whispers and verses.
+  beginNight() {
+    if (get().status !== 'prologue') return
+    set({ status: 'playing', prologueQueue: [] })
   },
   pause() {
     if (get().status === 'playing') set({ status: 'paused', isBoosting: false })

@@ -92,3 +92,5 @@ src/
 ## Quick mental model
 
 React draws the HUD. Zustand holds “what the player sees about the run.” Pure `logic.js` owns the grid truth. `engine.js` advances that truth on a timer, drives Three.js, and pushes score/status into the store. `inputBus` feeds intended turns and boost into the engine each frame.
+
+Run statuses: `title → prologue → playing ⇄ paused → dead`. `start()` sets `prologue` (not `playing`): the night's fresh whispers/verses are collected into `prologueQueue` and shown one at a time on the prologue screen so the player can read them before the run. `beginNight()` (button, tap, Space/Enter) moves to `playing`, where the engine's `resetGame()` runs. The demo garden keeps drifting behind the prologue. In-play whispers/verses still use floating toasts, rendered in a single `.toast-stack` column so they can never overlap.
