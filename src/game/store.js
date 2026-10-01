@@ -3,6 +3,12 @@ import { MOON_IDS, MODE_IDS } from './logic.js'
 import { evaluateWhispers } from './whispers.js'
 import { evaluateVerses } from './verses.js'
 import { EVENT_IDS, rollNightEvent } from './nightEvents.js'
+import {
+  INK_IDS, inkById,
+  LANTERN_MAX_TIER, LANTERN_COSTS, lanternCount,
+  BLOOM_MAX_TIER, BLOOM_COSTS, bloomCount,
+  earnMoonlight, nextStreak, toDayString, journeyReady, JOURNEY_GOAL,
+} from './garden.js'
 
 export const BEST_KEY = 'ran-xinh-best' // legacy single best, migrated into BESTS_KEY
 export const BESTS_KEY = 'ran-xinh-bests'
@@ -17,6 +23,12 @@ export const WHISPERS_KEY = 'ran-xinh-whispers'
 export const SEEN_KEY = 'ran-xinh-seen'
 export const VERSES_KEY = 'ran-xinh-verses'
 export const TONIGHT_KEY = 'ran-xinh-tonight'
+// P4 "The Garden Remembers"
+export const MOONLIGHT_KEY = 'ran-xinh-moonlight' // { balance, earned }
+export const GARDEN_KEY = 'ran-xinh-garden' // { lantern, lotus, inks, ink }
+export const JOURNEY_KEY = 'ran-xinh-journey' // { progress, completed }
+export const KEEPSAKE_KEY = 'ran-xinh-keepsakes' // [{ id, night, date }]
+export const STREAK_KEY = 'ran-xinh-streak' // { count, lastDay }
 
 function readJSON(key) {
   try {
@@ -109,6 +121,65 @@ export const readTonight = () => {
   const v = readJSON(TONIGHT_KEY)
   return v === 'none' || EVENT_IDS.includes(v) ? v : null
 }
+// P4 "The Garden Remembers" readers.
+export const readMoonlight = () => {
+  const fresh = { balance: 0, earned: 0 }
+  try {
+    const parsed = JSON.parse(readJSON(MOONLIGHT_KEY) || 'null')
+    for (const k of Object.keys(fresh)) {
+      const v = parseInt(parsed?.[k], 10)
+      if (Number.isFinite(v) && v > 0) fresh[k] = v
+    }
+  } catch { /* corrupted save — start fresh */ }
+  return fresh
+}
+export const readGarden = () => {
+  const fresh = { lantern: 0, lotus: 0, inks: ['jade'], ink: 'jade' }
+  try {
+    const parsed = JSON.parse(readJSON(GARDEN_KEY) || 'null')
+    if (parsed && typeof parsed === 'object') {
+      const lan = parseInt(parsed.lantern, 10)
+      if (Number.isFinite(lan)) fresh.lantern = Math.max(0, Math.min(LANTERN_MAX_TIER, lan))
+      const lot = parseInt(parsed.lotus, 10)
+      if (Number.isFinite(lot)) fresh.lotus = Math.max(0, Math.min(BLOOM_MAX_TIER, lot))
+      if (Array.isArray(parsed.inks)) {
+        const owned = parsed.inks.filter((id) => INK_IDS.includes(id))
+        if (owned.length) fresh.inks = [...new Set(['jade', ...owned])]
+      }
+      if (fresh.inks.includes(parsed.ink)) fresh.ink = parsed.ink
+    }
+  } catch { /* corrupted save — start fresh */ }
+  return fresh
+}
+export const readJourney = () => {
+  const fresh = { progress: 0, completed: 0 }
+  try {
+    const parsed = JSON.parse(readJSON(JOURNEY_KEY) || 'null')
+    for (const k of Object.keys(fresh)) {
+      const v = parseInt(parsed?.[k], 10)
+      if (Number.isFinite(v) && v > 0) fresh[k] = v
+    }
+  } catch { /* corrupted save — start fresh */ }
+  return fresh
+}
+export const readKeepsakes = () => {
+  try {
+    const parsed = JSON.parse(readJSON(KEEPSAKE_KEY) || 'null')
+    return Array.isArray(parsed) ? parsed.filter((k) => k && typeof k.id === 'string') : []
+  } catch {
+    return []
+  }
+}
+export const readStreak = () => {
+  const fresh = { count: 0, lastDay: null }
+  try {
+    const parsed = JSON.parse(readJSON(STREAK_KEY) || 'null')
+    const c = parseInt(parsed?.count, 10)
+    if (Number.isFinite(c) && c > 0) fresh.count = c
+    if (typeof parsed?.lastDay === 'string') fresh.lastDay = parsed.lastDay
+  } catch { /* corrupted save — start fresh */ }
+  return fresh
+}
 // Seen run contexts: { modes: [...], phases: [...] }.
 export const readSeen = () => {
   const fresh = { modes: [], phases: [] }
@@ -133,6 +204,40 @@ function completeRun(get, set, cause) {
   const newBest = Math.max(prevBest, score)
   bests[mode] = newBest
   writeJSON(BESTS_KEY, JSON.stringify(bests))
+
+  // P4 "The Garden Remembers": every night earns moonlight, feeds the
+  // Journey to the Moon, and a completed Moonrise Night leaves a keepsake.
+  const wasMoonrise = get().moonriseActive === true
+  const ml = earnMoonlight({
+    score,
+    mode,
+    moonPhase: get().moonPhase,
+    isNewBest: score > prevBest,
+    streak: get().streak?.count || 0,
+    moonrise: wasMoonrise,
+  })
+  const moonlight = {
+    balance: (get().moonlight?.balance || 0) + ml,
+    earned: (get().moonlight?.earned || 0) + ml,
+  }
+  writeJSON(MOONLIGHT_KEY, JSON.stringify(moonlight))
+  let journey = {
+    progress: (get().journey?.progress || 0) + ml,
+    completed: get().journey?.completed || 0,
+  }
+  let keepsakes = get().keepsakes || []
+  let moonriseCoda = null
+  if (wasMoonrise) {
+    keepsakes = [
+      ...keepsakes,
+      { id: `keepsake-${get().night}-${Date.now()}`, night: get().night, date: toDayString() },
+    ]
+    writeJSON(KEEPSAKE_KEY, JSON.stringify(keepsakes))
+    journey = { progress: 0, completed: journey.completed + 1 }
+    moonriseCoda = { moonlight: ml, keepsake: keepsakes[keepsakes.length - 1] }
+  }
+  writeJSON(JOURNEY_KEY, JSON.stringify(journey))
+
   set({
     status: 'dead',
     bests,
@@ -141,11 +246,17 @@ function completeRun(get, set, cause) {
     isBoosting: false,
     deathCause: cause,
     timeLeft: null,
+    moonlight,
+    journey,
+    keepsakes,
+    moonriseActive: false,
+    moonriseCoda,
+    lastMoonlight: ml,
   })
 }
 
 export const useGame = create((set, get) => ({
-  status: 'title', // title | playing | paused | dead
+  status: 'title', // title | prologue | playing | paused | dead
   showHowTo: false,
   score: 0,
   length: 3,
@@ -207,7 +318,24 @@ export const useGame = create((set, get) => ({
   // The Lunar Chronicle (P3 storytelling): 30 two-line moon verses, earned
   // through deliberate feats and collected out of order.
   unlockedVerses: [],
+
+  // P4 "The Garden Remembers"
+  moonlight: { balance: 0, earned: 0 },
+  garden: { lantern: 0, lotus: 0, inks: ['jade'], ink: 'jade' },
+  journey: { progress: 0, completed: 0 },
+  keepsakes: [],
+  streak: { count: 0, lastDay: null },
+  showGarden: false,
+  moonriseArmed: false,
+  moonriseActive: false,
+  moonriseCoda: null,
+  lastMoonlight: 0,
   verseToasts: [],
+  // prologueQueue: whispers + verses unlocked by the nightStart evaluation,
+  // shown one at a time on the pre-play prologue screen so the player can
+  // actually read them before the run begins. Each entry is
+  // { kind: 'whisper'|'verse', id, text? , lines? }.
+  prologueQueue: [],
   // tonightEvent: the special event rolled for the upcoming night ('none' =
   // quiet night), announced on the title screen. nightEvent: the event active
   // during the current run.
@@ -233,6 +361,11 @@ export const useGame = create((set, get) => ({
       tonightEvent: readTonight() || rollNightEvent(),
       seenModes: seen.modes,
       seenPhases: seen.phases,
+      moonlight: readMoonlight(),
+      garden: readGarden(),
+      journey: readJourney(),
+      keepsakes: readKeepsakes(),
+      streak: readStreak(),
     })
   },
 
@@ -243,13 +376,20 @@ export const useGame = create((set, get) => ({
     const isFirstPhase = !prev.seenPhases.includes(prev.moonPhase)
     const seenModes = isFirstMode ? [...prev.seenModes, prev.gameMode] : prev.seenModes
     const seenPhases = isFirstPhase ? [...prev.seenPhases, prev.moonPhase] : prev.seenPhases
-    const nightEvent = prev.tonightEvent || 'none'
+    // P4 — a deliberately-started Moonrise Night overrides the rolled event.
+    const moonrise = prev.moonriseArmed === true
+    const nightEvent = moonrise ? 'moonrise' : (prev.tonightEvent || 'none')
     const tonightEvent = rollNightEvent()
+    // P4 — lunar streak: one counted day per calendar day, consecutive days
+    // extend it. A broken streak simply stops the bonus; never a punishment.
+    const advancedStreak = nextStreak(prev.streak, toDayString())
+    const streak = advancedStreak || prev.streak
+    if (advancedStreak) writeJSON(STREAK_KEY, JSON.stringify(advancedStreak))
     writeJSON(NIGHT_KEY, String(night))
     writeJSON(SEEN_KEY, JSON.stringify({ modes: seenModes, phases: seenPhases }))
     writeJSON(TONIGHT_KEY, tonightEvent)
     set({
-      status: 'playing',
+      status: 'prologue',
       score: 0,
       length: 3,
       isNewBest: false,
@@ -268,9 +408,97 @@ export const useGame = create((set, get) => ({
       nightBanner: { night },
       tonightEvent,
       nightEvent,
+      whisperToasts: [],
+      verseToasts: [],
+      prologueQueue: [],
+      streak,
+      moonriseArmed: false,
+      moonriseActive: moonrise,
+      moonriseCoda: null,
+      lastMoonlight: 0,
     })
     get().checkWhispers('nightStart', { isFirstMode, isFirstPhase })
     get().checkVerses('nightStart', { isFirstMode, isFirstPhase })
+    // The night's new poems belong to the prologue screen, not to floating
+    // toasts over live gameplay: collect them so they can be read one at a
+    // time before the run begins.
+    const afterStart = get()
+    set({
+      prologueQueue: [
+        ...afterStart.whisperToasts.map((t) => ({ kind: 'whisper', id: t.id, text: t.text })),
+        ...afterStart.verseToasts.map((t) => ({ kind: 'verse', id: t.id, lines: t.lines })),
+      ],
+      whisperToasts: [],
+      verseToasts: [],
+    })
+  },
+  // Called from the prologue screen (button, tap, or keypress) once the
+  // player has read the night's new whispers and verses.
+  beginNight() {
+    if (get().status !== 'prologue') return
+    set({ status: 'playing', prologueQueue: [] })
+  },
+
+  // --- P4 "The Garden Remembers" ---
+  setShowGarden(v) {
+    set({ showGarden: v })
+  },
+
+  // Journey to the Moon: when the ascension bar is full, the player may call
+  // the Moonrise Night — it arms and starts immediately.
+  startMoonrise() {
+    if (!journeyReady(get().journey?.progress || 0)) return
+    set({ moonriseArmed: true })
+    get().start()
+  },
+
+  dismissMoonriseCoda() {
+    set({ moonriseCoda: null })
+  },
+
+  _spend(cost) {
+    const moonlight = get().moonlight
+    if (moonlight.balance < cost) return null
+    const next = { balance: moonlight.balance - cost, earned: moonlight.earned }
+    writeJSON(MOONLIGHT_KEY, JSON.stringify(next))
+    set({ moonlight: next })
+    return next
+  },
+
+  _saveGarden(garden) {
+    writeJSON(GARDEN_KEY, JSON.stringify(garden))
+    set({ garden })
+  },
+
+  upgradeLanterns() {
+    const g = get().garden
+    const next = g.lantern + 1
+    if (next > LANTERN_MAX_TIER) return
+    if (!get()._spend(LANTERN_COSTS[next])) return
+    get()._saveGarden({ ...g, lantern: next })
+    get().checkVerses('garden')
+  },
+
+  upgradeBlooms() {
+    const g = get().garden
+    const next = g.lotus + 1
+    if (next > BLOOM_MAX_TIER) return
+    if (!get()._spend(BLOOM_COSTS[next])) return
+    get()._saveGarden({ ...g, lotus: next })
+    get().checkVerses('garden')
+  },
+
+  // Buying an ink also selects it; re-tapping an owned ink just selects it.
+  chooseInk(id) {
+    const ink = inkById(id)
+    const g = get().garden
+    if (g.inks.includes(ink.id)) {
+      if (g.ink !== ink.id) get()._saveGarden({ ...g, ink: ink.id })
+      return
+    }
+    if (!get()._spend(ink.cost)) return
+    get()._saveGarden({ ...g, inks: [...g.inks, ink.id], ink: ink.id })
+    get().checkVerses('garden')
   },
   pause() {
     if (get().status === 'playing') set({ status: 'paused', isBoosting: false })

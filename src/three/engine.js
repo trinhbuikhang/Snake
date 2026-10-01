@@ -25,6 +25,8 @@ import { inputBus } from '../game/inputBus.js'
 import audio from '../audio/sound.js'
 import { buildGarden } from './garden.js'
 import { createSnakeRig } from './snakeRig.js'
+import { buildDecor } from './decor.js'
+import { lanternCount, bloomCount, inkById } from '../game/garden.js'
 import { nightEventById } from '../game/nightEvents.js'
 
 const FOV = 42
@@ -101,6 +103,22 @@ export function createEngine(canvas, { reduced } = {}) {
 
   const garden = buildGarden(scene, { envTex, reduced })
   const rig = createSnakeRig(scene)
+  const decor = buildDecor(scene)
+
+  // P4 "The Garden Remembers": apply purchased decorations, the serpent's
+  // ink, and the Moonrise Night's giant moon from store state.
+  function applyGarden() {
+    const st = useGame.getState()
+    const g = st.garden || { lantern: 0, lotus: 0, ink: 'jade' }
+    decor.setLanternCount(lanternCount(g.lantern))
+    decor.setBloomCount(bloomCount(g.lotus))
+    rig.setInk(inkById(g.ink))
+    garden.moonGroup.scale.setScalar(st.moonriseActive ? 2.4 : 1)
+  }
+  applyGarden()
+  useGame.subscribe((s, prev) => {
+    if (s.garden !== prev.garden || s.moonriseActive !== prev.moonriseActive) applyGarden()
+  })
 
   // ---- postprocessing ----------------------------------------------------
   let composer = null
@@ -389,9 +407,11 @@ export function createEngine(canvas, { reduced } = {}) {
       if (st.showHowTo) {
         st.closeHowTo()
         if (st.status === 'title' || st.status === 'dead') st.start()
+        else if (st.status === 'prologue') st.beginNight()
         return
       }
       if (st.status === 'title' || st.status === 'dead') st.start()
+      else if (st.status === 'prologue') st.beginNight()
       return
     }
 
@@ -488,13 +508,15 @@ export function createEngine(canvas, { reduced } = {}) {
   // ---- store wiring ----------------------------------------------------------
   const unsubStore = useGame.subscribe((s, prev) => {
     if (s.status !== prev.status) {
-      if (s.status === 'playing' && (prev.status === 'title' || prev.status === 'dead')) {
+      if (s.status === 'playing' && (prev.status === 'title' || prev.status === 'dead' || prev.status === 'prologue')) {
         unlock() // runs inside the user's click/keypress gesture, so AudioContext creation is allowed
         resetGame()
         audio.setPadOn(true)
       } else if (s.status === 'playing' && prev.status === 'paused') {
         accum = 0
         prevCells = cloneXZ(curCells)
+      } else if (s.status === 'prologue' && (prev.status === 'title' || prev.status === 'dead')) {
+        unlock() // start() runs in the gesture; the demo garden keeps drifting behind the prologue
       } else if (s.status === 'title') {
         resetDemo()
         audio.setPadOn(false)
@@ -595,6 +617,7 @@ export function createEngine(canvas, { reduced } = {}) {
 
     garden.camera = camera.position
     garden.update(dt)
+    decor.update(animT)
 
     const st = useGame.getState()
 
@@ -639,7 +662,7 @@ export function createEngine(canvas, { reduced } = {}) {
           spiritMesh.position.set(w.x, 0.45 + Math.sin(animT * 6) * 0.06, w.z)
         }
       }
-    } else if (st.status === 'title' && !dying) {
+    } else if ((st.status === 'title' || st.status === 'prologue') && !dying) {
       demoAccum += dt
       while (demoAccum >= DEMO_INTERVAL) {
         demoAccum -= DEMO_INTERVAL
@@ -650,12 +673,12 @@ export function createEngine(canvas, { reduced } = {}) {
     let paintT = 0
     let death = null
     if (st.status === 'playing' && !dying) paintT = clamp01(accum / interval.v)
-    else if (st.status === 'title') paintT = clamp01(demoAccum / DEMO_INTERVAL)
+    else if (st.status === 'title' || st.status === 'prologue') paintT = clamp01(demoAccum / DEMO_INTERVAL)
     else if (st.status === 'paused' || dying) paintT = 1 // dying: hold the death pose, don't snap back a tick
     if (rig.death) death = { t: rig.death.t }
 
-    const cells = st.status === 'title' ? demoCur : curCells
-    const precells = st.status === 'title' ? prevDemoCells : prevCells
+    const cells = (st.status === 'title' || st.status === 'prologue') ? demoCur : curCells
+    const precells = (st.status === 'title' || st.status === 'prologue') ? prevDemoCells : prevCells
     rig.paint({ cur: cells, prev: precells, t: paintT, death, animT, dt, isBoosting })
 
     // Headlight follows snake head

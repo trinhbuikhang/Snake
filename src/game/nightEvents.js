@@ -31,6 +31,13 @@ export const NIGHT_EVENTS = [
     line: 'The garden blooms; the night slows to watch.',
     supernovaMult: 1, planetBonus: 1, speedMult: 0.92, fogMult: 1, weight: 4,
   },
+  // P4 — the Moonrise Night. Never rolled by chance (weight 0); it is earned
+  // by completing the Journey to the Moon and started deliberately.
+  {
+    id: 'moonrise', name: 'Moonrise Night',
+    line: 'The moon leans close. The sky is about to rain stars.',
+    supernovaMult: 4, planetBonus: 2, speedMult: 1, fogMult: 0.7, weight: 0,
+  },
 ]
 
 export const EVENT_IDS = NIGHT_EVENTS.map((e) => e.id)

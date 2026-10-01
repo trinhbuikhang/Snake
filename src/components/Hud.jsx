@@ -5,6 +5,13 @@ import { MOON_PHASES, moonPhaseById, GAME_MODES, gameModeById } from '../game/lo
 import { WHISPERS, WHISPER_COUNT } from '../game/whispers.js'
 import { VERSES, VERSE_COUNT } from '../game/verses.js'
 import { nightEventById } from '../game/nightEvents.js'
+import {
+  INKS,
+  LANTERN_TIERS, LANTERN_COSTS, LANTERN_MAX_TIER,
+  BLOOM_TIERS, BLOOM_COSTS, BLOOM_MAX_TIER,
+  lanternCount, bloomCount,
+  journeyReady, JOURNEY_GOAL, MOONLIGHT_GLYPH,
+} from '../game/garden.js'
 import { composeMoonCard, composeVerseCard } from '../game/moonCard.js'
 
 const arr = (d) => (
@@ -154,8 +161,16 @@ export function TitleOverlay() {
   const toggleCameraMode = useGame((s) => s.toggleCameraMode)
   const unlockedWhispers = useGame((s) => s.unlockedWhispers)
   const unlockedVerses = useGame((s) => s.unlockedVerses)
+  const keepsakes = useGame((s) => s.keepsakes)
   const tonightEvent = useGame((s) => s.tonightEvent)
   const tonight = nightEventById(tonightEvent)
+  const moonlight = useGame((s) => s.moonlight)
+  const journey = useGame((s) => s.journey)
+  const streak = useGame((s) => s.streak)
+  const setShowGarden = useGame((s) => s.setShowGarden)
+  const startMoonrise = useGame((s) => s.startMoonrise)
+  const moonriseReady = journeyReady(journey.progress)
+  const journeyPct = Math.min(100, Math.round((journey.progress / JOURNEY_GOAL) * 100))
 
   return (
     <div className="sheet" role="dialog" aria-label="Moonlit Serpent title">
@@ -166,9 +181,38 @@ export function TitleOverlay() {
           <span>A poetic, razor-sharp 3D snake experience</span>
         </p>
         <div className="rule" />
+        <div className="title-wallet" aria-live="polite">
+          <span className="moonlight-pill" title="Moonlight — earned every night, spent in the Garden">
+            {MOONLIGHT_GLYPH} {moonlight.balance}
+          </span>
+          {streak.count > 1 && (
+            <span className="streak-pill" title="Consecutive nights played — each adds +10% moonlight, up to +50%">
+              ✦ {streak.count}-night streak
+            </span>
+          )}
+        </div>
+        {moonriseReady ? (
+          <button type="button" className="btn btn--moonrise" onClick={startMoonrise} autoFocus>
+            🌕 Begin the Moonrise Night
+          </button>
+        ) : (
+          <div className="journey-bar" title="Journey to the Moon — earn moonlight to fill the bar">
+            <div className="journey-bar__track">
+              <div className="journey-bar__fill" style={{ width: `${journeyPct}%` }} />
+            </div>
+            <p className="journey-bar__label">
+              Journey to the Moon · {journey.progress}/{JOURNEY_GOAL}
+            </p>
+          </div>
+        )}
         <div className="actions">
-          <button type="button" className="btn btn--primary" onClick={start} autoFocus>
-            Start playing
+          {!moonriseReady && (
+            <button type="button" className="btn btn--primary" onClick={start} autoFocus>
+              Start playing
+            </button>
+          )}
+          <button type="button" className="btn" onClick={() => setShowGarden(true)}>
+            🏮 Garden
           </button>
           <button type="button" className="btn" onClick={openHowTo}>
             How to play
@@ -197,6 +241,142 @@ export function TitleOverlay() {
           📖 Journal · {unlockedWhispers.length}/{WHISPER_COUNT} whispers ·{' '}
           {unlockedVerses.length}/{VERSE_COUNT} verses
         </button>
+      </div>
+    </div>
+  )
+}
+
+// P4 "The Garden Remembers" — spend moonlight on visible garden upgrades,
+// choose the serpent's ink, and watch the Journey to the Moon.
+export function GardenOverlay() {
+  const setShowGarden = useGame((s) => s.setShowGarden)
+  const moonlight = useGame((s) => s.moonlight)
+  const garden = useGame((s) => s.garden)
+  const journey = useGame((s) => s.journey)
+  const streak = useGame((s) => s.streak)
+  const upgradeLanterns = useGame((s) => s.upgradeLanterns)
+  const upgradeBlooms = useGame((s) => s.upgradeBlooms)
+  const chooseInk = useGame((s) => s.chooseInk)
+  const startMoonrise = useGame((s) => s.startMoonrise)
+
+  const moonriseReady = journeyReady(journey.progress)
+  const journeyPct = Math.min(100, Math.round((journey.progress / JOURNEY_GOAL) * 100))
+
+  const lanternMaxed = garden.lantern >= LANTERN_MAX_TIER
+  const lanternCost = lanternMaxed ? 0 : LANTERN_COSTS[garden.lantern + 1]
+  const bloomMaxed = garden.lotus >= BLOOM_MAX_TIER
+  const bloomCost = bloomMaxed ? 0 : BLOOM_COSTS[garden.lotus + 1]
+
+  return (
+    <div className="sheet" role="dialog" aria-label="The Garden Remembers">
+      <div className="sheet-card garden">
+        <p className="overline">the garden remembers</p>
+        <h2>Your Garden</h2>
+        <p className="garden__balance" aria-live="polite">
+          <span className="moonlight-pill moonlight-pill--big">{MOONLIGHT_GLYPH} {moonlight.balance}</span>
+          <span className="garden__hint">moonlight · earned every night you play</span>
+        </p>
+
+        <div className="garden__section">
+          <h3>🏮 Lanterns</h3>
+          <p className="garden__desc">
+            Paper lanterns around the lake — {lanternCount(garden.lantern)} glowing now.
+          </p>
+          {lanternMaxed ? (
+            <p className="garden__maxed">✦ The shore is fully lit.</p>
+          ) : (
+            <button
+              type="button"
+              className="btn btn--secondary"
+              onClick={upgradeLanterns}
+              disabled={moonlight.balance < lanternCost}
+            >
+              Light {lanternCount(garden.lantern + 1)} lanterns · {MOONLIGHT_GLYPH} {lanternCost}
+            </button>
+          )}
+        </div>
+
+        <div className="garden__section">
+          <h3>🪷 Lotus blooms</h3>
+          <p className="garden__desc">
+            Glowing lotus flowers drifting on the water — {bloomCount(garden.lotus)} in bloom.
+          </p>
+          {bloomMaxed ? (
+            <p className="garden__maxed">✦ The lake is in full bloom.</p>
+          ) : (
+            <button
+              type="button"
+              className="btn btn--secondary"
+              onClick={upgradeBlooms}
+              disabled={moonlight.balance < bloomCost}
+            >
+              Bloom {bloomCount(garden.lotus + 1)} flowers · {MOONLIGHT_GLYPH} {bloomCost}
+            </button>
+          )}
+        </div>
+
+        <div className="garden__section">
+          <h3>🖋 Serpent ink</h3>
+          <p className="garden__desc">The color of the serpent's glow.</p>
+          <div className="garden__inks">
+            {INKS.map((ink) => {
+              const owned = garden.inks.includes(ink.id)
+              const selected = garden.ink === ink.id
+              const affordable = moonlight.balance >= ink.cost
+              return (
+                <button
+                  key={ink.id}
+                  type="button"
+                  className={`garden__ink${selected ? ' is-selected' : ''}`}
+                  onClick={() => chooseInk(ink.id)}
+                  disabled={!owned && !affordable}
+                  title={ink.desc}
+                >
+                  <span
+                    className="garden__swatch"
+                    style={{ background: `#${ink.emissive.toString(16).padStart(6, '0')}` }}
+                  />
+                  <span className="garden__ink-name">{ink.name}</span>
+                  <span className="garden__ink-state">
+                    {selected ? 'worn' : owned ? 'wear' : `${MOONLIGHT_GLYPH} ${ink.cost}`}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        <div className="garden__section garden__journey">
+          <h3>🌕 Journey to the Moon</h3>
+          <div className="journey-bar__track">
+            <div className="journey-bar__fill" style={{ width: `${journeyPct}%` }} />
+          </div>
+          <p className="garden__desc">
+            {journey.progress}/{JOURNEY_GOAL} ascension
+            {journey.completed > 0 && ` · ${journey.completed} moonrise${journey.completed > 1 ? 's' : ''} lived`}
+          </p>
+          {streak.count > 1 && (
+            <p className="garden__desc">
+              ✦ {streak.count}-night streak — moonlight earns +{Math.min(streak.count, 5) * 10}% tonight
+            </p>
+          )}
+          {moonriseReady ? (
+            <button type="button" className="btn btn--moonrise" onClick={startMoonrise}>
+              🌕 Begin the Moonrise Night
+            </button>
+          ) : (
+            <p className="garden__hint">
+              Fill the bar with moonlight to call a Moonrise Night — a giant moon,
+              a sky raining supernovas, and a keepsake for your Journal.
+            </p>
+          )}
+        </div>
+
+        <div className="actions">
+          <button type="button" className="btn btn--primary" onClick={() => setShowGarden(false)}>
+            Back to the garden
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -249,13 +429,19 @@ export function HowToOverlay() {
           <p>
             <span className="num">7</span>
             <span>
-              Every run is one <b>Night</b>. Listen for <b>whispers</b> — one-line poems the garden reveals as you play — earn <b>moon verses</b> through great feats, and collect them all in your <b>Journal</b>.
+              Every run is one <b>Night</b>. Listen for <b>whispers</b> — one-line poems the garden reveals as you play — earn <b>moon verses</b> through great feats, and collect them all in your <b>Journal</b>. Each night opens with a quiet moment to read the night's new poems before you begin.
             </span>
           </p>
           <p>
             <span className="num">8</span>
             <span>
               Some nights are <b>special</b> — meteor showers, thick fog, high tides — announced on the title screen. And on rare nights, the <b>Jade Carp</b> crosses the lake: catch it with your head for +10.
+            </span>
+          </p>
+          <p>
+            <span className="num">9</span>
+            <span>
+              Every night earns <b>☾ moonlight</b>. Spend it in the <b>Garden</b> to light paper lanterns, bloom lotuses, and change the serpent's ink — all visible in the 3D lake. Play consecutive nights to build a <b>streak</b> (+10% moonlight per night, up to +50%; it never punishes a missed night). Fill the <b>Journey to the Moon</b> bar to call a <b>Moonrise Night</b>: a giant moon, a sky raining supernovas, and a keepsake for your Journal.
             </span>
           </p>
           <p className="small">On mobile: swipe across the lake or use the virtual buttons below.</p>
@@ -323,6 +509,7 @@ export function GameOverOverlay() {
   const deathCause = useGame((s) => s.deathCause)
   const deathSnapshot = useGame((s) => s.deathSnapshot)
   const isNewBest = useGame((s) => s.isNewBest)
+  const lastMoonlight = useGame((s) => s.lastMoonlight)
   const start = useGame((s) => s.start)
   const toTitle = useGame((s) => s.toTitle)
   const [sharing, setSharing] = useState(false)
@@ -384,6 +571,11 @@ export function GameOverOverlay() {
         <p className="result-moon">
           {gameModeById(gameMode).name} · {moonPhaseById(moonPhase).name} run
         </p>
+        {lastMoonlight > 0 && (
+          <p className="result-moonlight" aria-live="polite">
+            {MOONLIGHT_GLYPH} +{lastMoonlight} moonlight for the garden
+          </p>
+        )}
         <div className="sheet-actions">
           <button type="button" className="btn btn--primary" onClick={start} autoFocus>
             Play again
@@ -404,6 +596,39 @@ export function GameOverOverlay() {
         <p className="hint">
           Press <kbd>Space</kbd> to glide again
         </p>
+      </div>
+    </div>
+  )
+}
+
+// P4 — the short cinematic that closes a Moonrise Night: a keepsake poem.
+export function MoonriseCoda() {
+  const moonriseCoda = useGame((s) => s.moonriseCoda)
+  const dismissMoonriseCoda = useGame((s) => s.dismissMoonriseCoda)
+  const night = useGame((s) => s.night)
+  if (!moonriseCoda) return null
+  return (
+    <div className="sheet coda" role="dialog" aria-label="Moonrise keepsake">
+      <div className="sheet-card coda__card">
+        <p className="coda__moon" aria-hidden="true">🌕</p>
+        <p className="overline">the moon remembers</p>
+        <h2>A Moonrise Night, lived</h2>
+        <p className="coda__poem">
+          “The moon leaned close,
+          <br />
+          and the sky rained stars.”
+        </p>
+        <p className="coda__meta">
+          Night {night} · {moonriseCoda.keepsake.date} · {MOONLIGHT_GLYPH} +{moonriseCoda.moonlight} moonlight
+        </p>
+        <p className="coda__hint">
+          A keepsake rests in your Journal. The journey begins again — the garden is already saving moonlight.
+        </p>
+        <div className="actions">
+          <button type="button" className="btn btn--primary" onClick={dismissMoonriseCoda} autoFocus>
+            Return to the garden
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -495,6 +720,89 @@ function VerseToasts() {
   )
 }
 
+// The night opens with a quiet moment: the night's new whispers and verses
+// are read one at a time BEFORE gameplay begins, instead of bursting over
+// the live garden in unreadable stacks.
+export function PrologueOverlay() {
+  const night = useGame((s) => s.night)
+  const queue = useGame((s) => s.prologueQueue)
+  const moonPhase = useGame((s) => s.moonPhase)
+  const gameMode = useGame((s) => s.gameMode)
+  const nightEvent = useGame((s) => s.nightEvent)
+  const beginNight = useGame((s) => s.beginNight)
+  const [index, setIndex] = useState(0)
+
+  const phase = moonPhaseById(moonPhase)
+  const mode = gameModeById(gameMode)
+  const event = nightEventById(nightEvent)
+
+  // Walk through the night's new poems, then begin the run on its own.
+  // Any tap or keypress skips straight to gameplay.
+  useEffect(() => {
+    const last = index >= queue.length
+    const wait = queue.length === 0 ? 2200 : last ? 2600 : 3600
+    const t = setTimeout(() => {
+      if (last) beginNight()
+      else setIndex((i) => i + 1)
+    }, wait)
+    return () => clearTimeout(t)
+  }, [index, queue.length, beginNight])
+
+  const item = index < queue.length ? queue[index] : null
+  return (
+    <div className="prologue-overlay" onClick={beginNight} role="dialog" aria-label="The night begins">
+      <div className="prologue-inner">
+        <p className="prologue-kicker">Night {night}</p>
+        <p className="prologue-sub">
+          {phase?.name} · {mode?.name}
+          {event && event.id !== 'none' ? ` · ${event.name}` : ''}
+        </p>
+        {item ? (
+          <div className="prologue-card" key={`${item.kind}-${item.id}-${index}`}>
+            {item.kind === 'verse' ? (
+              <>
+                <p className="prologue-card__overline">a verse of the chronicle</p>
+                <p className="prologue-card__line">“{item.lines[0]}”</p>
+                <p className="prologue-card__line">“{item.lines[1]}”</p>
+              </>
+            ) : (
+              <>
+                <p className="prologue-card__overline">a whisper of the night</p>
+                <p className="prologue-card__line prologue-card__line--whisper">
+                  <span aria-hidden="true">✦ </span>{item.text}
+                </p>
+              </>
+            )}
+          </div>
+        ) : (
+          <p className="prologue-quiet">The lake is quiet tonight.</p>
+        )}
+        {queue.length > 1 && (
+          <div className="prologue-dots" aria-hidden="true">
+            {queue.map((q, i) => (
+              <span
+                key={`${q.kind}-${q.id}`}
+                className={i === index ? 'prologue-dot is-active' : i < index ? 'prologue-dot is-done' : 'prologue-dot'}
+              />
+            ))}
+          </div>
+        )}
+        <button
+          type="button"
+          className="prologue-begin"
+          onClick={(e) => {
+            e.stopPropagation()
+            beginNight()
+          }}
+        >
+          Begin the night ▸
+        </button>
+        <p className="prologue-hint">tap anywhere to begin</p>
+      </div>
+    </div>
+  )
+}
+
 // P3 — share one moon verse as a 1080x1350 card (Web Share, download fallback).
 function VerseShareButton({ verse }) {
   const night = useGame((s) => s.night)
@@ -546,6 +854,7 @@ export function JournalOverlay() {
   const closeJournal = useGame((s) => s.closeJournal)
   const unlockedWhispers = useGame((s) => s.unlockedWhispers)
   const unlockedVerses = useGame((s) => s.unlockedVerses)
+  const keepsakes = useGame((s) => s.keepsakes)
   const night = useGame((s) => s.night)
   const totals = useGame((s) => s.totals)
   const [tab, setTab] = useState('whispers')
@@ -576,6 +885,15 @@ export function JournalOverlay() {
           >
             Verses · {unlockedVerses.length}/{VERSE_COUNT}
           </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={tab === 'keepsakes'}
+            className={`journal__tab${tab === 'keepsakes' ? ' is-active' : ''}`}
+            onClick={() => setTab('keepsakes')}
+          >
+            Keepsakes · {keepsakes.length}
+          </button>
         </div>
         {tab === 'whispers' ? (
           <>
@@ -598,7 +916,7 @@ export function JournalOverlay() {
               )}
             </div>
           </>
-        ) : (
+        ) : tab === 'verses' ? (
           <>
             <h2>The Lunar Chronicle</h2>
             <p className="journal__stats">
@@ -620,6 +938,29 @@ export function JournalOverlay() {
                 ),
               )}
             </div>
+          </>
+        ) : (
+          <>
+            <h2>Moonrise Keepsakes</h2>
+            <p className="journal__stats">
+              {keepsakes.length} moonrise{keepsakes.length === 1 ? '' : 's'} lived · Night {night}
+            </p>
+            {keepsakes.length === 0 ? (
+              <p className="journal__locked journal__empty">
+                No keepsakes yet. Fill the Journey to the Moon in the Garden,
+                and the moon will lean close for you.
+              </p>
+            ) : (
+              <div className="journal__grid">
+                {keepsakes.map((k) => (
+                  <div key={k.id} className="journal__entry is-heard keepsake">
+                    <p className="keepsake__moon">🌕</p>
+                    <p>“The moon leaned close, and the sky rained stars.”</p>
+                    <p className="keepsake__meta">Night {k.night} · {k.date}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </>
         )}
         <div className="actions">
@@ -812,21 +1153,27 @@ export default function Hud() {
   const status = useGame((s) => s.status)
   const showHowTo = useGame((s) => s.showHowTo)
   const showJournal = useGame((s) => s.showJournal)
+  const showGarden = useGame((s) => s.showGarden)
   const showControls = useGame((s) => s.showControls)
+  const moonriseCoda = useGame((s) => s.moonriseCoda)
 
   return (
     <>
       <div className="vignette" />
       <Corners />
-      {status === 'title' && !showHowTo && !showJournal && <TitleOverlay />}
+      {status === 'title' && !showHowTo && !showJournal && !showGarden && <TitleOverlay />}
       {status === 'title' && showHowTo && <HowToOverlay />}
       {status === 'title' && showJournal && !showHowTo && <JournalOverlay />}
+      {status === 'title' && showGarden && !showHowTo && <GardenOverlay />}
+      {status === 'prologue' && <PrologueOverlay />}
       {status === 'playing' && (
         <>
           <PlayingHud />
           <NightBanner />
-          <WhisperToasts />
-          <VerseToasts />
+          <div className="toast-stack">
+            <VerseToasts />
+            <WhisperToasts />
+          </div>
           <div className={showControls ? 'force-show-controls' : 'responsive-controls'}>
             <OnScreenControls />
           </div>
@@ -836,8 +1183,11 @@ export default function Hud() {
       {status === 'dead' && (
         <>
           <GameOverOverlay />
-          <WhisperToasts />
-          <VerseToasts />
+          {moonriseCoda && <MoonriseCoda />}
+          <div className="toast-stack">
+            <VerseToasts />
+            <WhisperToasts />
+          </div>
         </>
       )}
     </>

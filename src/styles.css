@@ -913,7 +913,9 @@ kbd {
   100% { opacity: 0; transform: translateX(-50%) translateY(8px); }
 }
 
-.whisper-toasts {
+/* Whispers + verses share one anchored column so the two stacks can never
+   overlap each other the way two separate fixed containers did. */
+.toast-stack {
   position: fixed;
   bottom: 9rem;
   left: 50%;
@@ -924,7 +926,16 @@ kbd {
   gap: 0.5rem;
   z-index: 45;
   pointer-events: none;
-  width: min(92vw, 34rem);
+  width: min(92vw, 36rem);
+}
+
+.whisper-toasts {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  pointer-events: none;
+  width: 100%;
 }
 
 .whisper-toast {
@@ -1059,17 +1070,12 @@ kbd {
 }
 
 .verse-toasts {
-  position: fixed;
-  bottom: 13.5rem;
-  left: 50%;
-  transform: translateX(-50%);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 0.5rem;
-  z-index: 46;
   pointer-events: none;
-  width: min(92vw, 36rem);
+  width: 100%;
 }
 
 .verse-toast {
@@ -1109,6 +1115,152 @@ kbd {
   100% { opacity: 0; transform: translateY(-10px); }
 }
 
+/* ---- Night prologue: read the night's new poems before playing ---- */
+
+.prologue-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse at center, rgba(4, 6, 12, 0.55) 0%, rgba(4, 6, 12, 0.85) 100%);
+  cursor: pointer;
+  animation: prologueIn 0.6s ease both;
+}
+
+.prologue-inner {
+  text-align: center;
+  padding: 0 1.5rem;
+  max-width: 36rem;
+}
+
+.prologue-kicker {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(2rem, 6vw, 3rem);
+  letter-spacing: 0.35em;
+  text-transform: uppercase;
+  color: #f4e9c8;
+  text-shadow: 0 0 18px rgba(244, 233, 200, 0.45), 0 2px 8px rgba(0, 0, 0, 0.7);
+  margin: 0 0 0.4rem;
+}
+
+.prologue-sub {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-size: clamp(0.95rem, 2.6vw, 1.15rem);
+  letter-spacing: 0.12em;
+  color: rgba(214, 226, 240, 0.8);
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
+  margin: 0 0 2rem;
+}
+
+.prologue-card {
+  padding: 1.5rem 2.2rem;
+  border: 1px solid rgba(217, 185, 106, 0.5);
+  border-radius: 1rem;
+  background: rgba(10, 14, 22, 0.88);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 0 32px rgba(217, 185, 106, 0.16);
+  animation: prologueCardIn 0.7s ease both;
+}
+
+.prologue-card__overline {
+  margin: 0 0 0.7rem;
+  font-size: 0.7rem;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: rgba(217, 185, 106, 0.9);
+}
+
+.prologue-card__line {
+  margin: 0.25rem 0;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-size: clamp(1.15rem, 3.4vw, 1.5rem);
+  line-height: 1.6;
+  letter-spacing: 0.04em;
+  color: #f4e9c8;
+}
+
+.prologue-quiet {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-size: clamp(1.05rem, 3vw, 1.3rem);
+  color: rgba(214, 226, 240, 0.6);
+  letter-spacing: 0.06em;
+  margin: 0;
+  animation: prologueCardIn 0.7s ease both;
+}
+
+.prologue-dots {
+  display: flex;
+  gap: 0.55rem;
+  justify-content: center;
+  margin: 1.5rem 0 0;
+}
+
+.prologue-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: rgba(214, 226, 240, 0.22);
+}
+
+.prologue-dot.is-done {
+  background: rgba(217, 185, 106, 0.55);
+}
+
+.prologue-dot.is-active {
+  background: #f4e9c8;
+  box-shadow: 0 0 8px rgba(244, 233, 200, 0.8);
+}
+
+.prologue-begin {
+  margin-top: 2.1rem;
+  padding: 0.75rem 2.2rem;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 1.05rem;
+  letter-spacing: 0.14em;
+  color: #f4e9c8;
+  background: rgba(217, 185, 106, 0.1);
+  border: 1px solid rgba(217, 185, 106, 0.65);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.25s ease, box-shadow 0.25s ease;
+}
+
+.prologue-begin:hover {
+  background: rgba(217, 185, 106, 0.22);
+  box-shadow: 0 0 18px rgba(217, 185, 106, 0.35);
+}
+
+.prologue-hint {
+  margin: 0.8rem 0 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(214, 226, 240, 0.4);
+}
+
+@keyframes prologueIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes prologueCardIn {
+  0% { opacity: 0; transform: translateY(16px) scale(0.97); }
+  100% { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .prologue-overlay,
+  .prologue-card,
+  .prologue-quiet {
+    animation-duration: 0.01s;
+  }
+}
+
 .journal__tabs {
   display: flex;
   gap: 0.5rem;
@@ -1143,4 +1295,273 @@ kbd {
   margin-top: 0.5rem;
   font-size: 0.8rem;
   padding: 0.3rem 0.8rem;
+}
+
+/* ---- P4 storytelling: The Garden Remembers ---- */
+
+.title-wallet {
+  display: flex;
+  gap: 0.6rem;
+  justify-content: center;
+  align-items: center;
+  margin: 0.4rem 0 0.9rem;
+  flex-wrap: wrap;
+}
+
+.moonlight-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #f4e9c8;
+  background: rgba(30, 34, 60, 0.55);
+  border: 1px solid rgba(244, 233, 200, 0.35);
+  border-radius: 999px;
+  padding: 0.35rem 1rem;
+}
+
+.moonlight-pill--big {
+  font-size: 1.25rem;
+  padding: 0.5rem 1.4rem;
+}
+
+.streak-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  color: #ffd54f;
+  background: rgba(60, 44, 10, 0.4);
+  border: 1px solid rgba(255, 213, 79, 0.35);
+  border-radius: 999px;
+  padding: 0.35rem 0.9rem;
+}
+
+.journey-bar {
+  margin: 0 auto 1rem;
+  max-width: 26rem;
+  width: 100%;
+}
+
+.journey-bar__track {
+  height: 0.55rem;
+  border-radius: 999px;
+  background: rgba(20, 30, 50, 0.7);
+  border: 1px solid rgba(244, 233, 200, 0.25);
+  overflow: hidden;
+}
+
+.journey-bar__fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #4eedb8, #f4e9c8, #ffd54f);
+  transition: width 0.6s ease;
+}
+
+.journey-bar__label {
+  margin: 0.45rem 0 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(244, 233, 200, 0.75);
+}
+
+.btn--moonrise {
+  background: linear-gradient(180deg, #fff3c4, #ffd54f 60%, #e8a93d);
+  color: #241a05;
+  border-color: rgba(255, 213, 79, 0.9);
+  font-weight: 700;
+  font-size: 1.05rem;
+  padding: 0.85rem 2.2rem;
+  margin: 0.4rem 0 1rem;
+  box-shadow: 0 10px 34px rgba(255, 213, 79, 0.35);
+}
+
+.btn--moonrise:hover {
+  box-shadow: 0 14px 44px rgba(255, 213, 79, 0.55);
+  border-color: #ffffff;
+}
+
+.result-moonlight {
+  font-size: 0.95rem;
+  letter-spacing: 0.1em;
+  color: #f4e9c8;
+  margin: -1.2rem 0 1.4rem;
+}
+
+/* Garden overlay */
+
+.garden {
+  max-height: 86vh;
+  overflow-y: auto;
+  text-align: center;
+}
+
+.garden__balance {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.8rem;
+  margin: 0.6rem 0 0.4rem;
+  flex-wrap: wrap;
+}
+
+.garden__section {
+  margin: 1.3rem auto 0;
+  max-width: 26rem;
+  padding-top: 1.1rem;
+  border-top: 1px solid rgba(127, 231, 195, 0.15);
+}
+
+.garden__section h3 {
+  margin: 0 0 0.4rem;
+  font-size: 1.05rem;
+  letter-spacing: 0.06em;
+  color: #eaf7ef;
+}
+
+.garden__desc {
+  font-size: 0.9rem;
+  color: rgba(234, 247, 239, 0.78);
+  margin: 0 0 0.7rem;
+}
+
+.garden__hint {
+  font-size: 0.82rem;
+  font-style: italic;
+  color: rgba(234, 247, 239, 0.55);
+  margin: 0.5rem 0 0;
+}
+
+.garden__maxed {
+  font-size: 0.9rem;
+  color: #ffd54f;
+  letter-spacing: 0.06em;
+}
+
+.garden__inks {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.6rem;
+}
+
+.garden__ink {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.55rem 0.7rem;
+  border-radius: 0.7rem;
+  background: rgba(22, 44, 35, 0.55);
+  border: 1px solid rgba(78, 237, 184, 0.22);
+  color: #eaf7ef;
+  cursor: pointer;
+  font-size: 0.82rem;
+}
+
+.garden__ink:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.garden__ink.is-selected {
+  border-color: #ffd54f;
+  box-shadow: 0 0 14px rgba(255, 213, 79, 0.25);
+}
+
+.garden__swatch {
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 10px currentColor;
+}
+
+.garden__ink-name {
+  flex: 1;
+  text-align: left;
+  font-weight: 600;
+}
+
+.garden__ink-state {
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+  color: rgba(234, 247, 239, 0.65);
+}
+
+.garden__journey .journey-bar__track {
+  margin: 0.4rem 0 0.2rem;
+}
+
+/* Moonrise coda */
+
+.coda {
+  z-index: 40; /* above the game-over sheet (--z-sheet: 30) */
+}
+
+.coda__card {
+  text-align: center;
+  background: radial-gradient(ellipse at 50% 20%, rgba(40, 46, 90, 0.92), rgba(8, 12, 24, 0.96));
+  border-color: rgba(255, 213, 79, 0.45);
+}
+
+.coda__moon {
+  font-size: 3.2rem;
+  margin: 0 0 0.4rem;
+  filter: drop-shadow(0 0 22px rgba(255, 213, 79, 0.8));
+}
+
+.coda__poem {
+  font-size: 1.25rem;
+  font-style: italic;
+  line-height: 1.7;
+  color: #f4e9c8;
+  margin: 1rem 0;
+}
+
+.coda__meta {
+  font-size: 0.82rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(244, 233, 200, 0.7);
+  margin: 0 0 0.8rem;
+}
+
+.coda__hint {
+  font-size: 0.88rem;
+  color: rgba(234, 247, 239, 0.7);
+  font-style: italic;
+  margin: 0 0 1.2rem;
+}
+
+/* Keepsakes */
+
+.keepsake {
+  text-align: center;
+}
+
+.keepsake__moon {
+  font-size: 1.8rem;
+  margin: 0 0 0.3rem;
+}
+
+.keepsake__meta {
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  color: rgba(234, 247, 239, 0.55);
+  margin-top: 0.4rem;
+}
+
+.journal__empty {
+  text-align: center;
+  padding: 2rem 1rem;
+  font-style: italic;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .journey-bar__fill {
+    transition: none;
+  }
 }

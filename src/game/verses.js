@@ -73,6 +73,11 @@ export const VERSES = [
     when: (c) => c.event === 'eat' && c.nightStats.boostEats >= 5 },
   { id: 'verse-garden-ghost', lines: ['Twenty-five endings,', 'and still you return.'],
     when: (c) => c.totals.deaths >= 25 },
+  // P4 — The Garden Remembers.
+  { id: 'verse-moonrise', lines: ['The moon leaned close,', 'and the sky rained stars.'],
+    when: (c) => c.event === 'nightStart' && c.nightEvent === 'moonrise' },
+  { id: 'verse-garden-awakens', lines: ['You hung a lantern', 'where the dark used to be.'],
+    when: (c) => c.event === 'garden' },
   // The final verse: only when every other verse has been heard.
   { id: 'verse-ink-legend', lines: ['You are the story', 'the lake has been telling.'],
     when: (c) => c.unlocked.length >= VERSES.length - 1 },
