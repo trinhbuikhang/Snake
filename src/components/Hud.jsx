@@ -1347,10 +1347,6 @@ export default function Hud() {
         <>
           <GameOverOverlay />
           {moonriseCoda && <MoonriseCoda />}
-          <div className="toast-stack">
-            <VerseToasts />
-            <WhisperToasts />
-          </div>
         </>
       )}
     </>
