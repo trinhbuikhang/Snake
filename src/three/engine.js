@@ -72,6 +72,60 @@ export function createEngine(canvas, { reduced } = {}) {
 
   // Camera shake
   let camShake = 0
+  // Reused scratch vectors — the frame loop must not allocate per frame.
+  const _shake = new THREE.Vector3()
+  const _headOff = new THREE.Vector3(0, 1.2, 0)
+
+  // ---- adaptive quality ------------------------------------------------------
+  // The garden is a heavy frame: UnrealBloom + 4x-MSAA composer targets +
+  // a 2048px PCF-soft shadow map at up to DPR 2. On weaker GPUs that stack
+  // tanks the frame rate, so a governor watches a rolling FPS average and
+  // steps the quality down until the frame budget fits. Ordered
+  // cheapest-sacrifice-first: MSAA under bloom is nearly invisible, then
+  // pixel ratio, then shadow resolution — the bloom itself goes last.
+  const QUALITY_STEPS = [
+    { dpr: 2,    msaa: 4, shadow: 2048, bloom: true  },
+    { dpr: 2,    msaa: 0, shadow: 2048, bloom: true  },
+    { dpr: 1.5,  msaa: 0, shadow: 2048, bloom: true  },
+    { dpr: 1.5,  msaa: 0, shadow: 1024, bloom: true  },
+    { dpr: 1.25, msaa: 0, shadow: 1024, bloom: true  },
+    { dpr: 1,    msaa: 0, shadow: 1024, bloom: false },
+  ]
+  let qualityIdx = 0
+  let fpsAccum = 0
+  let fpsCount = 0
+  let fpsBadStreak = 0
+  let qualityCooldownUntil = 0
+  const governorWarmUntil = performance.now() + 4000
+
+  function applyQuality() {
+    const q = QUALITY_STEPS[qualityIdx]
+    const w = canvas.clientWidth || 1
+    const h = canvas.clientHeight || 1
+    const dpr = Math.min(window.devicePixelRatio, q.dpr)
+    renderer.setPixelRatio(dpr)
+    renderer.setSize(w, h, false)
+    if (composer) {
+      composer.setPixelRatio(dpr)
+      composer.setSize(w, h)
+      try {
+        composer.renderTarget1.samples = q.msaa
+        composer.renderTarget1.dispose()
+        composer.renderTarget2.samples = q.msaa
+        composer.renderTarget2.dispose()
+      } catch {
+        /* MSAA optional */
+      }
+      if (bloomPass) bloomPass.enabled = q.bloom
+    }
+    if (moon.shadow.mapSize.x !== q.shadow) {
+      moon.shadow.mapSize.set(q.shadow, q.shadow)
+      if (moon.shadow.map) {
+        moon.shadow.map.dispose()
+        moon.shadow.map = null
+      }
+    }
+  }
 
   // ---- lights -----------------------------------------------------------
   const moon = new THREE.DirectionalLight(0xf2ede4, 2.1)
@@ -602,19 +656,7 @@ export function createEngine(canvas, { reduced } = {}) {
   }
 
   function resize() {
-    const w = canvas.clientWidth || 1
-    const h = canvas.clientHeight || 1
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-    renderer.setSize(w, h, false)
-    if (composer) {
-      composer.setSize(w, h)
-      try {
-        composer.renderTarget1.samples = 4
-        composer.renderTarget2.samples = 4
-      } catch {
-        /* MSAA optional */
-      }
-    }
+    applyQuality()
     updateCameraTarget()
   }
   const ro = new ResizeObserver(resize)
@@ -628,15 +670,40 @@ export function createEngine(canvas, { reduced } = {}) {
 
   function frame(now) {
     rafId = requestAnimationFrame(frame)
-    const dt = Math.min((now - prevTS) / 1000, 0.1)
+    const rawDt = (now - prevTS) / 1000
+    const dt = Math.min(rawDt, 0.1)
     prevTS = now
     animT += dt
+
+    // Adaptive quality: watch a rolling FPS average (raw dt, unclamped).
+    // Two consecutive bad windows step the quality down; a single hitch
+    // (tab switch, GC) is forgiven. Skips the first 4 s (warmup) and any
+    // frame after a long background pause.
+    if (now > governorWarmUntil && rawDt < 0.5) {
+      fpsAccum += rawDt
+      fpsCount++
+      if (fpsAccum >= 2.5) {
+        const avgFps = fpsCount / fpsAccum
+        fpsAccum = 0
+        fpsCount = 0
+        if (avgFps < 45 && qualityIdx < QUALITY_STEPS.length - 1 && now > qualityCooldownUntil) {
+          if (++fpsBadStreak >= 2) {
+            qualityIdx++
+            applyQuality()
+            fpsBadStreak = 0
+            qualityCooldownUntil = now + 5000
+          }
+        } else {
+          fpsBadStreak = 0
+        }
+      }
+    }
 
     // Camera smooth follow & shake
     if (camShake > 0.001) {
       camShake = Math.max(0, camShake - dt * 1.8)
     }
-    const shakeOffset = new THREE.Vector3(
+    _shake.set(
       (Math.random() - 0.5) * camShake * 1.2,
       (Math.random() - 0.5) * camShake * 0.8,
       (Math.random() - 0.5) * camShake * 1.2,
@@ -644,7 +711,7 @@ export function createEngine(canvas, { reduced } = {}) {
 
     // Smooth camera interpolation
     camera.position.lerp(camPosTarget, Math.min(1, dt * 5.5))
-    camera.position.add(shakeOffset)
+    camera.position.add(_shake)
     camera.lookAt(camLookTarget)
 
     garden.camera = camera.position
@@ -723,7 +790,7 @@ export function createEngine(canvas, { reduced } = {}) {
     rig.paint({ cur: cells, prev: precells, t: paintT, death, animT, dt, isBoosting })
 
     // Headlight follows snake head
-    headLight.position.copy(rig.group.position).add(new THREE.Vector3(0, 1.2, 0))
+    headLight.position.copy(rig.group.position).add(_headOff)
     headLight.intensity = headLightBase + (isBoosting ? 1.5 : 0) + pulse * 2.5
 
     // Bloom pulse decay
