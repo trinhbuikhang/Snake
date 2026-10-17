@@ -157,24 +157,38 @@ export function createGame(moonId = 'half', modeId = 'classic', eventId = 'none'
 
 // Queue a turn with smart buffering:
 // - Ignores reverse turns (prevent suicide).
-// - Allows up to 2 queued turns (corner cut); extra taps while the buffer is
-//   full are dropped. (Replacing the 2nd queued turn is impossible on a
-//   4-direction grid: every alternative is either a no-op or a suicide turn.)
+// - Holds up to 3 queued turns; when full, a new valid turn replaces the
+//   last queued one instead of being silently dropped, so the snake always
+//   follows the player's latest steering intent. This matters at high speed:
+//   ticks can fly by in ~40ms, and without replacement a fast steering burst
+//   would lose inputs and the snake would feel unresponsive.
+// - The replacement is validated against the turn it would follow, so a
+//   suicide turn can never sneak in through the back door (step() re-checks
+//   too, as a second guard).
+const MAX_QUEUE = 3
 export function turn(game, key) {
   const d = DIR[key]
   if (!d) return false
 
-  // Base the reference direction on the latest queued turn or current moving direction
-  const refKey = game.queue.length > 0 ? game.queue[game.queue.length - 1] : game.dir
+  // Reference direction: the turn this new input would follow. Normally the
+  // last queued turn; when the buffer is full and this input would replace
+  // it, the one before.
+  const full = game.queue.length >= MAX_QUEUE
+  const refIdx = full ? game.queue.length - 2 : game.queue.length - 1
+  const refKey = refIdx >= 0 ? game.queue[refIdx] : game.dir
   const refDir = DIR[refKey]
 
-  // Cannot turn opposite to the active/last pending direction
+  // Cannot turn opposite to the reference direction (suicide), nor repeat it.
   if (isOpposite(d, refDir)) return false
-  // Already heading in that direction
   if (d === refDir) return false
 
-  if (game.queue.length >= 2) return false
-  game.queue.push(key)
+  if (full) {
+    // Re-tapping the latest queued direction changes nothing.
+    if (key === game.queue[game.queue.length - 1]) return false
+    game.queue[game.queue.length - 1] = key // revise latest intent
+  } else {
+    game.queue.push(key)
+  }
   return true
 }
 
