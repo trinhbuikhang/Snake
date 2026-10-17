@@ -524,6 +524,7 @@ export function GameOverOverlay() {
   const lastMoonlight = useGame((s) => s.lastMoonlight)
   const night = useGame((s) => s.night)
   const highlights = useGame((s) => s.highlights)
+  const runUnlocks = useGame((s) => s.runUnlocks)
   const gardenerName = useGame((s) => s.gardenerName)
   const start = useGame((s) => s.start)
   const toTitle = useGame((s) => s.toTitle)
@@ -637,6 +638,26 @@ export function GameOverOverlay() {
                   style={{ animationDelay: `${0.35 + i * 0.45}s` }}
                 >
                   “{h.text}”
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {runUnlocks.length > 0 && (
+          <div className="run-unlocks" aria-label="New journal entries tonight">
+            <p className="run-unlocks__title">New in your journal tonight</p>
+            <ul>
+              {runUnlocks.map((u) => (
+                <li key={`${u.kind}-${u.id}`} className="run-unlocks__item">
+                  {u.kind === 'verse' ? (
+                    <>
+                      <span className="run-unlocks__kind">a verse of the chronicle</span>
+                      <span className="run-unlocks__lines">“{u.lines[0]}”</span>
+                      <span className="run-unlocks__lines">“{u.lines[1]}”</span>
+                    </>
+                  ) : (
+                    <span className="run-unlocks__lines">“{u.text}”</span>
+                  )}
                 </li>
               ))}
             </ul>
@@ -798,59 +819,16 @@ function CoachMarks() {
   )
 }
 
-function WhisperToast({ toast, onDone }) {
-  useEffect(() => {
-    const t = setTimeout(onDone, 4500)
-    return () => clearTimeout(t)
-  }, [onDone])
+// Mid-run unlocks no longer float over the live garden as toasts — a quiet
+// corner note counts them instead. The poems themselves wait in the game-over
+// summary, readable at rest.
+function JournalPing() {
+  const runUnlocks = useGame((s) => s.runUnlocks)
+  if (runUnlocks.length === 0) return null
   return (
-    <div className="whisper-toast" role="status">
-      <span className="whisper-toast__mark" aria-hidden="true">
-        ✦
-      </span>
-      <p>{toast.text}</p>
-    </div>
-  )
-}
-
-// P2 storytelling — floating one-line poems when a whisper unlocks.
-function WhisperToasts() {
-  const toasts = useGame((s) => s.whisperToasts)
-  const dismissWhisperToast = useGame((s) => s.dismissWhisperToast)
-  if (toasts.length === 0) return null
-  return (
-    <div className="whisper-toasts" aria-live="polite">
-      {toasts.map((t) => (
-        <WhisperToast key={t.toastId} toast={t} onDone={() => dismissWhisperToast(t.toastId)} />
-      ))}
-    </div>
-  )
-}
-
-function VerseToast({ toast, onDone }) {
-  useEffect(() => {
-    const t = setTimeout(onDone, 5500)
-    return () => clearTimeout(t)
-  }, [onDone])
-  return (
-    <div className="verse-toast" role="status">
-      <p className="verse-toast__overline">a verse of the chronicle</p>
-      <p className="verse-toast__line">“{toast.lines[0]}”</p>
-      <p className="verse-toast__line">“{toast.lines[1]}”</p>
-    </div>
-  )
-}
-
-// P3 storytelling — floating two-line verses when a moon verse unlocks.
-function VerseToasts() {
-  const toasts = useGame((s) => s.verseToasts)
-  const dismissVerseToast = useGame((s) => s.dismissVerseToast)
-  if (toasts.length === 0) return null
-  return (
-    <div className="verse-toasts" aria-live="polite">
-      {toasts.map((t) => (
-        <VerseToast key={t.toastId} toast={t} onDone={() => dismissVerseToast(t.toastId)} />
-      ))}
+    <div className="journal-ping" aria-live="polite">
+      <span aria-hidden="true">✦</span>
+      {runUnlocks.length} new in your journal
     </div>
   )
 }
@@ -1333,10 +1311,7 @@ export default function Hud() {
         <>
           <PlayingHud />
           <CoachMarks />
-          <div className="toast-stack">
-            <VerseToasts />
-            <WhisperToasts />
-          </div>
+          <JournalPing />
           <div className={showControls ? 'force-show-controls' : 'responsive-controls'}>
             <OnScreenControls />
           </div>
