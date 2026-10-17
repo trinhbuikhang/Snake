@@ -362,8 +362,14 @@ export const useGame = create((set, get) => ({
   seenPhases: [],
   // unlockedWhispers: whisper ids the player has heard
   unlockedWhispers: [],
-  // whisperToasts: queued toast notifications for freshly unlocked whispers
+  // whisperToasts: transient ferry for night-start unlocks — start() moves
+  // them into prologueQueue so they are read before the run begins.
   whisperToasts: [],
+  // runUnlocks: whispers + verses unlocked during a live run. They no longer
+  // float over the gameplay as toasts; a quiet corner note counts them and
+  // the poems wait in the game-over summary, readable at rest.
+  // Each entry is { kind: 'whisper'|'verse', id, text?, lines? }.
+  runUnlocks: [],
   // nightBanner: { night, modeLabel, phaseLabel } shown briefly when a run starts
   nightBanner: null,
   // coachStep: P6 first-night guide. -1 = hidden/done, 0..2 = visible steps.
@@ -479,6 +485,7 @@ export const useGame = create((set, get) => ({
       nightEvent,
       whisperToasts: [],
       verseToasts: [],
+      runUnlocks: [],
       prologueQueue: [],
       prologueIndex: 0,
       streak,
@@ -788,11 +795,25 @@ export const useGame = create((set, get) => ({
     }
     if (freshAll.length === 0) return
     writeJSON(WHISPERS_KEY, JSON.stringify(unlocked))
-    const toasts = freshAll.map((w) => ({ ...w, toastId: `w${Date.now()}-${Math.random().toString(36).slice(2, 8)}` }))
-    set((prev) => ({
-      unlockedWhispers: unlocked,
-      whisperToasts: [...prev.whisperToasts, ...toasts].slice(-6),
-    }))
+    // Night-start unlocks ride the toast ferry into the prologue queue, where
+    // they are read one at a time before the run begins. Mid-run unlocks no
+    // longer float over live gameplay — they rest in runUnlocks for the
+    // game-over summary instead.
+    if (get().status === 'prologue') {
+      const toasts = freshAll.map((w) => ({ ...w, toastId: `w${Date.now()}-${Math.random().toString(36).slice(2, 8)}` }))
+      set((prev) => ({
+        unlockedWhispers: unlocked,
+        whisperToasts: [...prev.whisperToasts, ...toasts].slice(-6),
+      }))
+    } else {
+      set((prev) => ({
+        unlockedWhispers: unlocked,
+        runUnlocks: [
+          ...prev.runUnlocks,
+          ...freshAll.map((w) => ({ kind: 'whisper', id: w.id, text: w.text })),
+        ].slice(-8),
+      }))
+    }
   },
 
   // Called by the engine right after addScore(): updates per-night + lifetime
@@ -862,21 +883,26 @@ export const useGame = create((set, get) => ({
     }
     if (freshAll.length === 0) return
     writeJSON(VERSES_KEY, JSON.stringify(unlocked))
-    const toasts = freshAll.map((v) => ({ ...v, toastId: `v${Date.now()}-${Math.random().toString(36).slice(2, 8)}` }))
     // P6: a soft moon-chime marks the moment a verse joins the chronicle.
+    // Audio feedback stays — it never covers the garden.
     playVerse()
-    set((prev) => ({
-      unlockedVerses: unlocked,
-      verseToasts: [...prev.verseToasts, ...toasts].slice(-4),
-    }))
-  },
-
-  dismissVerseToast(toastId) {
-    set((s) => ({ verseToasts: s.verseToasts.filter((t) => t.toastId !== toastId) }))
-  },
-
-  dismissWhisperToast(toastId) {
-    set((s) => ({ whisperToasts: s.whisperToasts.filter((t) => t.toastId !== toastId) }))
+    // Like whispers above: night-start unlocks ride the toast ferry into the
+    // prologue queue; mid-run unlocks rest in runUnlocks for the summary.
+    if (get().status === 'prologue') {
+      const toasts = freshAll.map((v) => ({ ...v, toastId: `v${Date.now()}-${Math.random().toString(36).slice(2, 8)}` }))
+      set((prev) => ({
+        unlockedVerses: unlocked,
+        verseToasts: [...prev.verseToasts, ...toasts].slice(-4),
+      }))
+    } else {
+      set((prev) => ({
+        unlockedVerses: unlocked,
+        runUnlocks: [
+          ...prev.runUnlocks,
+          ...freshAll.map((v) => ({ kind: 'verse', id: v.id, lines: v.lines })),
+        ].slice(-8),
+      }))
+    }
   },
 
   // Called by the engine when the snake catches the Jade Carp spirit.

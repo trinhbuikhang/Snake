@@ -1017,63 +1017,30 @@ kbd {
 
 /* Whispers + verses share one anchored column so the two stacks can never
    overlap each other the way two separate fixed containers did. */
-.toast-stack {
+/* ---- Mid-run unlock note: a quiet corner count, never over the garden ---- */
+.journal-ping {
   position: fixed;
-  bottom: 9rem;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
-  z-index: 45;
+  top: max(14px, env(safe-area-inset-top, 0px));
+  left: max(14px, env(safe-area-inset-left, 0px));
+  z-index: 40;
   pointer-events: none;
-  width: min(92vw, 36rem);
-}
-
-.whisper-toasts {
-  display: flex;
-  flex-direction: column;
+  display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  pointer-events: none;
-  width: 100%;
-}
-
-.whisper-toast {
-  display: flex;
-  align-items: baseline;
-  gap: 0.6rem;
-  padding: 0.6rem 1.1rem;
-  border: 1px solid rgba(244, 233, 200, 0.35);
+  gap: 0.45rem;
+  padding: 0.35rem 0.85rem;
+  border: 1px solid rgba(244, 233, 200, 0.28);
   border-radius: 999px;
-  background: rgba(8, 12, 20, 0.78);
+  background: rgba(8, 12, 20, 0.72);
   backdrop-filter: blur(6px);
-  animation: whisperToastIn 4.5s ease forwards;
-  max-width: 100%;
-}
-
-.whisper-toast__mark {
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
   color: #f4e9c8;
-  font-size: 0.9em;
-  flex-shrink: 0;
+  animation: journalPingIn 0.5s ease;
 }
 
-.whisper-toast p {
-  margin: 0;
-  font-family: Georgia, 'Times New Roman', serif;
-  font-style: italic;
-  font-size: 0.95rem;
-  letter-spacing: 0.04em;
-  color: #eef1e6;
-  text-align: center;
-}
-
-@keyframes whisperToastIn {
-  0% { opacity: 0; transform: translateY(12px) scale(0.96); }
-  8% { opacity: 1; transform: translateY(0) scale(1); }
-  82% { opacity: 1; }
-  100% { opacity: 0; transform: translateY(-8px); }
+@keyframes journalPingIn {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: none; }
 }
 
 /* Journal */
@@ -1143,8 +1110,7 @@ kbd {
 
 @media (prefers-reduced-motion: reduce) {
   .night-banner,
-  .whisper-toast,
-  .verse-toast {
+  .journal-ping {
     animation-duration: 0.01s;
   }
 }
@@ -1274,50 +1240,53 @@ kbd {
   }
 }
 
-.verse-toasts {
+/* ---- Game-over summary: poems unlocked during the run, read at rest ---- */
+.run-unlocks {
+  margin: 1rem 0 0.25rem;
+  text-align: center;
+}
+
+.run-unlocks__title {
+  text-transform: uppercase;
+  letter-spacing: 0.28em;
+  font-size: 0.72rem;
+  color: rgba(217, 185, 106, 0.8);
+  margin: 0 0 0.55rem;
+}
+
+.run-unlocks ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
-  pointer-events: none;
-  width: 100%;
+  gap: 0.6rem;
 }
 
-.verse-toast {
-  padding: 0.75rem 1.4rem;
-  border: 1px solid rgba(217, 185, 106, 0.5);
-  border-radius: 0.9rem;
-  background: rgba(10, 14, 22, 0.85);
-  backdrop-filter: blur(6px);
-  animation: verseToastIn 5.5s ease forwards;
-  max-width: 100%;
-  text-align: center;
-  box-shadow: 0 0 24px rgba(217, 185, 106, 0.18);
+.run-unlocks__item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.55rem 0.9rem;
+  border: 1px solid rgba(244, 233, 200, 0.16);
+  border-radius: 0.8rem;
+  background: rgba(10, 14, 22, 0.5);
 }
 
-.verse-toast__overline {
-  margin: 0 0 0.35rem;
-  font-size: 0.68rem;
+.run-unlocks__kind {
+  font-size: 0.62rem;
   letter-spacing: 0.3em;
   text-transform: uppercase;
-  color: rgba(217, 185, 106, 0.9);
+  color: rgba(217, 185, 106, 0.75);
 }
 
-.verse-toast__line {
-  margin: 0;
+.run-unlocks__lines {
   font-family: Georgia, 'Times New Roman', serif;
   font-style: italic;
-  font-size: 1.02rem;
+  font-size: 0.95rem;
   line-height: 1.5;
   letter-spacing: 0.04em;
-  color: #f4e9c8;
-}
-
-@keyframes verseToastIn {
-  0% { opacity: 0; transform: translateY(14px) scale(0.96); }
-  7% { opacity: 1; transform: translateY(0) scale(1); }
-  84% { opacity: 1; }
-  100% { opacity: 0; transform: translateY(-10px); }
+  color: #eef1e6;
 }
 
 /* ---- Night prologue: read the night's new poems before playing ---- */
