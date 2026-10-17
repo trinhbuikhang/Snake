@@ -353,5 +353,129 @@ export function setWaterOn(on) {
   }
 }
 
-export const audio = { unlockAudio, setMuted, playEat, playBloom, playVerse, playTurn, playDeath, setPadOn, setWaterOn }
+// (ambient score section follows; `audio` is exported at the end of the file)
+
+// ---- Generative ambient score ("the garden sings") -------------------------
+// P6 music, part 1: a sparse, endless koto-like melody woven from the minor
+// pentatonic, retuned by the night's moon phase. No samples, no files — pure
+// oscillators through the shared master bus, so the existing mute toggle and
+// compressor govern it exactly like every other voice. Silent Night is
+// untouched: engine.js never turns the ambient on for it.
+
+const MINOR_PENTA = [0, 3, 5, 7, 10, 12, 15, 17]
+
+// root note, phrase density (0..1) and air (lowpass Hz) per moon phase.
+// Thin moons sing low, dark and rare; the full moon sings higher and brighter.
+const PHASE_TUNING = {
+  new:      { root: 110.0,  density: 0.45, air: 640 },
+  crescent: { root: 98.0,   density: 0.55, air: 760 },
+  half:     { root: 110.0,  density: 0.65, air: 880 },
+  gibbous:  { root: 130.81, density: 0.75, air: 1020 },
+  full:     { root: 146.83, density: 0.85, air: 1180 },
+}
+let ambientPhase = PHASE_TUNING.half
+let ambientOn = false
+let ambientTimer = null
+let ambientGain = null
+let ambientFilter = null
+let nextPhraseAt = 0
+
+export function setAmbientPhase(phaseId) {
+  ambientPhase = PHASE_TUNING[phaseId] || PHASE_TUNING.half
+  if (ambientFilter && ctx) {
+    ambientFilter.frequency.setTargetAtTime(ambientPhase.air, ctx.currentTime, 0.8)
+  }
+}
+
+// A long soft bloom: slow attack, a silk harmonic, a gentle fall.
+// Sits an octave or two below the SFX chimes so the two never blur.
+function bloom(freq, at, vol = 0.07, dur = 2.4) {
+  if (!ctx || !ambientFilter) return
+  const c = ctx
+  const o = c.createOscillator()
+  o.type = 'sine'
+  o.frequency.value = freq
+  const o2 = c.createOscillator()
+  o2.type = 'triangle'
+  o2.frequency.value = freq * 2.001
+  const g2 = c.createGain()
+  g2.gain.value = 0.22 // shimmer blend
+  const g = c.createGain()
+  g.gain.setValueAtTime(0.0001, at)
+  g.gain.linearRampToValueAtTime(vol, at + 0.35)
+  g.gain.exponentialRampToValueAtTime(0.0001, at + dur)
+  o.connect(g)
+  o2.connect(g2)
+  g2.connect(g)
+  g.connect(ambientFilter)
+  o.start(at)
+  o2.start(at)
+  o.stop(at + dur + 0.1)
+  o2.stop(at + dur + 0.1)
+}
+
+// One phrase: 1–3 notes wandering the minor pentatonic, then silence.
+// Rests are music too — density follows the moon.
+function maybePlayPhrase(at) {
+  const { root, density } = ambientPhase
+  if (Math.random() > 0.3 + 0.7 * density) return
+  const count = 1 + Math.floor(Math.random() * 3)
+  let deg = Math.floor(Math.random() * 5)
+  const dir = Math.random() < 0.5 ? 1 : -1
+  let t = at
+  for (let i = 0; i < count; i++) {
+    const semis = MINOR_PENTA[Math.max(0, Math.min(MINOR_PENTA.length - 1, deg))]
+    bloom(root * Math.pow(2, semis / 12), t, 0.05 + Math.random() * 0.035, 2.0 + Math.random() * 1.2)
+    deg += dir * (1 + Math.floor(Math.random() * 2))
+    t += 0.8 + Math.random() * 0.7
+  }
+}
+
+function planPhrases() {
+  if (!ambientOn || !ctx || !ambientGain) return
+  const horizon = ctx.currentTime + 2.0
+  while (nextPhraseAt < horizon) {
+    maybePlayPhrase(nextPhraseAt)
+    // Longer silences under a thin moon.
+    nextPhraseAt += 2.5 + Math.random() * (7 - 5 * ambientPhase.density)
+  }
+}
+
+export function setAmbientOn(on) {
+  if (on === ambientOn) return
+  ambientOn = on
+  if (!ctx || !master) return
+  const c = ctx
+  if (on && !ambientTimer) {
+    ambientGain = c.createGain()
+    ambientGain.gain.value = 0
+    ambientFilter = c.createBiquadFilter()
+    ambientFilter.type = 'lowpass'
+    ambientFilter.frequency.value = ambientPhase.air
+    ambientFilter.connect(ambientGain)
+    ambientGain.connect(master)
+    nextPhraseAt = c.currentTime + 1.4 // first phrase arrives after the fade-in
+    ambientTimer = setInterval(planPhrases, 700)
+    ambientGain.gain.setTargetAtTime(1, c.currentTime, 1.2)
+  }
+  if (!on && ambientTimer) {
+    clearInterval(ambientTimer)
+    ambientTimer = null
+    const g = ambientGain
+    const f = ambientFilter
+    g.gain.setTargetAtTime(0, c.currentTime, 0.5)
+    setTimeout(() => {
+      if (ambientOn) return
+      try {
+        g.disconnect()
+        f.disconnect()
+      } catch {
+        /* already disconnected */
+      }
+      ambientGain = null
+      ambientFilter = null
+    }, 1600)
+  }
+}
+export const audio = { unlockAudio, setMuted, playEat, playBloom, playVerse, playTurn, playDeath, setPadOn, setWaterOn, setAmbientOn, setAmbientPhase }
 export default audio
