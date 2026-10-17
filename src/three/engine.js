@@ -528,9 +528,13 @@ export function createEngine(canvas, { reduced } = {}) {
         if (ev.id === 'silent') {
           audio.setPadOn(false)
           audio.setWaterOn(true)
+          audio.setAmbientOn(false)
         } else {
           audio.setWaterOn(false)
           audio.setPadOn(true)
+          // P6 music: the generative score tunes itself to the night's moon.
+          audio.setAmbientPhase(useGame.getState().moonPhase)
+          audio.setAmbientOn(true)
         }
       } else if (s.status === 'playing' && prev.status === 'ready') {
         // The ready beat ends: start the simulation from a clean slate.
@@ -545,9 +549,11 @@ export function createEngine(canvas, { reduced } = {}) {
         resetDemo()
         audio.setPadOn(false)
         audio.setWaterOn(false)
+        audio.setAmbientOn(false)
       } else if (s.status === 'dead') {
         audio.setPadOn(false)
         audio.setWaterOn(false)
+        audio.setAmbientOn(false)
       }
     }
     if (s.muted !== prev.muted) audio.setMuted(s.muted)
