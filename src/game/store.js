@@ -576,8 +576,17 @@ export const useGame = create((set, get) => ({
   },
 
   // P5 "Shared Skies" — the name signed on shared cards.
+  // While typing, keep the raw text (inner spaces included) and do not
+  // persist yet; trimming happens once, in commitGardenerName, when the
+  // field loses focus or the Journal closes. Trimming on every keystroke
+  // made mid-name spaces impossible to type.
   setGardenerName(name) {
-    const clean = typeof name === 'string' ? name.trim().slice(0, 24) : ''
+    const raw = typeof name === 'string' ? name.slice(0, 24) : ''
+    set({ gardenerName: raw })
+  },
+
+  commitGardenerName() {
+    const clean = (get().gardenerName || '').trim().slice(0, 24)
     writeJSON(NAME_KEY, clean)
     set({ gardenerName: clean })
   },
