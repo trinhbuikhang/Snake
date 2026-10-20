@@ -569,6 +569,24 @@ export function createEngine(canvas, { reduced } = {}) {
   document.addEventListener('visibilitychange', onVis)
 
   // ---- store wiring ----------------------------------------------------------
+  // Run audio, shared by run start and resume-from-pause so the two paths
+  // can never drift apart: Silent Night hears only water; every other
+  // night gets the pad and the generative score tuned to its moon.
+  function startRunAudio() {
+    const ev = nightEventById(useGame.getState().nightEvent)
+    if (ev.id === 'silent') {
+      audio.setPadOn(false)
+      audio.setWaterOn(true)
+      audio.setAmbientOn(false)
+    } else {
+      audio.setWaterOn(false)
+      audio.setPadOn(true)
+      // P6 music: the generative score tunes itself to the night's moon.
+      audio.setAmbientPhase(useGame.getState().moonPhase)
+      audio.setAmbientOn(true)
+    }
+  }
+
   const unsubStore = useGame.subscribe((s, prev) => {
     if (s.status !== prev.status) {
       // Entering a run: the prologue now opens a "ready" beat first (the
@@ -582,18 +600,7 @@ export function createEngine(canvas, { reduced } = {}) {
         resetGame()
         readyAccum = 0
         // P6 "First Light": Silent Night keeps its promise — no music, only water.
-        const ev = nightEventById(useGame.getState().nightEvent)
-        if (ev.id === 'silent') {
-          audio.setPadOn(false)
-          audio.setWaterOn(true)
-          audio.setAmbientOn(false)
-        } else {
-          audio.setWaterOn(false)
-          audio.setPadOn(true)
-          // P6 music: the generative score tunes itself to the night's moon.
-          audio.setAmbientPhase(useGame.getState().moonPhase)
-          audio.setAmbientOn(true)
-        }
+        startRunAudio()
       } else if (s.status === 'playing' && prev.status === 'ready') {
         // The ready beat ends: start the simulation from a clean slate.
         accum = 0
@@ -601,6 +608,13 @@ export function createEngine(canvas, { reduced } = {}) {
       } else if (s.status === 'playing' && prev.status === 'paused') {
         accum = 0
         prevCells = cloneXZ(curCells)
+        startRunAudio() // fade the night's sounds back in
+      } else if (s.status === 'paused') {
+        // Pause silences the garden too (T05): ambient, pad and water all
+        // fade out; startRunAudio() restores them on resume.
+        audio.setAmbientOn(false)
+        audio.setPadOn(false)
+        audio.setWaterOn(false)
       } else if (s.status === 'prologue' && (prev.status === 'title' || prev.status === 'dead')) {
         unlock() // start() runs in the gesture; the demo garden keeps drifting behind the prologue
       } else if (s.status === 'title') {
