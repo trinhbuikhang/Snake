@@ -433,6 +433,12 @@ function maybePlayPhrase(at) {
 
 function planPhrases() {
   if (!ambientOn || !ctx || !ambientGain) return
+  // The scheduler interval is throttled while the tab is hidden, but the
+  // audio clock keeps running. Without this clamp, a returning tab finds
+  // nextPhraseAt far in the past and the loop below schedules every
+  // overdue phrase at a past timestamp — a burst of notes all at once.
+  // Overdue phrases are dropped; the garden resumes singing from now.
+  nextPhraseAt = Math.max(nextPhraseAt, ctx.currentTime + 0.1)
   const horizon = ctx.currentTime + 2.0
   while (nextPhraseAt < horizon) {
     maybePlayPhrase(nextPhraseAt)
@@ -478,4 +484,19 @@ export function setAmbientOn(on) {
   }
 }
 export const audio = { unlockAudio, setMuted, playEat, playBloom, playVerse, playTurn, playDeath, setPadOn, setWaterOn, setAmbientOn, setAmbientPhase }
+
+// Test seam (T05): lets unit tests drive the phrase scheduler against a
+// minimal mock AudioContext and observe what gets scheduled. Not part of
+// the public audio API.
+export const __test__ = {
+  planPhrases,
+  mockAmbient(fakeCtx, { on = true, nextAt = 0 } = {}) {
+    ctx = fakeCtx
+    ambientFilter = fakeCtx.createBiquadFilter()
+    ambientGain = fakeCtx.createGain()
+    ambientOn = on
+    nextPhraseAt = nextAt
+  },
+  nextPhraseAt: () => nextPhraseAt,
+}
 export default audio

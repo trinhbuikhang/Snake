@@ -160,7 +160,7 @@ Commit bằng git thật (`git add` + `git commit`), không qua API dạng text.
     - `speedInterval()`: giảm theo `SPEED_STEP_EVERY`, kẹp ở `MIN_INTERVAL` trước khi nhân hệ số, boost nhân `BOOST_MULTIPLIER`.
   - Test cho hàm `isTypingTarget` từ T02.
   - Test store transitions (`start()` → `prologue` → `beginNight()` → `ready` → `enterPlaying()` → `playing`; `runUnlocks` nhận unlock giữa ván, bị xoá khi `start()`), mock `localStorage` nếu cần (`environment: 'jsdom'` hoặc stub đơn giản).
-- Workflow CI mới, ví dụ `.github/workflows/ci.yml` (Node 20, `cache: npm`), chạy trên `pull_request` và `push` vào `master`; run của chính PR này xanh (dán link).
+- Workflow CI mới, ví dụ `.github/workflows/ci.yml` (Node 22, `cache: npm`), chạy trên `pull_request` và `push` vào `master`; run của chính PR này xanh (dán link).
 - Mô tả PR dán nguyên output `npm test` (số test, số pass).
 
 **Gợi ý cách làm (không bắt buộc)**
@@ -174,7 +174,7 @@ Commit bằng git thật (`git add` + `git commit`), không qua API dạng text.
 
 ## T05 — Nhạc nền: dồn nốt sau khi tab chạy nền + không dừng khi pause
 
-- [ ] **T05** · Mức: **Trung bình** (AUDIT M1) · Branch: `fix/05-ambient-scheduler`
+- [x] **T05** · Mức: **Trung bình** (AUDIT M1) · Branch: `fix/05-ambient-scheduler`
 
 **Vấn đề**
 - `src/audio/sound.js` L434–441 (`planPhrases`): `while (nextPhraseAt < horizon)` không bù trễ. Khi tab ẩn, `setInterval` (L458) bị throttle nhưng `AudioContext` vẫn chạy → lúc quay lại, hàng loạt phrase được lên lịch ở thời điểm quá khứ và phát cùng lúc.
