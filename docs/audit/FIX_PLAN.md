@@ -20,9 +20,20 @@ Audit ngày 21/10/2026 phát hiện các lỗi trong phần việc Muse AI đã 
    - **Đã kiểm chứng thế nào**: lệnh chính xác đã chạy + output thật (dán nguyên văn, có thể rút gọn phần dài nhưng không bịa).
    - **Ảnh chụp màn hình** cho mọi thay đổi có ảnh hưởng hiển thị.
 6. **Tick checkbox của task trong file này (`docs/audit/FIX_PLAN.md`) ngay trong PR của task đó.**
-7. **Gặp điểm mơ hồ thì dừng lại và hỏi chủ repo**, không đoán. Các task có ghi "⚠️ Cần hỏi" thì phải hỏi trước khi code.
+7. **Gặp điểm mơ hồ thì dừng lại và hỏi chủ repo**, không đoán. Các quyết định trong mục "Quyết định đã chốt" bên dưới là cuối cùng — không cần hỏi lại; nhưng nếu code thực tế mâu thuẫn với quyết định, hãy dừng và báo.
 8. **Commit file nhị phân (ảnh) phải là nhị phân thật.** Nếu công cụ của bạn chỉ đẩy được file dạng text qua GitHub Contents API, hãy dừng và báo chủ repo — đó chính là nguyên nhân lỗi H1.
 9. Không push thẳng lên `master`, không force-push, không sửa lịch sử git.
+
+## Quyết định đã chốt
+
+Chủ repo đã chốt các điểm từng để mở; Muse AI làm theo, không cần hỏi lại:
+
+| Task | Quyết định | Lý do |
+|------|-----------|-------|
+| T03 | **Xoá hẳn** workflow GitHub Pages (`.github/workflows/deploy.yml`); không thêm workflow deploy nào khác. Deploy Cloudflare (tích hợp Git ở phía Cloudflare, không có file cấu hình trong repo) giữ nguyên. | Bản live chạy trên Cloudflare Workers; Pages trả 404 và gây dấu X đỏ trên mọi commit. |
+| T10a | Giảm độ sâu hàng đợi rẽ từ 3 về **2** (`MAX_QUEUE = 2`), giữ nguyên nhánh "thay lượt cuối khi đầy" hiện có (vẫn kiểm tra hợp lệ so với lượt trước đó); có test trong bộ vitest của T04. | Depth 3 làm lượt thứ 3 trễ 3 tick mà không giúp thêm gì đáng kể; depth 2 đủ cho cua góc nhanh. |
+| T10b | Unlock xảy ra ở màn **title** (thực tế: verse mở khi mua đồ trong Garden) được lưu vào hàng chờ `pendingUnlocks` (persist ở localStorage `ran-xinh-pending-unlocks`) và **hiển thị trong màn prologue của đêm kế tiếp**, trước các poem mở lúc `nightStart`. | Prologue là UI đọc poem có sẵn, xuất hiện ở đầu mọi ván (kể cả khi hàng đợi rỗng); không cần thêm UI mới, không che gameplay. |
+| T10f | Origin chính thức: **`https://moonlit-serpent.trinhbuikhang060708.workers.dev/`** cho `og:url`, `og:image`, `twitter:image` (URL tuyệt đối) + thêm `<link rel="canonical">`. Bỏ `maximum-scale=1, user-scalable=no` khỏi viewport; giữ `touch-action: none` trên `.garden-canvas` và đặt `touch-action: none` cho điều khiển khi chơi (`.dpad`, `.btn-boost`). Phần `accum`/đổi tên `readJSON`/`writeJSON` giữ như mô tả cũ. | Cho phép người dùng phóng to (accessibility) mà pinch/double-tap không zoom khi đang chơi. |
 
 ## Thứ tự task (tóm tắt)
 
@@ -30,7 +41,7 @@ Audit ngày 21/10/2026 phát hiện các lỗi trong phần việc Muse AI đã 
 |---|----|-----|--------|----------|
 | 1 | T01 | Cao | `fix/01-pwa-icons` | Decode 4 ảnh base64 + bump tên cache SW |
 | 2 | T02 | Cao | `fix/02-input-shortcuts` | Chặn phím tắt khi đang gõ + cho phép dấu cách trong tên |
-| 3 | T03 | Cao | `fix/03-pages-deploy` | Sửa hoặc gỡ workflow GitHub Pages (⚠️ cần hỏi) |
+| 3 | T03 | Cao | `fix/03-pages-deploy` | Xoá workflow GitHub Pages (đã chốt) |
 | 4 | T04 | Cao | `chore/04-vitest-ci` | vitest + `npm test` + CI chạy build & test |
 | 5 | T05 | Trung bình | `fix/05-ambient-scheduler` | Nhạc nền: chặn dồn nốt + dừng khi pause |
 | 6 | T06 | Trung bình | `fix/06-quality-governor` | Governor: ngưỡng, phục hồi, xử lý resize |
@@ -103,32 +114,29 @@ Commit bằng git thật (`git add` + `git commit`), không qua API dạng text.
 
 ---
 
-## T03 — Workflow GitHub Pages fail 11/11 lần
+## T03 — Workflow GitHub Pages fail 11/11 lần → xoá workflow
 
 - [ ] **T03** · Mức: **Cao** (AUDIT H4) · Branch: `fix/03-pages-deploy`
 
-> ⚠️ **Cần hỏi chủ repo trước khi code:** Bản live đang chạy trên **Cloudflare Workers** (`moonlit-serpent.trinhbuikhang060708.workers.dev`). Có cần GitHub Pages nữa không?
-> - **Phương án A (mặc định nếu chủ repo muốn giữ Pages):** sửa workflow sang `actions/deploy-pages@v4`.
-> - **Phương án B (nếu chỉ dùng Cloudflare):** xoá `.github/workflows/deploy.yml`.
+> ✅ **Đã chốt:** xoá workflow GitHub Pages. Bản live là Cloudflare Workers (`https://moonlit-serpent.trinhbuikhang060708.workers.dev/`), deploy qua tích hợp Git của Cloudflare (bot `cloudflare-workers-and-pages` comment trên PR; không có `wrangler.toml` trong repo). Không đụng tới phần Cloudflare.
 
 **Vấn đề**
 - `.github/workflows/deploy.yml` L41 `actions/upload-pages-artifact@v3` + L53 `actions/deploy-pages@v3` không tương thích → lỗi `Getting signed artifact URL failed … Failed to create deployment (status: 404)`. Mọi commit trên `master` có dấu X đỏ; `https://trinhbuikhang.github.io/Snake/` trả 404.
-- L32–40: bước "Force Pages build type" dùng `curl -X PUT` lên Pages API, `| head -c 500` nuốt lỗi; không cần nữa (API đã báo `build_type: workflow`).
+- L32–40: bước "Force Pages build type" dùng `curl -X PUT` lên Pages API, `| head -c 500` nuốt lỗi.
 
 **Hành vi mong muốn**
-- A: workflow chạy xanh, site có ở `https://trinhbuikhang.github.io/Snake/` và chạy được (base `./` trong `vite.config.js` đã hỗ trợ subpath).
-- B: không còn workflow deploy Pages; không còn run fail.
+- Repo không còn workflow deploy GitHub Pages; push lên `master` không còn tạo run "Deploy to GitHub Pages".
+- Cloudflare tiếp tục build/deploy như cũ.
 
 **Tiêu chí nghiệm thu**
-- A: `deploy-pages@v4`; bước `curl` bị xoá; run của PR/merge hiển thị ✅ (dán link run vào PR); mở URL Pages thấy màn title, không lỗi console.
-- B: file workflow bị xoá; sau merge không có run "Deploy to GitHub Pages" mới.
-- Cả hai: ghi trong PR phương án nào đã được chủ repo chọn.
-
-**Gợi ý cách làm (không bắt buộc)**
-- A: đổi `actions/deploy-pages@v3` → `@v4`, giữ `actions/configure-pages@v5` và `upload-pages-artifact@v3`. Lưu ý: workflow chỉ chạy trên `push` vào `master`, nên có thể phải chờ merge mới thấy kết quả deploy; dùng `workflow_dispatch` trên branch nếu chủ repo cho phép.
+- File `.github/workflows/deploy.yml` bị xoá; thư mục `.github/workflows/` không còn file nào khác tham chiếu Pages: `rg -n -i "pages|deploy-pages|upload-pages-artifact|configure-pages" .github` không có kết quả.
+- Tài liệu: `rg -n -i "github pages|github\.io|deploy\.yml" AGENT.md README* 2>/dev/null` không có kết quả (tại thời điểm audit `AGENT.md` không nhắc Pages và repo không có README — nếu vẫn vậy thì không cần sửa tài liệu, ghi rõ điều này trong PR).
+- Không sửa `index.html`, `vite.config.js` hay bất cứ cấu hình nào liên quan Cloudflare trong PR này.
+- Sau khi merge: `gh run list --limit 5` không có run "Deploy to GitHub Pages" mới; comment preview của Cloudflare vẫn xuất hiện trên PR này (dán ảnh chụp hoặc link).
+- Ghi chú trong PR: chủ repo có thể tắt Pages trong Settings → Pages (việc ngoài code, không thuộc PR).
 
 **Kiểm chứng**
-- `gh run list --workflow "Deploy to GitHub Pages" --limit 3` (dán output), hoặc xác nhận file đã bị xoá.
+- Dán output các lệnh `rg` ở trên và `gh run list --limit 5` sau merge.
 
 ---
 
@@ -147,7 +155,7 @@ Commit bằng git thật (`git add` + `git commit`), không qua API dạng text.
 - `vitest` trong `devDependencies`; `package.json` có `"test": "vitest run"`.
 - Tối thiểu các file test sau, đều được commit:
   - `src/game/logic.test.js`:
-    - `turn()`: từ chối quay đầu; từ chối trùng hướng; hàng đợi tối đa 3; khi đầy, chỉ thay lượt cuối và giá trị mới hợp lệ so với lượt trước đó; phím không hợp lệ trả `false`.
+    - `turn()`: từ chối quay đầu; từ chối trùng hướng; hàng đợi tối đa theo `MAX_QUEUE` hiện hành (3 tại thời điểm T04; T10a sẽ đổi thành 2 và cập nhật test); khi đầy, chỉ thay lượt cuối và giá trị mới hợp lệ so với lượt trước đó; phím không hợp lệ trả `false`. Nên export `MAX_QUEUE` để test không hardcode.
     - `step()`: tiêu thụ hàng đợi theo thứ tự; không bao giờ tự cắn do lượt trong hàng đợi (fuzz ≥ 1000 lần với seed cố định hoặc vòng lặp xác định); đâm tường → `cause: 'wall'`; Zen wrap; Lantern hết giờ → `cause: 'time'`.
     - `speedInterval()`: giảm theo `SPEED_STEP_EVERY`, kẹp ở `MIN_INTERVAL` trước khi nhân hệ số, boost nhân `BOOST_MULTIPLIER`.
   - Test cho hàm `isTypingTarget` từ T02.
@@ -305,12 +313,32 @@ Commit bằng git thật (`git add` + `git commit`), không qua API dạng text.
 Mỗi mục con là **một PR riêng**, làm theo thứ tự a → f. Tham chiếu chi tiết: AUDIT mục "Thấp" (L1–L8) và "Vấn đề có từ trước".
 
 - [ ] **T10a** · Thấp (AUDIT L1) · Branch: `fix/10a-turn-queue`
-  - **Vấn đề:** `src/game/logic.js` L158–193 — hàng đợi sâu 3 làm lượt thứ 3 trễ 3 tick; "replace" chỉ cho phép thay lượt cuối bằng hướng ngược của nó; comment nói quá ("always follows the player's latest steering intent").
-  - ⚠️ **Cần hỏi chủ repo:** giữ depth 3 hay quay về 2? Có muốn bỏ các lệnh rẽ đã quá cũ (ví dụ > 2 tick) không?
-  - **Nghiệm thu:** comment khớp hành vi thật; test trong `logic.test.js` mô tả đúng hành vi đã chọn; `npm test` xanh.
+  - **Vấn đề:** `src/game/logic.js` L158–193 — hàng đợi sâu 3 làm lượt thứ 3 trễ 3 tick; comment nói quá ("always follows the player's latest steering intent").
+  - ✅ **Đã chốt:** `MAX_QUEUE = 2`. Giữ nhánh "khi đầy thì thay lượt cuối" hiện có (hợp lệ hoá so với `queue[0]`, tức chỉ có thể thay lượt cuối bằng hướng ngược của nó).
+  - **Hành vi mong muốn:** tối đa 2 lượt chờ; hai lượt được áp dụng ở **hai tick liên tiếp**; không bao giờ có lượt nào khiến rắn quay ngược vào thân.
+  - **Nghiệm thu (test trong `src/game/logic.test.js`, chạy bằng `npm test`):**
+    - Đang đi `right`, gọi `turn(g,'up')`, `turn(g,'left')` → `g.queue` là `['up','left']`; `step()` lần 1 → `g.dir === 'up'`, đầu rắn đi lên 1 ô; `step()` lần 2 → `g.dir === 'left'`; không có `dead`.
+    - Hàng đợi đầy `['up','left']`: `turn(g,'down')` trả `false` (ngược `up`), `turn(g,'up')` trả `false` (trùng `up`), `turn(g,'left')` trả `false` (trùng lượt cuối), `turn(g,'right')` trả `true` và `g.queue` thành `['up','right']`; `g.queue.length` không bao giờ > 2.
+    - Đang đi `right`: `turn(g,'left')` trả `false` (quay đầu); chuỗi `turn('up')`, `turn('left')`, `turn('down')` không bao giờ làm queue chứa hai phần tử kề nhau ngược nhau, và với rắn dài ≥ 4 thì hai `step()` sau đó không trả `cause: 'self'` do đảo chiều.
+    - Fuzz (seed cố định, ≥ 1000 ván, rắn dài 3, không có mồi): chuỗi lệnh ngẫu nhiên + `step()` không bao giờ trả `cause: 'self'`.
+    - Comment trên `turn()` mô tả đúng hành vi depth 2.
+
 - [ ] **T10b** · Thấp (AUDIT L2) · Branch: `fix/10b-run-unlocks`
-  - **Vấn đề:** `src/game/store.js` L811–815, L900–904 `.slice(-8)` cắt bớt unlock giữa ván; verse mở khi mua đồ trong Garden ở màn title (L616, L625, L638) bị đẩy vào `runUnlocks` rồi bị `start()` xoá (L488) mà người chơi không thấy.
-  - **Nghiệm thu:** game over hiển thị đủ unlock của ván (hoặc "+N nữa trong Journal" nếu cắt); unlock khi ở `title` được hiển thị cho người chơi (ví dụ toast ngắn trong Garden overlay hoặc ping trên title) — ⚠️ hỏi chủ repo chọn cách hiển thị; test store trong `npm test`.
+  - **Vấn đề:** `src/game/store.js` L811–815, L900–904 `.slice(-8)` cắt bớt unlock giữa ván; verse mở khi mua đồ trong Garden ở màn title (`upgradeLanterns`/`upgradeBlooms`/`chooseInk` → `checkVerses('garden')`, L616, L625, L638; `GardenOverlay` chỉ hiển thị khi `status === 'title'`, `Hud.jsx` L1302) bị đẩy vào `runUnlocks` rồi bị `start()` xoá (L488) mà người chơi không thấy.
+  - ✅ **Đã chốt:** unlock xảy ra khi `status === 'title'` đi vào `pendingUnlocks` (persist `ran-xinh-pending-unlocks`), và được đưa vào **đầu `prologueQueue` của đêm kế tiếp** trong `start()`, trước các poem `nightStart`.
+  - **Hành vi mong muốn (định tuyến trong `checkWhispers`/`checkVerses`):**
+    - `prologue` → như hiện tại (qua `whisperToasts`/`verseToasts` → `prologueQueue`).
+    - `title` → `pendingUnlocks` (mỗi mục `{ kind, id, text? , lines? }`, không trùng `id`), ghi localStorage ngay.
+    - các trạng thái khác (`ready`, `playing`, `paused`, `dead`) → `runUnlocks` như hiện tại.
+    - `start()`: `prologueQueue = [...pendingUnlocks, ...nightStart poems]`, sau đó xoá `pendingUnlocks` khỏi state và localStorage.
+    - Bỏ `.slice(-8)` của `runUnlocks`; màn game over liệt kê đủ (danh sách cuộn được nếu dài); `JournalPing` hiện đúng tổng số.
+  - **Nghiệm thu (test store trong `npm test` + kiểm tra thủ công):**
+    - Ở `title`, gọi `checkVerses('garden')` với điều kiện mở được 1 verse → `runUnlocks` rỗng, `pendingUnlocks.length === 1`, `localStorage['ran-xinh-pending-unlocks']` chứa id đó.
+    - Gọi `start()` → `status === 'prologue'`, `prologueQueue[0].id` là id đó, `pendingUnlocks` rỗng và key localStorage đã bị xoá.
+    - Reload (gọi lại `hydrate()`) giữa hai bước trên → `pendingUnlocks` vẫn còn và vẫn xuất hiện ở prologue kế tiếp.
+    - Ở `playing`, mở 10 unlock → `runUnlocks.length === 10`; màn game over render đủ 10 mục.
+    - Thủ công: mua 1 bậc lantern trong Garden (dùng localStorage `ran-xinh-moonlight` để có đủ moonlight) → Start → card đầu tiên của prologue là verse đó. Đính kèm ảnh chụp.
+
 - [ ] **T10c** · Thấp (AUDIT L4) · Branch: `fix/10c-ready-blur`
   - **Vấn đề:** `src/three/engine.js` L556–560 chỉ pause khi `playing`; mất focus trong beat `ready` (L764–771) thì ván vẫn tự bắt đầu.
   - **Nghiệm thu:** blur/ẩn tab khi `ready` → ván không tự chạy (giữ ở `ready` hoặc chuyển `paused` sau khi vào `playing` — ghi rõ lựa chọn); kiểm tra thủ công có mô tả.
@@ -321,9 +349,15 @@ Mỗi mục con là **một PR riêng**, làm theo thứ tự a → f. Tham chi�
   - **Vấn đề:** claim "zero per-frame allocations" sai (`engine.js` L790 tạo object mỗi frame, L298–299 cấp phát mỗi tick); chunk `engine` 580 KB; `setTimeout` coach (`store.js` L533–537) không được clear.
   - **Nghiệm thu:** tái sử dụng object tham số `paint`; sửa comment cho đúng; build không còn cảnh báo chunk > 500 KB hoặc ghi lý do chấp nhận; timeout coach được lưu và clear khi rời `playing`. Dán output `npm run build`.
 - [ ] **T10f** · Thấp (AUDIT L6 + "Vấn đề có từ trước") · Branch: `fix/10f-misc`
-  - **Vấn đề:** URL OG hardcode domain workers.dev (`index.html` L25–26, L33); `engine.js` L745 `accum -= interval.v` trừ khoảng tick mới thay vì `tickDt`; `index.html` L7 `user-scalable=no` chặn zoom; `readJSON`/`writeJSON` (`store.js` L46–60) đặt tên gây hiểu nhầm.
-  - ⚠️ **Cần hỏi chủ repo:** domain chính thức là gì (phụ thuộc T03)? Có chấp nhận bỏ `user-scalable=no` không (ảnh hưởng thao tác chạm khi chơi trên mobile)?
-  - **Nghiệm thu:** `accum -= tickDt` + test nhịp (nếu tách được); các mục còn lại theo quyết định của chủ repo; đổi tên hàm đi kèm cập nhật mọi chỗ gọi, `npm test` + `npm run build` xanh.
+  - **Vấn đề:** `index.html` L7 `maximum-scale=1, user-scalable=no` chặn zoom (accessibility); OG dùng domain workers.dev (L25–26, L33) nhưng chưa có `canonical`; `engine.js` L745 `accum -= interval.v` trừ khoảng tick mới thay vì `tickDt`; `readJSON`/`writeJSON` (`store.js` L46–60) đặt tên gây hiểu nhầm.
+  - ✅ **Đã chốt:** origin chính thức `https://moonlit-serpent.trinhbuikhang060708.workers.dev/`; bỏ chặn zoom trong viewport nhưng chặn pinch/double-tap trên vùng chơi bằng CSS `touch-action`.
+  - **Nghiệm thu:**
+    - `index.html`: `og:url` = `https://moonlit-serpent.trinhbuikhang060708.workers.dev/`; `og:image` và `twitter:image` = `https://moonlit-serpent.trinhbuikhang060708.workers.dev/og-image.jpg` (tuyệt đối, đã đúng tại thời điểm audit — giữ nguyên); thêm `<link rel="canonical" href="https://moonlit-serpent.trinhbuikhang060708.workers.dev/" />`.
+    - Viewport đúng bằng `width=device-width, initial-scale=1, viewport-fit=cover` (không còn `maximum-scale`, `user-scalable`).
+    - `src/styles.css`: `.garden-canvas` giữ `touch-action: none`; `.dpad` và `.btn-boost` (cùng các nút con của d-pad) đổi `touch-action: manipulation` → `none`; các sheet/menu cuộn được giữ nguyên (không đặt `touch-action: none` cho `.stage`/`body`, vì title sheet cần cuộn trên màn thấp).
+    - Thủ công trên mobile hoặc DevTools device mode: pinch/double-tap trên vùng chơi và d-pad không zoom trang; pinch trên màn title vẫn zoom được; title sheet vẫn cuộn được. Đính kèm ảnh chụp/ghi chú thiết bị.
+    - `engine.js`: `accum -= tickDt` (biến `tickDt` đã có ở L734).
+    - Đổi tên `readJSON`/`writeJSON` thành tên phản ánh đúng (ví dụ `readItem`/`writeItem`), cập nhật mọi chỗ gọi; `npm test` + `npm run build` xanh.
 
 ---
 
