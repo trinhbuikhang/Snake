@@ -229,7 +229,7 @@ Commit bằng git thật (`git add` + `git commit`), không qua API dạng text.
 
 ## T07 — Service worker cache đúng như comment
 
-- [ ] **T07** · Mức: **Trung bình** (AUDIT M3) · Branch: `fix/07-sw-strategy`
+- [x] **T07** · Mức: **Trung bình** (AUDIT M3) · Branch: `fix/07-sw-strategy`
 
 **Vấn đề**
 - `public/sw.js` L6–7 ghi "Hashed static assets (assets/*): cache-first", nhưng L58–76 áp dụng cache-first cho **mọi** request same-origin không phải navigation (manifest, icons, og-image…) → tài nguyên không hash bị kẹt bản cũ đến khi đổi `CACHE`.
