@@ -201,7 +201,7 @@ Commit bằng git thật (`git add` + `git commit`), không qua API dạng text.
 
 ## T06 — Adaptive quality governor
 
-- [ ] **T06** · Mức: **Trung bình** (AUDIT M2) · Branch: `fix/06-quality-governor`
+- [x] **T06** · Mức: **Trung bình** (AUDIT M2) · Branch: `fix/06-quality-governor`
 
 **Vấn đề**
 - `src/three/engine.js` L86–128, L682–700: ngưỡng cứng `avgFps < 45`; trên thiết bị bị giới hạn 30fps (iOS Low Power Mode, Chrome Energy Saver, màn 30Hz) governor hạ dần tới mức thấp nhất (tắt bloom) dù GPU đủ mạnh. Chỉ giảm, không bao giờ nâng lại. Đo cả ở title/prologue/pause.

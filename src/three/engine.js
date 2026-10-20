@@ -24,6 +24,7 @@ import { useGame, READY_BEAT_S } from '../game/store.js'
 import { inputBus } from '../game/inputBus.js'
 import { isTypingTarget } from '../game/keyboard.js'
 import audio from '../audio/sound.js'
+import { createGovernor, observeWarmupFrame, settleWarmup, nextQualityIdx, msaaRetargetNeeded } from './qualityGovernor.js'
 import { buildGarden } from './garden.js'
 import { createSnakeRig } from './snakeRig.js'
 import { buildDecor } from './decor.js'
@@ -93,13 +94,17 @@ export function createEngine(canvas, { reduced } = {}) {
     { dpr: 1,    msaa: 0, shadow: 1024, bloom: false },
   ]
   let qualityIdx = 0
+  let appliedMsaa = null
   let fpsAccum = 0
   let fpsCount = 0
-  let fpsBadStreak = 0
-  let qualityCooldownUntil = 0
-  const governorWarmUntil = performance.now() + 4000
+  // Governor decisions live in qualityGovernor.js (pure, unit-tested):
+  // it learns the device's rAF ceiling during a warmup and judges FPS
+  // windows relative to that ceiling — stepping down after 2 bad
+  // windows, back up after ~10s of sustained headroom.
+  let gov = createGovernor(QUALITY_STEPS.length - 1)
+  let warmElapsed = 0
 
-  function applyQuality() {
+  function applySize() {
     const q = QUALITY_STEPS[qualityIdx]
     const w = canvas.clientWidth || 1
     const h = canvas.clientHeight || 1
@@ -109,13 +114,27 @@ export function createEngine(canvas, { reduced } = {}) {
     if (composer) {
       composer.setPixelRatio(dpr)
       composer.setSize(w, h)
-      try {
-        composer.renderTarget1.samples = q.msaa
-        composer.renderTarget1.dispose()
-        composer.renderTarget2.samples = q.msaa
-        composer.renderTarget2.dispose()
-      } catch {
-        /* MSAA optional */
+    }
+    return q
+  }
+
+  function applyQuality() {
+    const q = applySize()
+    if (composer) {
+      // Retargeting MSAA samples disposes both composer render targets —
+      // only pay that when the step actually changes msaa (T06: resizes
+      // and DPR/shadow-only steps must not dispose anything). The
+      // decision is the pure msaaRetargetNeeded() so it is unit-tested.
+      if (msaaRetargetNeeded(appliedMsaa, q.msaa)) {
+        try {
+          composer.renderTarget1.samples = q.msaa
+          composer.renderTarget1.dispose()
+          composer.renderTarget2.samples = q.msaa
+          composer.renderTarget2.dispose()
+        } catch {
+          /* MSAA optional */
+        }
+        appliedMsaa = q.msaa
       }
       if (bloomPass) bloomPass.enabled = q.bloom
     }
@@ -674,7 +693,10 @@ export function createEngine(canvas, { reduced } = {}) {
   }
 
   function resize() {
-    applyQuality()
+    // Sizes only (T06): a resize must not dispose composer targets or
+    // re-apply quality side effects — applyQuality() owns those, and it
+    // runs when the governor actually changes the step.
+    applySize()
     updateCameraTarget()
   }
   const ro = new ResizeObserver(resize)
@@ -693,26 +715,30 @@ export function createEngine(canvas, { reduced } = {}) {
     prevTS = now
     animT += dt
 
-    // Adaptive quality: watch a rolling FPS average (raw dt, unclamped).
-    // Two consecutive bad windows step the quality down; a single hitch
-    // (tab switch, GC) is forgiven. Skips the first 4 s (warmup) and any
-    // frame after a long background pause.
-    if (now > governorWarmUntil && rawDt < 0.5) {
-      fpsAccum += rawDt
-      fpsCount++
-      if (fpsAccum >= 2.5) {
-        const avgFps = fpsCount / fpsAccum
-        fpsAccum = 0
-        fpsCount = 0
-        if (avgFps < 45 && qualityIdx < QUALITY_STEPS.length - 1 && now > qualityCooldownUntil) {
-          if (++fpsBadStreak >= 2) {
-            qualityIdx++
+    // Adaptive quality (T06): FPS is judged relative to the device's own
+    // rAF ceiling, learned from a warmup, and measured ONLY while playing
+    // — title, prologue and pause frames must not cost the run its
+    // quality, and a device capped at 30fps must not be punished for its
+    // ceiling. Thresholds, hysteresis and recovery live in the pure,
+    // unit-tested qualityGovernor.js.
+    if (useGame.getState().status === 'playing' && rawDt < 0.5) {
+      if (gov.targetFps === null) {
+        gov = observeWarmupFrame(gov, rawDt)
+        warmElapsed += rawDt
+        if (warmElapsed >= 2) gov = settleWarmup(gov)
+      } else {
+        fpsAccum += rawDt
+        fpsCount++
+        if (fpsAccum >= 2.5) {
+          const avgFps = fpsCount / fpsAccum
+          fpsAccum = 0
+          fpsCount = 0
+          const next = nextQualityIdx(gov, avgFps)
+          if (next.idx !== gov.idx) {
+            qualityIdx = next.idx
             applyQuality()
-            fpsBadStreak = 0
-            qualityCooldownUntil = now + 5000
           }
-        } else {
-          fpsBadStreak = 0
+          gov = next
         }
       }
     }
@@ -835,6 +861,13 @@ export function createEngine(canvas, { reduced } = {}) {
     resetDemo()
     updateCameraTarget()
     resize()
+    // Apply the starting quality step in full exactly once (T06 review):
+    // resize() now only sets sizes, and the governor only re-applies on
+    // a step change — without this call the composer's targets would
+    // keep their default 0 samples instead of step 0's 4x MSAA.
+    // appliedMsaa starts null, so this first call performs the one
+    // MSAA retarget; later resizes stay size-only.
+    applyQuality()
     prevTS = performance.now()
     rafId = requestAnimationFrame(frame)
   }
