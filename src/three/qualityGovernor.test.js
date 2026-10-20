@@ -4,6 +4,7 @@ import {
   observeWarmupFrame,
   settleWarmup,
   nextQualityIdx,
+  msaaRetargetNeeded,
   DOWN_RATIO,
   UP_RATIO,
   BAD_WINDOWS_TO_STEP_DOWN,
@@ -129,5 +130,66 @@ describe('nextQualityIdx()', () => {
     let s45 = warmedGovernor(45)
     s45 = feedWindows(s45, 40, 10)
     expect(s45.idx).toBe(0)
+  })
+})
+
+describe('two-step oscillation (review fix: failed-step memory)', () => {
+  // The pathological pair: step 0 renders at 30fps (bad on a 60Hz
+  // device), step 1 renders at 58fps (good). Naive thresholds bounce
+  // 0 -> 1 -> 0 -> 1 ... forever; the governor must settle.
+  const fpsAt = (idx) => (idx === 0 ? 30 : 58)
+
+  it('bounds the number of step changes over ~100 windows', () => {
+    let s = warmedGovernor(60)
+    let changes = 0
+    for (let w = 0; w < 100; w += 1) {
+      const next = nextQualityIdx(s, fpsAt(s.idx))
+      if (next.idx !== s.idx) changes += 1
+      s = next
+    }
+    expect(changes).toBeLessThanOrEqual(3) // down, up, down — then settled
+    expect(s.idx).toBe(1)
+    expect(s.failedSteps).toContain(0)
+  })
+
+  it('never steps up into a failed step again, however long the good run', () => {
+    let s = warmedGovernor(60)
+    s = feedWindows(s, 30, BAD_WINDOWS_TO_STEP_DOWN) // -> idx 1 (from start: no failure marked)
+    s = feedWindows(s, 58, GOOD_WINDOWS_TO_STEP_UP) // -> idx 0 (stepped up into)
+    s = feedWindows(s, 30, BAD_WINDOWS_TO_STEP_DOWN) // -> idx 1, step 0 now failed
+    expect(s.failedSteps).toContain(0)
+    s = feedWindows(s, 58, 25)
+    expect(s.idx).toBe(1)
+  })
+
+  it('blocks only the failed step; other steps stay reachable', () => {
+    let s = warmedGovernor(60)
+    s = feedWindows(s, 30, BAD_WINDOWS_TO_STEP_DOWN) // -> 1
+    s = feedWindows(s, 58, GOOD_WINDOWS_TO_STEP_UP) // -> 0
+    s = feedWindows(s, 30, BAD_WINDOWS_TO_STEP_DOWN) // -> 1, 0 failed
+    s = feedWindows(s, 30, BAD_WINDOWS_TO_STEP_DOWN) // -> 2
+    expect(s.idx).toBe(2)
+    s = feedWindows(s, 58, GOOD_WINDOWS_TO_STEP_UP) // -> 1 (not failed: allowed)
+    expect(s.idx).toBe(1)
+    s = feedWindows(s, 58, GOOD_WINDOWS_TO_STEP_UP * 2) // 0 is failed: holds at 1
+    expect(s.idx).toBe(1)
+  })
+})
+
+describe('msaaRetargetNeeded()', () => {
+  it('is needed exactly once at startup, when nothing is applied yet', () => {
+    expect(msaaRetargetNeeded(null, 4)).toBe(true)
+    expect(msaaRetargetNeeded(4, 4)).toBe(false)
+  })
+
+  it('is not needed again while the step keeps the same sample count', () => {
+    // Resizes and same-msaa step changes must never retarget/dispose.
+    expect(msaaRetargetNeeded(4, 4)).toBe(false)
+    expect(msaaRetargetNeeded(0, 0)).toBe(false)
+  })
+
+  it('is needed when the step changes the sample count', () => {
+    expect(msaaRetargetNeeded(4, 0)).toBe(true)
+    expect(msaaRetargetNeeded(0, 4)).toBe(true)
   })
 })

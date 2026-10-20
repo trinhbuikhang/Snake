@@ -24,7 +24,7 @@ import { useGame, READY_BEAT_S } from '../game/store.js'
 import { inputBus } from '../game/inputBus.js'
 import { isTypingTarget } from '../game/keyboard.js'
 import audio from '../audio/sound.js'
-import { createGovernor, observeWarmupFrame, settleWarmup, nextQualityIdx } from './qualityGovernor.js'
+import { createGovernor, observeWarmupFrame, settleWarmup, nextQualityIdx, msaaRetargetNeeded } from './qualityGovernor.js'
 import { buildGarden } from './garden.js'
 import { createSnakeRig } from './snakeRig.js'
 import { buildDecor } from './decor.js'
@@ -94,7 +94,7 @@ export function createEngine(canvas, { reduced } = {}) {
     { dpr: 1,    msaa: 0, shadow: 1024, bloom: false },
   ]
   let qualityIdx = 0
-  let lastMsaa = null
+  let appliedMsaa = null
   let fpsAccum = 0
   let fpsCount = 0
   // Governor decisions live in qualityGovernor.js (pure, unit-tested):
@@ -123,8 +123,9 @@ export function createEngine(canvas, { reduced } = {}) {
     if (composer) {
       // Retargeting MSAA samples disposes both composer render targets —
       // only pay that when the step actually changes msaa (T06: resizes
-      // and DPR/shadow-only steps must not dispose anything).
-      if (q.msaa !== lastMsaa) {
+      // and DPR/shadow-only steps must not dispose anything). The
+      // decision is the pure msaaRetargetNeeded() so it is unit-tested.
+      if (msaaRetargetNeeded(appliedMsaa, q.msaa)) {
         try {
           composer.renderTarget1.samples = q.msaa
           composer.renderTarget1.dispose()
@@ -133,7 +134,7 @@ export function createEngine(canvas, { reduced } = {}) {
         } catch {
           /* MSAA optional */
         }
-        lastMsaa = q.msaa
+        appliedMsaa = q.msaa
       }
       if (bloomPass) bloomPass.enabled = q.bloom
     }
@@ -860,6 +861,13 @@ export function createEngine(canvas, { reduced } = {}) {
     resetDemo()
     updateCameraTarget()
     resize()
+    // Apply the starting quality step in full exactly once (T06 review):
+    // resize() now only sets sizes, and the governor only re-applies on
+    // a step change — without this call the composer's targets would
+    // keep their default 0 samples instead of step 0's 4x MSAA.
+    // appliedMsaa starts null, so this first call performs the one
+    // MSAA retarget; later resizes stay size-only.
+    applyQuality()
     prevTS = performance.now()
     rafId = requestAnimationFrame(frame)
   }

@@ -16,6 +16,23 @@
 //                                 rate hovering near a threshold can
 //                                 never make quality oscillate.
 //
+// One more guard, against a subtler oscillation: if step N renders
+// badly while step N+1 renders well (a step boundary that toggles MSAA
+// or bloom can do exactly this), plain thresholds would bounce between
+// the two steps forever — down in ~5s, up in ~10s, repeat. So the
+// governor remembers any step it stepped UP into that then failed: it
+// will not step up into that step again this session. The first
+// descent from the starting step marks nothing (nothing was retried
+// yet), so ordinary recovery is unaffected.
+//
+// Known, accepted limitation: the ceiling is measured from frame
+// intervals while playing at the top quality step, so on a machine
+// that is GPU-bound from the very first frame the measured ceiling is
+// the achieved rate, not the panel's refresh rate, and the governor
+// judges relative to that. Accepted for this design (see FIX_PLAN
+// T06 review notes); the absolute floor it protects is that a stable
+// capped display is never punished.
+//
 // No DOM, no Three, no clocks: the engine feeds it numbers, tests feed
 // it numbers. State is a plain object; every function returns a new
 // state instead of mutating.
@@ -34,7 +51,17 @@ export function createGovernor(maxIdx) {
     badWindows: 0,
     goodWindows: 0,
     warmIntervals: [],
+    failedSteps: [], // idx values stepped up into, then failed (see header)
+    reachedBy: 'start', // how the current idx was arrived at: start | up | down
   }
+}
+
+// The engine's MSAA bookkeeping, kept pure so it is testable: the
+// composer's render targets must be retargeted (and disposed) exactly
+// when the applied sample count differs from the step's — at startup
+// (appliedMsaa still null) that means exactly once.
+export function msaaRetargetNeeded(appliedMsaa, stepMsaa) {
+  return appliedMsaa !== stepMsaa
 }
 
 // Feed one frame interval (seconds) during warmup. Intervals from a
@@ -66,14 +93,33 @@ export function nextQualityIdx(state, avgFps) {
   if (avgFps < DOWN_RATIO * state.targetFps) {
     const badWindows = state.badWindows + 1
     if (badWindows >= BAD_WINDOWS_TO_STEP_DOWN && state.idx < state.maxIdx) {
-      return { ...state, idx: state.idx + 1, badWindows: 0, goodWindows: 0 }
+      // Stepping down. If this step was reached by stepping UP into it,
+      // it has now failed its audition: remember it, and never step up
+      // into it again this session (anti-oscillation, see header).
+      const failedSteps =
+        state.reachedBy === 'up' && !state.failedSteps.includes(state.idx)
+          ? [...state.failedSteps, state.idx]
+          : state.failedSteps
+      return {
+        ...state,
+        idx: state.idx + 1,
+        badWindows: 0,
+        goodWindows: 0,
+        failedSteps,
+        reachedBy: 'down',
+      }
     }
     return { ...state, badWindows, goodWindows: 0 }
   }
   if (avgFps > UP_RATIO * state.targetFps) {
     const goodWindows = state.goodWindows + 1
     if (goodWindows >= GOOD_WINDOWS_TO_STEP_UP && state.idx > 0) {
-      return { ...state, idx: state.idx - 1, badWindows: 0, goodWindows: 0 }
+      if (state.failedSteps.includes(state.idx - 1)) {
+        // The step above already failed once after being stepped into;
+        // hold here instead of bouncing back into it.
+        return { ...state, badWindows: 0, goodWindows: 0 }
+      }
+      return { ...state, idx: state.idx - 1, badWindows: 0, goodWindows: 0, reachedBy: 'up' }
     }
     return { ...state, badWindows: 0, goodWindows }
   }
