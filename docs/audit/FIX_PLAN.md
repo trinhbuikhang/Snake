@@ -54,7 +54,7 @@ Chủ repo đã chốt các điểm từng để mở; Muse AI làm theo, không
 
 ## T01 — Ảnh PWA/OG là văn bản base64
 
-- [ ] **T01** · Mức: **Cao** (AUDIT H1) · Branch: `fix/01-pwa-icons`
+- [x] **T01** · Mức: **Cao** (AUDIT H1) · Branch: `fix/01-pwa-icons`
 
 **Vấn đề**
 - `public/icons/icon-192.png`, `public/icons/icon-512.png`, `public/icons/icon-maskable-512.png`, `public/og-image.jpg` chứa **văn bản base64** (bắt đầu bằng `iVBORw0K…` / `/9j/4AAQ…`), không phải ảnh. Trình duyệt không decode được; bản live trên Cloudflare Workers cũng trả về base64 với `Content-Type: image/*`.
