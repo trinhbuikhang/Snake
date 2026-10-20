@@ -5,10 +5,15 @@
 //   shadowed by a stale app shell. Falls back to the cached shell offline.
 // - Hashed static assets (assets/*): cache-first. Filenames are
 //   content-addressed, so a cached copy can never be stale.
+// - Everything else same-origin (manifest, icons, og-image): filenames
+//   carry no hash, so they are served stale-while-revalidate — the
+//   cached copy answers at once while a network fetch refreshes the
+//   cache in the background. Changes land within a visit or two,
+//   without needing a CACHE bump to unstick them.
 //
 // Bump CACHE when the precache list or this strategy changes; on activate
 // every older moonlit-serpent-* cache is deleted.
-const CACHE = 'moonlit-serpent-v3'
+const CACHE = 'moonlit-serpent-v4'
 const CORE = ['./', './index.html', './manifest.webmanifest']
 
 self.addEventListener('install', (event) => {
@@ -58,21 +63,47 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
-  // Static assets: cache-first (hashed filenames are content-addressed).
+  // Hashed assets (assets/*): cache-first — the URL itself is the version.
+  const isHashedAsset = url.pathname.includes('/assets/')
+  if (isHashedAsset) {
+    event.respondWith(
+      caches.match(request, { ignoreSearch: false }).then(
+        (hit) =>
+          hit ||
+          fetch(request)
+            .then((res) => {
+              if (res && res.status === 200) {
+                const copy = res.clone()
+                caches.open(CACHE).then((cache) => cache.put(request, copy))
+              }
+              return res
+            })
+            .catch(() => caches.match('./index.html')),
+      ),
+    )
+    return
+  }
+
+  // Everything else same-origin (manifest, icons, og-image):
+  // stale-while-revalidate. Serve the cached copy immediately when there
+  // is one; the network answer refreshes the cache for the next visit.
   event.respondWith(
-    caches.match(request, { ignoreSearch: false }).then(
-      (hit) =>
-        hit ||
-        fetch(request)
+    caches.open(CACHE).then((cache) =>
+      cache.match(request).then((hit) => {
+        const network = fetch(request)
           .then((res) => {
-            // Cache a copy of every successful same-origin response for offline play.
-            if (res && (res.status === 200 || res.type === 'opaque')) {
-              const copy = res.clone()
-              caches.open(CACHE).then((cache) => cache.put(request, copy))
+            if (res && res.status === 200) {
+              return cache.put(request, res.clone()).then(() => res)
             }
             return res
           })
-          .catch(() => caches.match('./index.html')),
+          .catch(() => null)
+        if (hit) {
+          event.waitUntil(network)
+          return hit
+        }
+        return network.then((res) => res || caches.match('./index.html'))
+      }),
     ),
   )
 })
