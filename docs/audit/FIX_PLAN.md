@@ -142,7 +142,7 @@ Commit bằng git thật (`git add` + `git commit`), không qua API dạng text.
 
 ## T04 — Hạ tầng test thật: vitest + `npm test` + CI
 
-- [ ] **T04** · Mức: **Cao** (AUDIT H2) · Branch: `chore/04-vitest-ci`
+- [x] **T04** · Mức: **Cao** (AUDIT H2) · Branch: `chore/04-vitest-ci`
 
 **Vấn đề**
 - Không có file test, không có script `test` trong `package.json`, dù PR #1–#16 ghi hàng trăm test pass. PR #1 và PR #16 mâu thuẫn nhau về nhánh "replace" của `turn()`.

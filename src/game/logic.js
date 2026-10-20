@@ -165,7 +165,7 @@ export function createGame(moonId = 'half', modeId = 'classic', eventId = 'none'
 // - The replacement is validated against the turn it would follow, so a
 //   suicide turn can never sneak in through the back door (step() re-checks
 //   too, as a second guard).
-const MAX_QUEUE = 3
+export const MAX_QUEUE = 3
 export function turn(game, key) {
   const d = DIR[key]
   if (!d) return false
