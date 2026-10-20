@@ -980,6 +980,7 @@ export function JournalOverlay() {
   const totals = useGame((s) => s.totals)
   const gardenerName = useGame((s) => s.gardenerName)
   const setGardenerName = useGame((s) => s.setGardenerName)
+  const commitGardenerName = useGame((s) => s.commitGardenerName)
   const [tab, setTab] = useState('whispers')
   const heardWhispers = new Set(unlockedWhispers)
   const heardVerses = new Set(unlockedVerses)
@@ -996,6 +997,7 @@ export function JournalOverlay() {
             className="name-row__input"
             value={gardenerName}
             onChange={(e) => setGardenerName(e.target.value)}
+            onBlur={() => commitGardenerName()}
             maxLength={24}
             placeholder="the ink gardener"
             autoComplete="off"
@@ -1099,7 +1101,14 @@ export function JournalOverlay() {
           </>
         )}
         <div className="actions">
-          <button type="button" className="btn btn--primary" onClick={closeJournal}>
+          <button
+            type="button"
+            className="btn btn--primary"
+            onClick={() => {
+              commitGardenerName()
+              closeJournal()
+            }}
+          >
             Back to the garden
           </button>
         </div>

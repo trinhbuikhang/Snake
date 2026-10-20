@@ -88,7 +88,7 @@ Commit bằng git thật (`git add` + `git commit`), không qua API dạng text.
 
 ## T02 — Phím tắt toàn cục chiếm ô nhập tên
 
-- [ ] **T02** · Mức: **Cao** (AUDIT H3) · Branch: `fix/02-input-shortcuts`
+- [x] **T02** · Mức: **Cao** (AUDIT H3) · Branch: `fix/02-input-shortcuts`
 
 **Vấn đề**
 - `src/three/engine.js` L449–503: `onKeyDown` gắn trên `window`, không kiểm tra `e.target`. Khi gõ trong `<input id="gardener-name">` (`src/components/Hud.jsx` L994–1002): Space gọi `st.start()` (đóng Journal, bắt đầu ván); W/A/S/D/H/J/K/L bị `preventDefault()` (L500) nên không gõ được; C/V đổi camera; P bị chặn; M bật/tắt tiếng.

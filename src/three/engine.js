@@ -22,6 +22,7 @@ import {
 } from '../game/logic.js'
 import { useGame, READY_BEAT_S } from '../game/store.js'
 import { inputBus } from '../game/inputBus.js'
+import { isTypingTarget } from '../game/keyboard.js'
 import audio from '../audio/sound.js'
 import { buildGarden } from './garden.js'
 import { createSnakeRig } from './snakeRig.js'
@@ -447,6 +448,9 @@ export function createEngine(canvas, { reduced } = {}) {
   const unlock = () => audio.unlockAudio()
 
   function onKeyDown(e) {
+    // Typing in a form field (e.g. the Journal's gardener-name input):
+    // every game shortcut is ignored, so letters and Space reach the field.
+    if (isTypingTarget(e.target)) return
     unlock()
     const st = useGame.getState()
     const c = e.code
