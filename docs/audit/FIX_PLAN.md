@@ -116,7 +116,7 @@ Commit bằng git thật (`git add` + `git commit`), không qua API dạng text.
 
 ## T03 — Workflow GitHub Pages fail 11/11 lần → xoá workflow
 
-- [ ] **T03** · Mức: **Cao** (AUDIT H4) · Branch: `fix/03-pages-deploy`
+- [x] **T03** · Mức: **Cao** (AUDIT H4) · Branch: `fix/03-pages-deploy`
 
 > ✅ **Đã chốt:** xoá workflow GitHub Pages. Bản live là Cloudflare Workers (`https://moonlit-serpent.trinhbuikhang060708.workers.dev/`), deploy qua tích hợp Git của Cloudflare (bot `cloudflare-workers-and-pages` comment trên PR; không có `wrangler.toml` trong repo). Không đụng tới phần Cloudflare.
 
