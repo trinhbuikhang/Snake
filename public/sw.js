@@ -8,7 +8,7 @@
 //
 // Bump CACHE when the precache list or this strategy changes; on activate
 // every older moonlit-serpent-* cache is deleted.
-const CACHE = 'moonlit-serpent-v2'
+const CACHE = 'moonlit-serpent-v3'
 const CORE = ['./', './index.html', './manifest.webmanifest']
 
 self.addEventListener('install', (event) => {
