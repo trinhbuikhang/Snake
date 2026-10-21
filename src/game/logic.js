@@ -44,7 +44,16 @@ export function speedInterval(foodsEaten, isBoosting = false, speedMult = 1, mod
 }
 
 export function gridToWorld(x, y) {
-  return { x: x - (N - 1) / 2, z: y - (N - 1) / 2 }
+  return gridToWorldInto(x, y, { x: 0, z: 0 })
+}
+
+// Non-allocating twin of gridToWorld: fills `out` with the world
+// coordinates and returns it. For per-tick snapshot writers (P06)
+// that refill reused cell objects instead of allocating new ones.
+export function gridToWorldInto(x, y, out) {
+  out.x = x - (N - 1) / 2
+  out.z = y - (N - 1) / 2
+  return out
 }
 
 function freeCells(game) {

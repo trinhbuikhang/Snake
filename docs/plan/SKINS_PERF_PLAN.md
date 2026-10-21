@@ -200,7 +200,7 @@ Prototype đầy đủ đã chạy được (xem `docs/plan/skins/reference/`). 
 
 ## P06 — Dọn cấp phát lặt vặt *(tuỳ chọn, ưu tiên thấp)*
 
-- [ ] **P06** · Mức: **Thấp** · Branch: `perf/p06-alloc-hygiene`
+- [x] **P06** · Mức: **Thấp** · Branch: `perf/p06-alloc-hygiene`
 
 **Vấn đề**
 - `src/three/garden.js` L1020–1066 (`burstAt`): mỗi lần ăn tạo nhiều `new THREE.Color(...)`/`new THREE.Vector3(...)`.

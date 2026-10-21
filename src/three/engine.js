@@ -18,6 +18,7 @@ import {
   LANTERN_DURATION,
   BASE_INTERVAL,
   gridToWorld,
+  gridToWorldInto,
   N,
 } from '../game/logic.js'
 import { useGame, READY_BEAT_S } from '../game/store.js'
@@ -27,6 +28,7 @@ import audio from '../audio/sound.js'
 import { createGovernor, observeWarmupFrame, settleWarmup, nextQualityIdx, msaaRetargetNeeded, msaaFor, QUALITY_STEPS, SPIKE_FRAME_MULTIPLE } from './qualityGovernor.js'
 import { disposeObject3D } from './dispose.js'
 import { rescaleAccum } from './tickClock.js'
+import { writeCellsInto } from './cellBuffer.js'
 import { buildGarden } from './garden.js'
 import { createSnakeRig } from './snakeRig.js'
 import { buildDecor } from './decor.js'
@@ -50,7 +52,6 @@ const CAM_PRESETS = {
 }
 
 const clamp01 = (v) => Math.max(0, Math.min(1, v))
-const cloneXZ = (cells) => cells.map((c) => ({ x: c.x, z: c.z }))
 
 export function createEngine(canvas, { reduced } = {}) {
   const mq = window.matchMedia?.('(prefers-reduced-motion: reduce)')
@@ -94,9 +95,9 @@ export function createEngine(canvas, { reduced } = {}) {
   // Reused scratch state — the frame loop must not allocate per frame:
   // scratch vectors plus the one paint-param object below (rig.paint()
   // destructures its argument and never retains it, so the same object is
-  // refilled every frame). Per-tick simulation arrays (cloneXZ(),
-  // worldCells()) are a different story: they allocate at tick rate
-  // (~4-8x/s), not per frame (AUDIT L3).
+  // refilled every frame). Per-tick snapshot arrays used to allocate
+  // at tick rate too; since P06 they are double-buffered and refilled
+  // in place (see snapBufs below and cellBuffer.js).
   const _shake = new THREE.Vector3()
   const _headOff = new THREE.Vector3(0, 1.2, 0)
   const paintParams = { cur: null, prev: null, t: 0, death: null, animT: 0, dt: 0, isBoosting: false }
@@ -301,8 +302,15 @@ export function createEngine(canvas, { reduced } = {}) {
 
   // ---- game state ---------------------------------------------------------
   let logic = createGame()
-  let curCells = []
-  let prevCells = []
+  // P06: the (prev, cur) snapshot pair is double-buffered — two
+  // reusable arrays alternate roles per tick (see cellBuffer.js for
+  // why mutating the back buffer inside the tick is safe).
+  const snapBufs = [[], []]
+  let snapIdx = 0
+  let curCells = snapBufs[0]
+  let prevCells = snapBufs[0]
+  const fillWorldCells = (buf, cells) =>
+    writeCellsInto(buf, cells.length, (i, o) => gridToWorldInto(cells[i].x, cells[i].y, o))
   let interval = { v: BASE_INTERVAL }
   let accum = 0
   let readyAccum = 0 // clock for the "night begins" beat before the run starts
@@ -360,8 +368,6 @@ export function createEngine(canvas, { reduced } = {}) {
     camShake = 0.18
   }
 
-  const worldCells = (snake) => snake.map((c) => gridToWorld(c.x, c.y))
-
   // Run modifiers ("Tuần trăng" + game mode + night event): light intensity,
   // food glow, fog density, speed
   function applyRunModifiers() {
@@ -394,8 +400,9 @@ export function createEngine(canvas, { reduced } = {}) {
     // A rare garden spirit visits roughly 1 in 15 nights.
     if (Math.random() < 1 / 15) spawnSpirit()
     st.setTimeLeft(logic.mode === 'lantern' ? LANTERN_DURATION : null)
-    curCells = worldCells(logic.snake)
-    prevCells = cloneXZ(curCells)
+    snapIdx = 0
+    curCells = fillWorldCells(snapBufs[0], logic.snake)
+    prevCells = curCells
     accum = 0
     isBoosting = false
     interval.v = BASE_INTERVAL
@@ -417,8 +424,13 @@ export function createEngine(canvas, { reduced } = {}) {
   }
 
   function commitTick() {
-    prevCells = cloneXZ(curCells)
-    curCells = worldCells(logic.snake)
+    // Swap the double buffer: the new state is written into the
+    // buffer that is not the current `cur`, then the pair flips.
+    const nextIdx = 1 - snapIdx
+    fillWorldCells(snapBufs[nextIdx], logic.snake)
+    prevCells = snapBufs[snapIdx]
+    curCells = snapBufs[nextIdx]
+    snapIdx = nextIdx
     rig.setDir(DIR[logic.dir].x, DIR[logic.dir].y)
     rig.onStep()
 
@@ -446,25 +458,29 @@ export function createEngine(canvas, { reduced } = {}) {
 
   // ---- title-screen orbit demo ------------------------------------------
   let demo = null
-  let demoCur = []
-  let prevDemoCells = []
+  // Same double-buffering as the game snapshots (P06).
+  const demoBufs = [[], []]
+  let demoBufIdx = 0
+  let demoCur = demoBufs[0]
+  let prevDemoCells = demoBufs[0]
   let demoAccum = 0
 
-  function demoBody() {
-    const cells = []
+  // Writes the demo snake's current body into buf (head first,
+  // walking back along the orbit path), grid → world in place.
+  function fillDemoCells(buf) {
     const L = demo.path.length
-    for (let k = 0; k < demo.len; k++) {
-      const i = ((demo.idx - k) % L + L) % L
-      cells.push(demo.path[i])
-    }
-    return cells
+    return writeCellsInto(buf, demo.len, (k, o) => {
+      const p = demo.path[(((demo.idx - k) % L) + L) % L]
+      gridToWorldInto(p.x, p.y, o)
+    })
   }
 
   function resetDemo() {
     demo = createDemo()
     demoAccum = 0
-    prevDemoCells = demoBody().map((c) => gridToWorld(c.x, c.y))
-    demoCur = cloneXZ(prevDemoCells)
+    demoBufIdx = 0
+    demoCur = fillDemoCells(demoBufs[0])
+    prevDemoCells = demoCur
     rig.reset(demo.len)
     rig.setDir(0, 1)
     garden.hideFood()
@@ -473,8 +489,11 @@ export function createEngine(canvas, { reduced } = {}) {
   function advanceDemo() {
     const L = demo.path.length
     demo.idx = (demo.idx + 1) % L
-    prevDemoCells = cloneXZ(demoCur)
-    demoCur = demoBody().map((c) => gridToWorld(c.x, c.y))
+    const nextIdx = 1 - demoBufIdx
+    fillDemoCells(demoBufs[nextIdx])
+    prevDemoCells = demoBufs[demoBufIdx]
+    demoCur = demoBufs[nextIdx]
+    demoBufIdx = nextIdx
     const h = demo.path[demo.idx]
     const p2 = demo.path[((demo.idx - 1) % L + L) % L]
     rig.setDir(h.x - p2.x, h.y - p2.y)
@@ -741,11 +760,13 @@ export function createEngine(canvas, { reduced } = {}) {
         startRunAudio()
       } else if (s.status === 'playing' && prev.status === 'ready') {
         // The ready beat ends: start the simulation from a clean slate.
+        // Snap prev onto cur (same buffer, P06): interpolation across
+        // the beat would drag the snake from its pre-beat pose.
         accum = 0
-        prevCells = cloneXZ(curCells)
+        prevCells = curCells
       } else if (s.status === 'playing' && prev.status === 'paused') {
         accum = 0
-        prevCells = cloneXZ(curCells)
+        prevCells = curCells
         startRunAudio() // fade the night's sounds back in
       } else if (s.status === 'paused') {
         // Pause silences the garden too (T05): ambient, pad and water all
