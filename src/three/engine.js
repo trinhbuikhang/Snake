@@ -24,7 +24,7 @@ import { useGame, READY_BEAT_S } from '../game/store.js'
 import { inputBus } from '../game/inputBus.js'
 import { isTypingTarget } from '../game/keyboard.js'
 import audio from '../audio/sound.js'
-import { createGovernor, observeWarmupFrame, settleWarmup, nextQualityIdx, msaaRetargetNeeded, msaaFor, QUALITY_STEPS } from './qualityGovernor.js'
+import { createGovernor, observeWarmupFrame, settleWarmup, nextQualityIdx, msaaRetargetNeeded, msaaFor, QUALITY_STEPS, SPIKE_FRAME_MULTIPLE } from './qualityGovernor.js'
 import { disposeObject3D } from './dispose.js'
 import { rescaleAccum } from './tickClock.js'
 import { buildGarden } from './garden.js'
@@ -111,6 +111,7 @@ export function createEngine(canvas, { reduced } = {}) {
   let appliedMsaa = null
   let fpsAccum = 0
   let fpsCount = 0
+  let spikeCount = 0 // frames in the current window beyond the spike threshold (P04)
   // Governor decisions live in qualityGovernor.js (pure, unit-tested):
   // it learns the device's rAF ceiling during a warmup and judges FPS
   // windows relative to that ceiling — stepping down after 2 bad
@@ -834,11 +835,17 @@ export function createEngine(canvas, { reduced } = {}) {
     prevTS = now
     animT += dt
 
-    // Adaptive quality (T06): FPS is judged relative to the device's own
-    // rAF ceiling, learned from a warmup, and measured ONLY while playing
-    // — title, prologue and pause frames must not cost the run its
-    // quality, and a device capped at 30fps must not be punished for its
-    // ceiling. Thresholds, hysteresis and recovery live in the pure,
+    // Adaptive quality (T06, P04): FPS is judged relative to the
+    // display's refresh rate — the warmup median snapped up to the
+    // nearest standard rate by snapRefresh(), NOT the rate the GPU
+    // achieves at the top step (a weak machine rendering 35fps on a
+    // 60Hz panel must still feel pressure to step down; a stable
+    // 30Hz device must not). A window is also judged on its spikes
+    // (P04): frames longer than SPIKE_FRAME_MULTIPLE × the target
+    // interval are counted, and >= 10% of them makes the window bad
+    // even when its average is fine. Measured ONLY while playing —
+    // title, prologue and pause frames must not cost the run its
+    // quality. Thresholds, hysteresis and recovery live in the pure,
     // unit-tested qualityGovernor.js.
     if (useGame.getState().status === 'playing' && rawDt < 0.5) {
       if (gov.targetFps === null) {
@@ -848,11 +855,14 @@ export function createEngine(canvas, { reduced } = {}) {
       } else {
         fpsAccum += rawDt
         fpsCount++
+        if (rawDt > SPIKE_FRAME_MULTIPLE / gov.targetFps) spikeCount++
         if (fpsAccum >= 2.5) {
           const avgFps = fpsCount / fpsAccum
+          const spikeRatio = spikeCount / fpsCount
           fpsAccum = 0
           fpsCount = 0
-          const next = nextQualityIdx(gov, avgFps)
+          spikeCount = 0
+          const next = nextQualityIdx(gov, avgFps, spikeRatio)
           if (next.idx !== gov.idx) {
             qualityIdx = next.idx
             applyQuality()

@@ -157,7 +157,7 @@ Prototype đầy đủ đã chạy được (xem `docs/plan/skins/reference/`). 
 
 ## P04 — Governor so với tần số màn hình + frame spike
 
-- [ ] **P04** · Mức: **Trung bình** · Branch: `perf/p04-governor-refresh`
+- [x] **P04** · Mức: **Trung bình** · Branch: `perf/p04-governor-refresh`
 
 **Vấn đề**
 - `src/three/engine.js` L756–760 + `src/three/qualityGovernor.js` L81–86 (`settleWarmup`): "trần" `targetFps` = median FPS đo **trong lúc đang render ở bậc chất lượng cao nhất**. Máy yếu chạy được 35 fps ở bậc 0 sẽ học `targetFps ≈ 35` → `avgFps` không bao giờ < 0.75 × 35 → **không bao giờ hạ bậc**, dù màn hình 60Hz. Governor chỉ giúp được máy *sau đó* mới chậm đi.
