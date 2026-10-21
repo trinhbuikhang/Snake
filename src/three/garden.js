@@ -3,6 +3,22 @@ import * as THREE from 'three'
 const INK = 0x08100d
 const POND_WATER = 0x0c1a16
 const CREAM = 0xf3efe6
+
+// P06: burst palettes are built once, not per eat. ParticleField.spawn
+// only reads colorA/colorB (it clones before it lerps), so sharing
+// these Color objects across every burst is safe. Keys are the food
+// types burstAt() derives; unknown keys (the spirit's 'carp') fall
+// back to neptune, exactly what the old ternary chains did.
+const BURST_PALETTES = {
+  sun: [new THREE.Color(0xffea00), new THREE.Color(0xff3d00)],
+  earth: [new THREE.Color(0x70d6ff), new THREE.Color(0x2ecc71)],
+  mars: [new THREE.Color(0xff7043), new THREE.Color(0xd84315)],
+  saturn: [new THREE.Color(0xffe082), new THREE.Color(0xffa726)],
+  jupiter: [new THREE.Color(0xffcc80), new THREE.Color(0xe65100)],
+  neptune: [new THREE.Color(0x80d8ff), new THREE.Color(0x0288d1)],
+}
+// Death-petal colors (petalFall) — also constant per call site.
+const PETAL_COLORS = [new THREE.Color(CREAM), new THREE.Color(0xf5b5c0)]
 const JADE_GLOW = 0x4eedb8
 const GOLD_CORE = 0xffc107
 const GOLD_PETAL = 0xffd54f
@@ -473,6 +489,7 @@ export function buildGarden(scene, { envTex, reduced }) {
   const s4 = new THREE.Vector3()
   const e4 = new THREE.Euler()
   const v4 = new THREE.Vector3()
+  const burstPos = new THREE.Vector3() // P06: scratch origin for burstAt (spawn reads it synchronously)
   for (let i = 0; i < PETALS; i++) {
     petalData.push({
       base: new THREE.Vector3((Math.random() - 0.5) * 17, 1.0 + Math.random() * 4.5, (Math.random() - 0.5) * 17),
@@ -1087,32 +1104,10 @@ export function buildGarden(scene, { envTex, reduced }) {
       spawnRipple(x, z, bloom ? 4.5 : 3.2, 1.2, rippleColor)
       setTimeout(() => spawnRipple(x, z, bloom ? 3.4 : 2.4, 1.0, 0xffffff), 130)
 
-      const colA = bloom
-        ? new THREE.Color(0xffea00)
-        : activeKey === 'earth'
-        ? new THREE.Color(0x70d6ff)
-        : activeKey === 'mars'
-        ? new THREE.Color(0xff7043)
-        : activeKey === 'saturn'
-        ? new THREE.Color(0xffe082)
-        : activeKey === 'jupiter'
-        ? new THREE.Color(0xffcc80)
-        : new THREE.Color(0x80d8ff)
-
-      const colB = bloom
-        ? new THREE.Color(0xff3d00)
-        : activeKey === 'earth'
-        ? new THREE.Color(0x2ecc71)
-        : activeKey === 'mars'
-        ? new THREE.Color(0xd84315)
-        : activeKey === 'saturn'
-        ? new THREE.Color(0xffa726)
-        : activeKey === 'jupiter'
-        ? new THREE.Color(0xe65100)
-        : new THREE.Color(0x0288d1)
+      const [colA, colB] = BURST_PALETTES[activeKey] ?? BURST_PALETTES.neptune
 
       burst.spawn({
-        at: new THREE.Vector3(x, y + 0.1, z),
+        at: burstPos.set(x, y + 0.1, z),
         count: bloom ? 42 : 24,
         speed: bloom ? 4.4 : 3.2,
         upBias: 1.4,
@@ -1133,8 +1128,8 @@ export function buildGarden(scene, { envTex, reduced }) {
           speed: 0.65,
           upBias: 0,
           life: 2.6,
-          colorA: new THREE.Color(CREAM),
-          colorB: new THREE.Color(0xf5b5c0),
+          colorA: PETAL_COLORS[0],
+          colorB: PETAL_COLORS[1],
         })
       }
     },
