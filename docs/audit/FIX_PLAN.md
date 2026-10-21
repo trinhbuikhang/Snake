@@ -285,7 +285,7 @@ Commit bằng git thật (`git add` + `git commit`), không qua API dạng text.
 
 ## T09 — Cập nhật `AGENT.md`
 
-- [ ] **T09** · Mức: **Trung bình** (AUDIT M5) · Branch: `docs/09-agent-md`
+- [x] **T09** · Mức: **Trung bình** (AUDIT M5) · Branch: `docs/09-agent-md`
 
 **Vấn đề**
 - `AGENT.md` L53: Status chỉ ghi `title | playing | paused | dead` (thiếu `prologue`, `ready`).
