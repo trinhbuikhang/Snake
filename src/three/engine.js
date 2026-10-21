@@ -29,6 +29,7 @@ import { createGovernor, observeWarmupFrame, settleWarmup, nextQualityIdx, msaaR
 import { disposeObject3D } from './dispose.js'
 import { rescaleAccum } from './tickClock.js'
 import { writeCellsInto } from './cellBuffer.js'
+import { fitAligned } from './cameraFit.js'
 import { buildGarden } from './garden.js'
 import { createSnakeRig } from './snakeRig.js'
 import { buildDecor } from './decor.js'
@@ -38,6 +39,7 @@ import { SKIN_IDS } from '../game/skins.js'
 
 const FOV = 42
 const FIT_HALF = 11.8
+const BOARD_HALF = 10.25 // board edge (±10) + rim, for the perspective fit
 const DEMO_INTERVAL = 0.15
 const DEATH_DURATION = 1.6
 const BLOOM_BASE = 0.42
@@ -47,7 +49,10 @@ const BLOOM_BASE = 0.42
 // 'topdown': Overhead tactical 2.5D view for maximum precision.
 // 'cinematic': Gentle isometric tilt for artistic elegance.
 const CAM_PRESETS = {
-  aligned: { az: 0, el: 1.05, fov: 42, distMult: 1.08 },
+  // S05: 'aligned' fits the board perspective-correctly (cameraFit.js):
+  // el a touch lower so the serpent's face reads, NDC margins leave
+  // the top 20% to the HUD pills.
+  aligned: { az: 0, el: 1.0, fov: 42, distMult: 1, perspFit: { x: 0.97, top: 0.8, bottom: 0.93 } },
   topdown: { az: 0, el: 1.48, fov: 44, distMult: 1.15 },
   cinematic: { az: 0.54, el: 0.88, fov: 42, distMult: 1.12 },
 }
@@ -918,19 +923,36 @@ export function createEngine(canvas, { reduced } = {}) {
     const right = new THREE.Vector3().crossVectors(viewDir, worldUp).normalize()
     const up = new THREE.Vector3().crossVectors(right, viewDir).normalize()
 
-    let maxR = 0
-    let maxU = 0
-    for (const sx of [-1, 1]) {
-      for (const sz of [-1, 1]) {
-        const v = new THREE.Vector3(sx * FIT_HALF, 0, sz * FIT_HALF)
-        maxR = Math.max(maxR, Math.abs(v.dot(right)))
-        maxU = Math.max(maxU, Math.abs(v.dot(up)) + 0.3)
+    if (preset.perspFit) {
+      // S05: perspective-correct fit (aligned only) — the closest
+      // distance keeping every board corner inside the NDC margins,
+      // with the look point slid toward the near edge so the board
+      // centres vertically instead of wasting the far half-screen.
+      const { dist, lookZ } = fitAligned({
+        el: preset.el,
+        fov: preset.fov,
+        aspect: camera.aspect,
+        boardHalf: BOARD_HALF,
+        margins: preset.perspFit,
+      })
+      camLookTarget.set(0, 0, lookZ)
+      camPosTarget.copy(viewDir).multiplyScalar(dist * preset.distMult).add(camLookTarget)
+    } else {
+      let maxR = 0
+      let maxU = 0
+      for (const sx of [-1, 1]) {
+        for (const sz of [-1, 1]) {
+          const v = new THREE.Vector3(sx * FIT_HALF, 0, sz * FIT_HALF)
+          maxR = Math.max(maxR, Math.abs(v.dot(right)))
+          maxU = Math.max(maxU, Math.abs(v.dot(up)) + 0.3)
+        }
       }
-    }
 
-    const tanHalf = Math.tan((camera.fov * Math.PI) / 360)
-    const dist = Math.max(maxU / tanHalf, maxR / (tanHalf * camera.aspect)) * preset.distMult
-    camPosTarget.copy(viewDir).multiplyScalar(dist)
+      const tanHalf = Math.tan((camera.fov * Math.PI) / 360)
+      const dist = Math.max(maxU / tanHalf, maxR / (tanHalf * camera.aspect)) * preset.distMult
+      camLookTarget.set(0, 0, 0)
+      camPosTarget.copy(viewDir).multiplyScalar(dist)
+    }
     camera.updateProjectionMatrix()
   }
 
