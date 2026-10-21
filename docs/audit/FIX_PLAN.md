@@ -323,7 +323,7 @@ Mỗi mục con là **một PR riêng**, làm theo thứ tự a → f. Tham chi�
     - Fuzz (seed cố định, ≥ 1000 ván, rắn dài 3, không có mồi): chuỗi lệnh ngẫu nhiên + `step()` không bao giờ trả `cause: 'self'`.
     - Comment trên `turn()` mô tả đúng hành vi depth 2.
 
-- [ ] **T10b** · Thấp (AUDIT L2) · Branch: `fix/10b-run-unlocks`
+- [x] **T10b** · Thấp (AUDIT L2) · Branch: `fix/10b-run-unlocks`
   - **Vấn đề:** `src/game/store.js` L811–815, L900–904 `.slice(-8)` cắt bớt unlock giữa ván; verse mở khi mua đồ trong Garden ở màn title (`upgradeLanterns`/`upgradeBlooms`/`chooseInk` → `checkVerses('garden')`, L616, L625, L638; `GardenOverlay` chỉ hiển thị khi `status === 'title'`, `Hud.jsx` L1302) bị đẩy vào `runUnlocks` rồi bị `start()` xoá (L488) mà người chơi không thấy.
   - ✅ **Đã chốt:** unlock xảy ra khi `status === 'title'` đi vào `pendingUnlocks` (persist `ran-xinh-pending-unlocks`), và được đưa vào **đầu `prologueQueue` của đêm kế tiếp** trong `start()`, trước các poem `nightStart`.
   - **Hành vi mong muốn (định tuyến trong `checkWhispers`/`checkVerses`):**

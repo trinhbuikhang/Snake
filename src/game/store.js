@@ -34,6 +34,7 @@ export const STREAK_KEY = 'ran-xinh-streak' // { count, lastDay }
 // P5 "Shared Skies"
 export const NAME_KEY = 'ran-xinh-name' // gardener's display name for shared cards
 export const ONBOARDED_KEY = 'ran-xinh-onboarded' // first-night coach marks seen
+export const PENDING_UNLOCKS_KEY = 'ran-xinh-pending-unlocks' // title-screen unlocks waiting for the next prologue (T10b)
 export const COACH_STEPS = 3 // number of first-night guide steps
 export const COMMUNITY_BOOST = 10 // extra roll weight for the week's shared sky
 // The "night begins" ready beat: seconds of stillness between the prologue
@@ -126,6 +127,19 @@ export const readVerses = () => {
   try {
     const parsed = JSON.parse(readJSON(VERSES_KEY) || 'null')
     return Array.isArray(parsed) ? parsed.filter((v) => typeof v === 'string') : []
+  } catch {
+    return []
+  }
+}
+// Pending unlock entries earned on the title screen (T10b): full poem
+// entries { kind, id, text?, lines? } waiting for the next prologue.
+export const readPendingUnlocks = () => {
+  try {
+    const parsed = JSON.parse(readJSON(PENDING_UNLOCKS_KEY) || 'null')
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter(
+      (p) => p && (p.kind === 'whisper' || p.kind === 'verse') && typeof p.id === 'string',
+    )
   } catch {
     return []
   }
@@ -370,6 +384,12 @@ export const useGame = create((set, get) => ({
   // the poems wait in the game-over summary, readable at rest.
   // Each entry is { kind: 'whisper'|'verse', id, text?, lines? }.
   runUnlocks: [],
+  // pendingUnlocks: whispers + verses unlocked while on the title screen
+  // (e.g. Garden purchases via checkVerses('garden')). Persisted under
+  // PENDING_UNLOCKS_KEY; start() moves them to the head of the next
+  // night's prologueQueue so they are actually read (T10b). Same entry
+  // shape as runUnlocks.
+  pendingUnlocks: [],
   // nightBanner: { night, modeLabel, phaseLabel } shown briefly when a run starts
   nightBanner: null,
   // coachStep: P6 first-night guide. -1 = hidden/done, 0..2 = visible steps.
@@ -437,6 +457,7 @@ export const useGame = create((set, get) => ({
       keepsakes: readKeepsakes(),
       streak: readStreak(),
       gardenerName: readName(),
+      pendingUnlocks: readPendingUnlocks(),
       communityEvent: communityEventForWeek(isoWeekId(new Date())),
     })
   },
@@ -502,16 +523,25 @@ export const useGame = create((set, get) => ({
     get().checkVerses('nightStart', { isFirstMode, isFirstPhase })
     // The night's new poems belong to the prologue screen, not to floating
     // toasts over live gameplay: collect them so they can be read one at a
-    // time before the run begins.
+    // time before the run begins. Poems earned on the title screen
+    // (pendingUnlocks, T10b) lead the queue — they have waited longest —
+    // then the nightStart poems.
     const afterStart = get()
     set({
       prologueQueue: [
+        ...afterStart.pendingUnlocks,
         ...afterStart.whisperToasts.map((t) => ({ kind: 'whisper', id: t.id, text: t.text })),
         ...afterStart.verseToasts.map((t) => ({ kind: 'verse', id: t.id, lines: t.lines })),
       ],
       whisperToasts: [],
       verseToasts: [],
+      pendingUnlocks: [],
     })
+    try {
+      localStorage.removeItem(PENDING_UNLOCKS_KEY)
+    } catch {
+      /* storage unavailable — the in-state copy is already cleared */
+    }
   },
   // Called from the prologue screen (button, card tap, or keypress) once
   // the player has read the night's new whispers and verses. Opens the
@@ -804,23 +834,31 @@ export const useGame = create((set, get) => ({
     }
     if (freshAll.length === 0) return
     writeJSON(WHISPERS_KEY, JSON.stringify(unlocked))
-    // Night-start unlocks ride the toast ferry into the prologue queue, where
-    // they are read one at a time before the run begins. Mid-run unlocks no
-    // longer float over live gameplay — they rest in runUnlocks for the
-    // game-over summary instead.
-    if (get().status === 'prologue') {
+    // Routing by status (T10b): night-start unlocks ride the toast ferry
+    // into the prologue queue, where they are read one at a time before
+    // the run begins. Title-screen unlocks wait in pendingUnlocks
+    // (persisted) for the next night's prologue. Any other status rests
+    // in runUnlocks for the game-over summary — never capped, the sheet
+    // scrolls.
+    const items = freshAll.map((w) => ({ kind: 'whisper', id: w.id, text: w.text }))
+    const status = get().status
+    if (status === 'prologue') {
       const toasts = freshAll.map((w) => ({ ...w, toastId: `w${Date.now()}-${Math.random().toString(36).slice(2, 8)}` }))
       set((prev) => ({
         unlockedWhispers: unlocked,
         whisperToasts: [...prev.whisperToasts, ...toasts].slice(-6),
       }))
+    } else if (status === 'title') {
+      const pending = [...get().pendingUnlocks]
+      for (const item of items) {
+        if (!pending.some((p) => p.id === item.id)) pending.push(item)
+      }
+      writeJSON(PENDING_UNLOCKS_KEY, JSON.stringify(pending))
+      set({ unlockedWhispers: unlocked, pendingUnlocks: pending })
     } else {
       set((prev) => ({
         unlockedWhispers: unlocked,
-        runUnlocks: [
-          ...prev.runUnlocks,
-          ...freshAll.map((w) => ({ kind: 'whisper', id: w.id, text: w.text })),
-        ].slice(-8),
+        runUnlocks: [...prev.runUnlocks, ...items],
       }))
     }
   },
@@ -895,21 +933,28 @@ export const useGame = create((set, get) => ({
     // P6: a soft moon-chime marks the moment a verse joins the chronicle.
     // Audio feedback stays — it never covers the garden.
     playVerse()
-    // Like whispers above: night-start unlocks ride the toast ferry into the
-    // prologue queue; mid-run unlocks rest in runUnlocks for the summary.
-    if (get().status === 'prologue') {
+    // Like whispers above, routed by status (T10b): prologue → toast
+    // ferry; title → pendingUnlocks (persisted) for the next prologue;
+    // anything else → runUnlocks for the game-over summary, uncapped.
+    const items = freshAll.map((v) => ({ kind: 'verse', id: v.id, lines: v.lines }))
+    const status = get().status
+    if (status === 'prologue') {
       const toasts = freshAll.map((v) => ({ ...v, toastId: `v${Date.now()}-${Math.random().toString(36).slice(2, 8)}` }))
       set((prev) => ({
         unlockedVerses: unlocked,
         verseToasts: [...prev.verseToasts, ...toasts].slice(-4),
       }))
+    } else if (status === 'title') {
+      const pending = [...get().pendingUnlocks]
+      for (const item of items) {
+        if (!pending.some((p) => p.id === item.id)) pending.push(item)
+      }
+      writeJSON(PENDING_UNLOCKS_KEY, JSON.stringify(pending))
+      set({ unlockedVerses: unlocked, pendingUnlocks: pending })
     } else {
       set((prev) => ({
         unlockedVerses: unlocked,
-        runUnlocks: [
-          ...prev.runUnlocks,
-          ...freshAll.map((v) => ({ kind: 'verse', id: v.id, lines: v.lines })),
-        ].slice(-8),
+        runUnlocks: [...prev.runUnlocks, ...items],
       }))
     }
   },
