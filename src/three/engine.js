@@ -40,6 +40,13 @@ import { SKIN_IDS } from '../game/skins.js'
 const FOV = 42
 const FIT_HALF = 11.8
 const BOARD_HALF = 10.25 // board edge (±10) + rim, for the perspective fit
+// S05 review: HUD geometry the aligned fit must respect. The pill
+// row's bottom edge sits ~74px from the top; the touch cluster
+// (Dash + d-pad, anchored bottom-right: 16px inset + 66px Dash +
+// 16px gap + 190px pad) starts 288px from the right edge.
+const HUD_BOTTOM_PX = 74
+const TOUCH_CLUSTER_W_PX = 288
+const FIT_GAP_PX = 8 // breathing room between board and HUD/cluster
 const DEMO_INTERVAL = 0.15
 const DEATH_DURATION = 1.6
 const BLOOM_BASE = 0.42
@@ -928,14 +935,34 @@ export function createEngine(canvas, { reduced } = {}) {
       // distance keeping every board corner inside the NDC margins,
       // with the look point slid toward the near edge so the board
       // centres vertically instead of wasting the far half-screen.
-      const { dist, lookZ } = fitAligned({
+      //
+      // The preset margins are the tall-screen values. Two runtime
+      // adjustments (S05 review, measured once per resize — this
+      // function never runs per frame):
+      // - Short screens: the fixed top margin reserves 10% of the
+      //   height, but the HUD pill row is ~74px tall regardless —
+      //   at 390px high that is 39px of room for 74px of pills and
+      //   the far rows hid underneath. Reserve the pill row's real
+      //   height + gap instead whenever that asks for more room.
+      let top = preset.perspFit.top
+      const hudReserve = HUD_BOTTOM_PX + FIT_GAP_PX
+      if (h > hudReserve * 2) top = Math.min(top, 1 - (2 * hudReserve) / h)
+      // - Touch landscape: keep the board's right edge left of the
+      //   Dash/d-pad cluster via an asymmetric right margin;
+      //   fitAligned slides the look point sideways (lookX) to
+      //   satisfy it, so the board shifts instead of shrinking.
+      let right = preset.perspFit.x
+      if (camera.aspect > 1 && window.matchMedia?.('(pointer: coarse)')?.matches) {
+        right = Math.min(right, 1 - (2 * (TOUCH_CLUSTER_W_PX + FIT_GAP_PX)) / w)
+      }
+      const { dist, lookZ, lookX } = fitAligned({
         el: preset.el,
         fov: preset.fov,
         aspect: camera.aspect,
         boardHalf: BOARD_HALF,
-        margins: preset.perspFit,
+        margins: { x: preset.perspFit.x, right, top, bottom: preset.perspFit.bottom },
       })
-      camLookTarget.set(0, 0, lookZ)
+      camLookTarget.set(lookX, 0, lookZ)
       camPosTarget.copy(viewDir).multiplyScalar(dist * preset.distMult).add(camLookTarget)
     } else {
       let maxR = 0
