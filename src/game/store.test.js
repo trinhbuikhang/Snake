@@ -128,3 +128,21 @@ describe('unlock routing', () => {
     expect(new Set(unlocks.map((u) => u.id)).size).toBe(unlocks.length)
   })
 })
+
+describe('coach marks', () => {
+  it('pausing mid-delay then resuming restores the remaining coach delay', () => {
+    // Night 1, fresh profile (onboarded key absent): enterPlaying arms it.
+    useGame.setState({ status: 'ready', night: 1, coachStep: -1 })
+    useGame.getState().enterPlaying()
+    expect(useGame.getState().status).toBe('playing')
+    vi.advanceTimersByTime(1000) // 1s into the 2s delay
+    useGame.getState().pause()
+    vi.advanceTimersByTime(500) // resumed before the delay would have fired
+    expect(useGame.getState().coachStep).toBe(-1)
+    useGame.getState().resume()
+    vi.advanceTimersByTime(499) // just under the restored ~1s remainder
+    expect(useGame.getState().coachStep).toBe(-1)
+    vi.advanceTimersByTime(1) // the restored remainder elapses
+    expect(useGame.getState().coachStep).toBe(0)
+  })
+})

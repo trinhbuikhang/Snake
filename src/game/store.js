@@ -47,11 +47,21 @@ export const COACH_DELAY_MS = 2000
 // The coach mark's delayed show — stored so leaving `playing` can cancel
 // it instead of letting a dead timer fire into another status (AUDIT L8).
 let coachTimer = null
+let coachDueAt = 0 // wall-clock ms the pending timer should fire (0 = none)
 function clearCoachTimer() {
   if (coachTimer !== null) {
     clearTimeout(coachTimer)
     coachTimer = null
   }
+}
+function armCoachTimer(delayMs, get, set) {
+  clearCoachTimer()
+  coachDueAt = Date.now() + delayMs
+  coachTimer = setTimeout(() => {
+    coachTimer = null
+    coachDueAt = 0
+    if (get().status === 'playing' && get().coachStep < 0) set({ coachStep: 0 })
+  }, delayMs)
 }
 
 function readItem(key) {
@@ -246,6 +256,7 @@ export const readSeen = () => {
 function completeRun(get, set, cause) {
   // The run is over (dead) — the pending coach mark must not fire later.
   clearCoachTimer()
+  coachDueAt = 0
   const mode = get().gameMode
   const score = get().score
   // P6: the first night's coach marks end with the run, finished or not.
@@ -573,11 +584,7 @@ export const useGame = create((set, get) => ({
     // until the snake is already moving, so the guide never covers the
     // player's first orienting seconds.
     if (get().night === 1 && !readOnboarded()) {
-      clearCoachTimer()
-      coachTimer = setTimeout(() => {
-        coachTimer = null
-        if (get().status === 'playing' && get().coachStep < 0) set({ coachStep: 0 })
-      }, COACH_DELAY_MS)
+      armCoachTimer(COACH_DELAY_MS, get, set)
     }
   },
 
@@ -697,13 +704,21 @@ export const useGame = create((set, get) => ({
     }
   },
   resume() {
-    if (get().status === 'paused') set({ status: 'playing' })
+    if (get().status === 'paused') {
+      set({ status: 'playing' })
+      // If pause() cancelled the coach timer mid-delay (night 1), resume
+      // it with the time left — otherwise the guide never shows this run.
+      const remaining = coachDueAt - Date.now()
+      if (remaining > 0) armCoachTimer(remaining, get, set)
+      else coachDueAt = 0
+    }
   },
   togglePause() {
     get().status === 'playing' ? get().pause() : get().resume()
   },
   toTitle() {
     clearCoachTimer()
+    coachDueAt = 0
     set({ status: 'title', showHowTo: false, isNewBest: false, isBoosting: false })
   },
 
