@@ -277,7 +277,7 @@ Prototype đầy đủ đã chạy được (xem `docs/plan/skins/reference/`). 
 
 ## S03 — Skin Plush Moon ("Gấu bông")
 
-- [ ] **S03** · Mức: **Cao** · Branch: `feat/s03-skin-plush-moon`
+- [x] **S03** · Mức: **Cao** · Branch: `feat/s03-skin-plush-moon`
 
 **Mục tiêu (so với `images/concept-plush-moon.jpg`)**
 - Chất nỉ/thú bông: lì (roughness ~0.95, sheen 1), noise sợi mịn, **viền lông tơ** ở silhouette (rim fuzz có noise), đường chỉ khâu đứt quãng dọc sống lưng (dừng ở trán).
