@@ -18,9 +18,12 @@ npm install
 npm run dev      # Vite dev server (host: true)
 npm run build    # production build → dist/
 npm run preview  # preview production build
+npm test         # vitest run — committed suites; the ONLY basis for a "tests pass" claim
 ```
 
 `vite.config.js` uses `base: './'` so the build can be served from a subpath or opened as static files.
+
+CI (`.github/workflows/ci.yml`, Node 22) runs `npm ci` + `npm run build` + `npm test` on every PR and every `master` push. The old GitHub Pages deploy workflow is gone — deploys are Cloudflare-only (push to `master`).
 
 ## Architecture
 
@@ -50,9 +53,9 @@ src/
 | Layer | Role | Rule |
 |-------|------|------|
 | `game/logic.js` | Pure simulation | No React, no Three, no DOM. Safe to unit-test in Node. |
-| `game/store.js` | UI + session state | Status (`title` \| `playing` \| `paused` \| `dead`), score, camera, mute, floating texts. Persists prefs via localStorage keys `ran-xinh-*`. |
+| `game/store.js` | UI + session state | Status (`title` \| `prologue` \| `ready` \| `playing` \| `paused` \| `dead`), score, camera, mute, floating texts. Persists prefs via localStorage keys `ran-xinh-*`. |
 | `game/inputBus.js` | Input fan-in | Decouples DOM events from the engine tick. |
-| `three/engine.js` | Runtime glue | Owns WebGL, composer/bloom, camera presets, tick that calls `step` / `turn`. |
+| `three/engine.js` | Runtime glue | Owns WebGL, composer/bloom, camera presets, the quality governor, the tick that calls `step` / `turn`, and full teardown in `destroy()`. |
 | `components/*` | Thin React shell | Canvas mount + HUD only — do not put game rules in JSX. |
 
 ### Gameplay constants (in `logic.js`)
@@ -85,6 +88,9 @@ src/
 4. **localStorage keys** are prefixed `ran-xinh-`; keep that prefix for any new prefs.
 5. **English product voice** in player-facing strings; keep code identifiers in English.
 6. Avoid drive-by refactors and unrelated file edits.
+7. **Never claim "tests pass" without committed tests runnable via `npm test`.** Sandbox-only checks are fine, but they must be labeled as manual. (Audit rule, from T04.)
+8. **Binary files (icons, images, fonts) must be committed through real git.** Never push them through a UTF-8-text-only API — base64 text masquerading as binaries was exactly how production ended up serving "PNGs" that were text files. (Audit rule, from T01.)
+9. Check `docs/audit/FIX_PLAN.md` before touching anything the audit covers — settled decisions there are final. Ambiguity → stop and ask.
 
 ## Out of scope unless asked
 
@@ -96,8 +102,23 @@ src/
 
 React draws the HUD. Zustand holds “what the player sees about the run.” Pure `logic.js` owns the grid truth. `engine.js` advances that truth on a timer, drives Three.js, and pushes score/status into the store. `inputBus` feeds intended turns and boost into the engine each frame.
 
-Run statuses: `title → prologue → playing ⇄ paused → dead`. `start()` sets `prologue` (not `playing`): the night's fresh whispers/verses are collected into `prologueQueue` and shown one at a time on the prologue screen so the player can read them before the run. `beginNight()` (button, tap, Space/Enter) moves to `playing`, where the engine's `resetGame()` runs. The demo garden keeps drifting behind the prologue. In-play whispers/verses still use floating toasts, rendered in a single `.toast-stack` column so they can never overlap.
+Run statuses: `title → prologue → ready → playing ⇄ paused → dead`. `start()` sets `prologue` (not `playing`): the night's fresh whispers/verses are collected into `prologueQueue` and shown one at a time on the prologue screen (dwell `PROLOGUE_DWELL` in `Hud.jsx`: 6000ms verses, 4500ms whispers) so the player can read them before the run. `beginNight()` (button, card tap, Space/Enter) moves to `ready`: the garden is visible and the snake holds still for `READY_BEAT_S` (1.8s, driven by the engine frame loop in `engine.js`) — the engine's own timer then calls `enterPlaying()`, which also fires the first-night coach marks. The demo garden keeps drifting behind the prologue.
+
+Mid-run whispers/verses never float over live gameplay anymore (PR #13): they rest in the store's `runUnlocks` array. During play a quiet `JournalPing` corner note ("✦ N new in your journal") is the only signal; the game-over sheet lists them under "New in your journal tonight". There is no `.toast-stack` anymore.
 
 P5 "Shared Skies": `src/game/community.js` (pure) derives the week's shared sky from the ISO week id — every gardener worldwide gets the same event each week, no server. `rollNightEvent(random, extraWeights)` boosts the community event's weight (+10). `verse-shared-sky` unlocks when a run ends under the week's shared sky. Tonight's Highlights: `noteHighlight(kind, text, priority)` collects moments during a run (first supernova, score milestones 25/50/100, spirit catch, lantern feast); `completeRun()` adds moonrise/new-best and finalizes the top 3 by priority into `highlights`, shown as a staggered reel on the game-over sheet and shareable via `composeHighlightCard()`. Shared cards carry the gardener's signature (`ran-xinh-name`, set in the Journal) plus a caption in the Web Share payload.
 
-P6 "First Light" (launch polish): PWA via `public/manifest.webmanifest` + `public/sw.js` (offline-first, versioned cache, registered from `main.jsx` in PROD only) + icons in `public/icons/` (192/512/maskable, generated from the ink-serpent key art); `index.html` carries manifest/apple-touch/OG/Twitter meta and `public/og-image.jpg` (1200×630 JPEG, rendered by `/tmp/uitest/render_og.py`). `GameCanvas` lazy-loads `three/engine.js` via dynamic `import()` so three.js ships as a separate chunk and first paint never waits on it (canvas fades in via `.garden-canvas--ready`). Audio: `setWaterOn()` in `src/audio/sound.js` (looped water + droplet plinks) plays instead of the pad on Silent Night — the engine picks ambience from `nightEventById(st.nightEvent)` when a run starts; `playVerse()` chimes when `checkVerses()` unlocks fresh verses. First-night onboarding: `beginNight()` sets `coachStep: 0` when `night === 1` and `ran-xinh-onboarded` is unset; `CoachMarks` in `Hud.jsx` shows 3 auto-advancing hints (tap to skip), `completeRun()`/`dismissCoach()` persist the flag.
+P6 "First Light" (launch polish): PWA via `public/manifest.webmanifest` + `public/sw.js` (versioned cache `moonlit-serpent-v4` — navigations network-first, `/assets/*` cache-first, other same-origin files stale-while-revalidate; registered from `main.jsx` in PROD only) + icons in `public/icons/` (192/512/maskable, generated from the ink-serpent key art); `index.html` carries manifest/apple-touch/OG/Twitter meta and `public/og-image.jpg` (1200×630 JPEG, rendered by `/tmp/uitest/render_og.py`). `GameCanvas` lazy-loads `three/engine.js` via dynamic `import()` so three.js ships as a separate chunk and first paint never waits on it (canvas fades in via `.garden-canvas--ready`). Audio: `setWaterOn()` in `src/audio/sound.js` (looped water + droplet plinks) plays instead of the pad on Silent Night — the engine picks ambience from `nightEventById(st.nightEvent)` when a run starts; `playVerse()` chimes when `checkVerses()` unlocks fresh verses. First-night onboarding: `beginNight()` sets `coachStep: 0` when `night === 1` and `ran-xinh-onboarded` is unset; `CoachMarks` in `Hud.jsx` shows 3 auto-advancing hints (tap to skip), `completeRun()`/`dismissCoach()` persist the flag.
+
+## Post-launch fixes (T01–T08, from the 2026-10-21 audit)
+
+What the audit changed, condensed so agents don't relearn it the hard way:
+
+- **T01 — real binaries:** `public/icons/` and `public/og-image.jpg` are true PNG/JPEG bytes committed through real git (T01 re-decoded them from base64 *text* that the text-only API had written). SW cache is now `moonlit-serpent-v4`.
+- **T02 — keyboard scope:** `src/game/keyboard.js` exports `isTypingTarget()`; `engine.js`'s key handler returns early while typing, so global shortcuts never hijack text inputs. `setGardenerName()` no longer trims per keystroke — `commitGardenerName()` trims and persists on blur / Journal close.
+- **T03 — Cloudflare-only deploys:** the broken GitHub Pages workflow is deleted; push to `master` is the only deploy path.
+- **T04 — committed tests:** Vitest suites live in the repo (`logic`, `keyboard`, `store`, `dispose`, `engine`, `sound`, `qualityGovernor`, `sw`). CI on Node 22. Includes a seeded 1000-game fuzz in `logic.test.js` and real-engine lifecycle tests in `engine.test.js` (GPU-bound pieces mocked).
+- **T05 — ambient scheduler:** `planPhrases` clamps overdue phrases to `currentTime + 0.1` instead of bursting after a hidden tab; pause fades ambient/pad/water out and resume restores them via `startRunAudio()` (Silent Night plays water only).
+- **T06 — quality governor:** `src/three/qualityGovernor.js` is pure: warmup learns the median rAF ceiling (≥30 samples), steps down after 2 windows below 0.75× target, back up after 4 windows above 0.92× target, with hysteresis and anti-oscillation (`failedSteps`). It is only sampled while `status === 'playing'`; `resize()` never disposes composer targets; `start()` applies the initial quality step exactly once (step 0 keeps 4× MSAA).
+- **T07 — SW strategy:** `public/sw.js` matches its header — navigations network-first, `/assets/*` cache-first, all other same-origin files stale-while-revalidate. `src/sw.test.js` runs the real SW against stubs.
+- **T08 — engine teardown:** `destroy()` cancels rAF, removes listeners, unsubscribes the garden/store/inputBus subscriptions, silences ambient/pad/water, disposes composer targets and **every** composer pass (RenderPass/bloom/OutputPass), calls `moon.dispose()` (the 2048×2048 moonlight shadow map is a `WebGLRenderTarget` the traversal can't reach) and `roomEnv.dispose()` (the PMREM `RoomEnvironment` temp scene), then `disposeObject3D(scene)` (`src/three/dispose.js`: traverse + dedupe geometry/material/textures), `envTex`, `pmrem`, and the renderer.
