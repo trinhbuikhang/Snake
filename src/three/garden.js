@@ -206,6 +206,19 @@ export function foodLightIntensity(activeKey, glowMult = 1, visible = true) {
   return base * (glowMult > 0 ? glowMult : 1)
 }
 
+// Which food visuals are on screen for a logical food state: hidden →
+// nothing; shown → the beacon and only the active planet's group.
+// Pure and exported for tests (P02 review): the compile-prepare
+// restore re-applies THIS from the current logical state instead of
+// restoring a snapshot — a snapshot taken at load went stale the
+// moment the title flow hid the food (or a run's first setFood
+// landed), and restoring it stacked all six planets on screen.
+export function foodVisibility({ visible, activeKey, keys }) {
+  const groups = {}
+  for (const key of keys) groups[key] = !!visible && key === activeKey
+  return { beacon: !!visible, groups }
+}
+
 export function buildGarden(scene, { envTex, reduced }) {
   const time = { t: 0, cam: new THREE.Vector3() }
 
@@ -950,6 +963,17 @@ export function buildGarden(scene, { envTex, reduced }) {
   let foodGlowMult = 1 // moon-phase multiplier for the food beacon light
   let foodVisible = false // food visuals shown? (the light stays in the graph either way)
 
+  // Single writer for food visual visibility (P02 review): every
+  // show/hide path goes through here, so the scene graph can never
+  // disagree with the logical state (foodVisible + activePlanetKey).
+  function applyFoodVisibility() {
+    const vis = foodVisibility({ visible: foodVisible, activeKey: activePlanetKey, keys: Object.keys(planets) })
+    beaconMesh.visible = vis.beacon
+    for (const [key, planetObj] of Object.entries(planets)) {
+      planetObj.group.visible = vis.groups[key]
+    }
+  }
+
   // Particle systems
   const burst = new ParticleField(scene, { capacity: 450, size: 0.24, additive: true })
   burst.gravity = -2.6
@@ -966,10 +990,7 @@ export function buildGarden(scene, { envTex, reduced }) {
       const activeKey = bloom ? 'sun' : (planetType || 'earth')
       activePlanetKey = activeKey
 
-      beaconMesh.visible = true
-      for (const [key, planetObj] of Object.entries(planets)) {
-        planetObj.group.visible = key === activeKey
-      }
+      applyFoodVisibility()
 
       // Adapt light color & beacon to active planet
       if (activeKey === 'sun') {
@@ -1008,25 +1029,23 @@ export function buildGarden(scene, { envTex, reduced }) {
       // group would drop the point-light count and force every lit
       // material to recompile when food reappears; the light is turned
       // off by intensity instead (see foodLightIntensity).
-      beaconMesh.visible = false
-      for (const planetObj of Object.values(planets)) planetObj.group.visible = false
+      applyFoodVisibility()
       foodLight.intensity = foodLightIntensity(activePlanetKey, foodGlowMult, false)
     },
 
     // P02: the engine calls this once at load so compileAsync() can
     // build every planet's shader programs before the first food of a
     // run appears: temporarily show every planet group + the beacon
-    // (compile only traverses visible objects), then restore exactly
-    // what was visible before. Returns the restore function.
+    // (compile only traverses visible objects). The returned restore
+    // does NOT write back a snapshot of what was visible here — while
+    // the compile is in flight the logical state moves on (the title
+    // flow hides the food; a fast Start lands the first setFood), and
+    // a stale snapshot would resurrect every planet at once (P02
+    // review). It re-applies the CURRENT logical visibility instead.
     prepareFoodForCompile() {
-      const saved = Object.values(planets).map((p) => [p.group, p.group.visible])
-      const beaconWas = beaconMesh.visible
-      for (const [group] of saved) group.visible = true
+      for (const planetObj of Object.values(planets)) planetObj.group.visible = true
       beaconMesh.visible = true
-      return () => {
-        for (const [group, was] of saved) group.visible = was
-        beaconMesh.visible = beaconWas
-      }
+      return () => applyFoodVisibility()
     },
 
     addRipple(x, z, maxScale = 2.4, color = 0x6eedc4) {
@@ -1206,6 +1225,11 @@ export function buildGarden(scene, { envTex, reduced }) {
       time.cam.copy(v)
     },
   })
+
+  // P02 review: start from a consistent hidden state — foodVisible is
+  // false, so no planet group or beacon may be visible yet and the
+  // food light must be off until the first setFood.
+  garden.hideFood()
 
   return garden
 }

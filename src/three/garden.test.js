@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { foodLightIntensity } from './garden.js'
+import { foodLightIntensity, foodVisibility } from './garden.js'
+
+const KEYS = ['earth', 'mars', 'saturn', 'jupiter', 'neptune', 'sun']
 
 // P02: the food point light is never hidden — only its intensity
 // changes. These are the exact intensities the pre-P02 setFood chain
@@ -33,5 +35,48 @@ describe('foodLightIntensity (P02)', () => {
 
   it('defaults to visible at glow 1', () => {
     expect(foodLightIntensity('mars')).toBe(3.0)
+  })
+})
+
+// P02 review regression: prepareFoodForCompile's restore re-applies
+// foodVisibility() from the CURRENT logical state (this is the exact
+// function applyFoodVisibility — and therefore the restore — uses).
+// The original bug restored a load-time snapshot instead: prepare ran
+// while every planet was visible, hideFood landed during the async
+// compile, and the restore stacked all six planets + the beacon on
+// the title screen.
+describe('foodVisibility (P02 review)', () => {
+  it('hidden food shows nothing, whatever the active planet', () => {
+    const vis = foodVisibility({ visible: false, activeKey: 'earth', keys: KEYS })
+    expect(vis.beacon).toBe(false)
+    expect(vis.groups).toEqual({
+      earth: false, mars: false, saturn: false, jupiter: false, neptune: false, sun: false,
+    })
+  })
+
+  it('shown food shows the beacon and only the active planet', () => {
+    const vis = foodVisibility({ visible: true, activeKey: 'mars', keys: KEYS })
+    expect(vis.beacon).toBe(true)
+    expect(vis.groups).toEqual({
+      earth: false, mars: true, saturn: false, jupiter: false, neptune: false, sun: false,
+    })
+    const sun = foodVisibility({ visible: true, activeKey: 'sun', keys: KEYS })
+    expect(sun.groups.sun).toBe(true)
+    expect(sun.groups.earth).toBe(false)
+  })
+
+  it('restore ordering: prepare → hideFood → restore shows nothing', () => {
+    // Logical state when the restore runs: title flow hid the food.
+    const atRestore = foodVisibility({ visible: false, activeKey: 'earth', keys: KEYS })
+    expect(Object.values(atRestore.groups).some(Boolean)).toBe(false)
+    expect(atRestore.beacon).toBe(false)
+  })
+
+  it('restore ordering: prepare → setFood(mars) → restore shows only mars', () => {
+    // Logical state when the restore runs: a fast Start already
+    // placed mars — the restore must not resurrect the other five.
+    const atRestore = foodVisibility({ visible: true, activeKey: 'mars', keys: KEYS })
+    expect(Object.entries(atRestore.groups).filter(([, v]) => v)).toEqual([['mars', true]])
+    expect(atRestore.beacon).toBe(true)
   })
 })
