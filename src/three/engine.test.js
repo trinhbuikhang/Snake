@@ -46,15 +46,31 @@ vi.mock('three', async () => {
       this.disposeCalls = 0
       this.compileCalls = []
       this.compileAsyncCalls = []
+      this.renderCalls = []
+      this.events = []
+      this.currentTarget = null
       if (h.noCompileAsync) this.compileAsync = undefined
       h.renderers.push(this)
     }
     setPixelRatio() {}
     setSize() {}
+    getRenderTarget() {
+      return this.currentTarget
+    }
+    setRenderTarget(t) {
+      this.events.push(['setRenderTarget', t])
+      this.currentTarget = t
+    }
+    render(scene, camera) {
+      this.events.push(['render'])
+      this.renderCalls.push([scene, camera])
+    }
     compile(scene, camera) {
+      this.events.push(['compile'])
       this.compileCalls.push([scene, camera])
     }
     compileAsync(scene, camera) {
+      this.events.push(['compileAsync'])
       this.compileAsyncCalls.push([scene, camera])
       return Promise.resolve(scene)
     }
@@ -76,6 +92,8 @@ vi.mock('three/addons/postprocessing/EffectComposer.js', () => ({
     constructor() {
       this.renderTarget1 = { samples: 0, dispose: vi.fn() }
       this.renderTarget2 = { samples: 0, dispose: vi.fn() }
+      this.writeBuffer = this.renderTarget1
+      this.readBuffer = this.renderTarget2
       this.passes = []
       this.dispose = vi.fn()
       h.composers.push(this)
@@ -399,6 +417,66 @@ describe('createEngine lifecycle', () => {
     expect(renderer.compileAsyncCalls).toHaveLength(0)
     expect(renderer.compileCalls).toHaveLength(1)
     await new Promise((r) => setTimeout(r, 0))
+    expect(h.foodRestore).toHaveBeenCalledTimes(1)
+    engine.destroy()
+  })
+
+  it('compiles against the composer read buffer and restores the target before awaiting (P02 round 2)', async () => {
+    const engine = createEngine(freshCanvas(), { reduced: false })
+    const renderer = h.renderers[0]
+    const readBuffer = h.composers[0].readBuffer
+    const targetEvents = renderer.events.filter(([k]) => k === 'setRenderTarget').map(([, t]) => t)
+    expect(targetEvents).toEqual([readBuffer, null]) // aim at readBuffer, back to the previous (null) target
+    const kinds = renderer.events.map(([k]) => k)
+    expect(kinds.indexOf('setRenderTarget')).toBeLessThan(kinds.indexOf('compileAsync'))
+    // The restore already happened synchronously during createEngine —
+    // before the async compile settles (no await has run yet here).
+    expect(renderer.currentTarget).toBe(null)
+    await new Promise((r) => setTimeout(r, 0))
+    expect(h.foodRestore).toHaveBeenCalledTimes(1)
+    engine.destroy()
+  })
+
+  it('warms up with one synchronous off-screen render on the second frame (P02 round 2)', async () => {
+    const engine = createEngine(freshCanvas(), { reduced: false })
+    const renderer = h.renderers[0]
+    await new Promise((r) => setTimeout(r, 0)) // let the init compile settle
+    expect(h.garden.prepareFoodForCompile).toHaveBeenCalledTimes(1)
+    expect(h.foodRestore).toHaveBeenCalledTimes(1)
+
+    engine.start()
+    runFrames(200) // two loop frames — the warm-up fires on frame 2
+    // No await since runFrames: the warm-up's restore must already
+    // have run inside the frame callback (same tick as the render).
+    expect(renderer.renderCalls).toHaveLength(1)
+    expect(h.garden.prepareFoodForCompile).toHaveBeenCalledTimes(2)
+    expect(h.foodRestore).toHaveBeenCalledTimes(2)
+    // It drew into the composer read buffer, then restored the target.
+    const renderIdx = renderer.events.findIndex(([k]) => k === 'render')
+    expect(renderer.events[renderIdx - 1]).toEqual(['setRenderTarget', h.composers[0].readBuffer])
+    expect(renderer.events[renderIdx + 1]).toEqual(['setRenderTarget', null])
+
+    runFrames(2000) // exactly once — never again on later frames
+    expect(renderer.renderCalls).toHaveLength(1)
+    engine.destroy()
+  })
+
+  it('reduced mode keeps the null target and still warms up once (P02 round 2)', () => {
+    const engine = createEngine(freshCanvas(), { reduced: true })
+    const renderer = h.renderers[0]
+    expect(h.composers).toHaveLength(0)
+    expect(renderer.compileAsyncCalls).toHaveLength(1)
+    // No composer → nothing ever re-aims the render target.
+    expect(renderer.events.filter(([k]) => k === 'setRenderTarget')).toHaveLength(0)
+
+    engine.start()
+    runFrames(200) // two frames
+    // The loop renders via renderer.render in reduced mode: frame 1,
+    // the warm-up (start of frame 2's render, same tick), frame 2.
+    expect(renderer.renderCalls).toHaveLength(3)
+    expect(h.garden.prepareFoodForCompile).toHaveBeenCalledTimes(2)
+    // The warm-up restore ran synchronously (the init compile's
+    // restore is still pending a microtask — no await in this test).
     expect(h.foodRestore).toHaveBeenCalledTimes(1)
     engine.destroy()
   })
