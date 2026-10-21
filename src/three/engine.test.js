@@ -34,6 +34,7 @@ const h = vi.hoisted(() => ({
   rig: null,
   rigCalls: [],
   nextRigs: [],
+  pendingCompile: null,
   decor: null,
   noCompileAsync: false,
   foodRestore: null,
@@ -78,6 +79,7 @@ vi.mock('three', async () => {
     compileAsync(scene, camera) {
       this.events.push(['compileAsync'])
       this.compileAsyncCalls.push([scene, camera])
+      if (h.pendingCompile) return h.pendingCompile.promise
       return Promise.resolve(scene)
     }
     dispose() {
@@ -275,6 +277,7 @@ beforeEach(() => {
   }
   h.rigCalls = []
   h.nextRigs = []
+  h.pendingCompile = null
   h.rig = {
     death: null,
     group: { position: new THREE.Vector3(0, 0, 0) },
@@ -576,25 +579,78 @@ describe('skin swapping (S04)', () => {
     dispose: vi.fn(),
   })
 
-  it('creates the rig for the selected skin and swaps live on change', () => {
+  it('creates the rig for the selected skin and swaps live on change', async () => {
     const engine = createEngine(freshCanvas(), { reduced: false })
-    // The boot rig is built for the store's selected skin (default).
+    // The boot rig is built for the stored selected skin (default).
     expect(h.rigCalls).toEqual(['moonJade'])
 
     const plush = makeRig('plushMoon')
-    h.nextRigs.push(plush)
+    const spare = makeRig('moonJade')
+    h.nextRigs.push(plush, spare)
     useGame.setState({ skins: { owned: ['moonJade', 'plushMoon'], selected: 'plushMoon' } })
 
-    // New rig created with the new id; the old rig disposed exactly
-    // once; ink/pose re-applied to the new rig.
+    // New rig created with the new id; ink/pose re-applied to it.
     expect(h.rigCalls).toEqual(['moonJade', 'plushMoon'])
-    expect(h.rig.dispose).toHaveBeenCalledTimes(1)
     expect(plush.setInk).toHaveBeenCalled()
     expect(plush.reset).toHaveBeenCalled()
     expect(plush.setDir).toHaveBeenCalled()
 
+    // The old rig's dispose is deferred until the boot precompile
+    // settles (S04 review fix) — mocked compileAsync resolves
+    // immediately, so one macrotask later it has happened exactly
+    // once, and the spare-skin precompile consumed its own rig.
+    await new Promise((r) => setTimeout(r, 0))
+    expect(h.rig.dispose).toHaveBeenCalledTimes(1)
+    expect(spare.dispose).toHaveBeenCalledTimes(1)
+
     engine.destroy()
     useGame.setState({ skins: { owned: ['moonJade'], selected: 'moonJade' } })
+  })
+
+  it('boots a single rig for the already-hydrated skin (no boot swap)', async () => {
+    localStorage.setItem(
+      'ran-xinh-skin',
+      JSON.stringify({ owned: ['moonJade', 'plushMoon'], selected: 'plushMoon' }),
+    )
+    useGame.getState().hydrate()
+    const engine = createEngine(freshCanvas(), { reduced: false })
+    await new Promise((r) => setTimeout(r, 0))
+    // Exactly one rig was ever created for plushMoon (the spare-skin
+    // precompile may attempt the OTHER skin, but under this mock it
+    // aliases the live rig and disposes nothing).
+    expect(h.rigCalls.filter((id) => id === 'plushMoon')).toEqual(['plushMoon'])
+    expect(h.rig.dispose).not.toHaveBeenCalled()
+    engine.destroy()
+    localStorage.removeItem('ran-xinh-skin')
+    useGame.setState({ skins: { owned: ['moonJade'], selected: 'moonJade' } })
+  })
+
+  it('defers the old rig dispose until the boot precompile settles', async () => {
+    let settle
+    h.pendingCompile = { promise: new Promise((res) => { settle = res }) }
+    const engine = createEngine(freshCanvas(), { reduced: false })
+    const plush = makeRig('plushMoon')
+    const spare = makeRig('moonJade')
+    h.nextRigs.push(plush, spare)
+    // Swapping while compileAsync is still polling must not throw
+    // and must not dispose the old rig's materials yet.
+    useGame.setState({ skins: { owned: ['moonJade', 'plushMoon'], selected: 'plushMoon' } })
+    expect(h.rigCalls).toEqual(['moonJade', 'plushMoon'])
+    expect(plush.setInk).toHaveBeenCalled()
+    expect(h.rig.dispose).not.toHaveBeenCalled()
+
+    settle()
+    await new Promise((r) => setTimeout(r, 0))
+    // After the settle: old rig disposed exactly once, and the
+    // precompile ran to completion (food visibility restored, spare
+    // skin precompiled + disposed).
+    expect(h.rig.dispose).toHaveBeenCalledTimes(1)
+    expect(h.foodRestore).toHaveBeenCalled()
+    expect(spare.dispose).toHaveBeenCalledTimes(1)
+
+    engine.destroy()
+    useGame.setState({ skins: { owned: ['moonJade'], selected: 'moonJade' } })
+    h.pendingCompile = null
   })
 
   it('never swaps a rig without dispose() (the ?rig=old debug rig)', () => {

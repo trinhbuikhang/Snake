@@ -21,7 +21,7 @@ import {
   gridToWorldInto,
   N,
 } from '../game/logic.js'
-import { useGame, READY_BEAT_S } from '../game/store.js'
+import { useGame, READY_BEAT_S, readSkins } from '../game/store.js'
 import { inputBus } from '../game/inputBus.js'
 import { isTypingTarget } from '../game/keyboard.js'
 import audio from '../audio/sound.js'
@@ -199,7 +199,14 @@ export function createEngine(canvas, { reduced } = {}) {
   const envTex = pmrem.fromScene(roomEnv, 0.04).texture
 
   const garden = buildGarden(scene, { envTex, reduced })
-  let rig = createSnakeRig(scene, useGame.getState().skins?.selected)
+  // The worn skin is read from storage directly (validated by
+  // readSkins), NOT from the store: hydrate() only runs later, so a
+  // returning player who wears Plush Moon would otherwise boot a
+  // Moon Jade rig and swap mid-startup (S04 review — that swap raced
+  // the shader precompile and crashed it). Boot builds exactly one
+  // rig; when hydrate() then lands the same selection, swapRig's
+  // same-skin guard makes it a no-op.
+  let rig = createSnakeRig(scene, readSkins().selected)
   const decor = buildDecor(scene)
 
   // P4 "The Garden Remembers": apply purchased decorations, the serpent's
@@ -224,6 +231,25 @@ export function createEngine(canvas, { reduced } = {}) {
   // synchronous block before the old rig goes away, so the swap
   // never stalls a rendered frame on shader linking.
   const compiledSkins = new Set([rig.skin])
+  // While the boot precompile's compileAsync is still polling the
+  // scene's materials, disposing ANY of them breaks its poll loop
+  // (three.js: reading 'isReady' of undefined) and the promise never
+  // settles — restoreFood() and the spare-skin precompile would
+  // never run (S04 review). swapRig therefore defers the old rig's
+  // dispose until the precompile settles; by the time a player can
+  // swap mid-game it has long settled and dispose is immediate.
+  let precompilePending = null
+  function disposeOldRig(old) {
+    if (precompilePending) {
+      const pending = precompilePending
+      pending.then(
+        () => old.dispose(),
+        () => old.dispose(),
+      )
+    } else {
+      old.dispose()
+    }
+  }
   function compileSceneNow() {
     const prevTarget = composer ? renderer.getRenderTarget() : null
     if (composer) renderer.setRenderTarget(composer.readBuffer)
@@ -247,7 +273,7 @@ export function createEngine(canvas, { reduced } = {}) {
       }
       compiledSkins.add(skinId)
     }
-    old.dispose()
+    disposeOldRig(old)
     applyGarden()
     rig.reset(logic.snake.length)
     rig.setDir(DIR[logic.dir].x, DIR[logic.dir].y)
@@ -299,7 +325,16 @@ export function createEngine(canvas, { reduced } = {}) {
       } finally {
         if (composer) renderer.setRenderTarget(prevTarget)
       }
-      await pending
+      if (pending) {
+        // Tracked so swapRig can defer disposing the old rig until
+        // this settles (see disposeOldRig).
+        precompilePending = pending
+        try {
+          await pending
+        } finally {
+          if (precompilePending === pending) precompilePending = null
+        }
+      }
     } catch {
       // Optimization only — a failed precompile must never break
       // boot; any missing program compiles lazily on first use.

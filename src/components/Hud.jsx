@@ -343,7 +343,8 @@ export function GardenOverlay() {
                   type="button"
                   role="radio"
                   aria-checked={selected}
-                  className={`garden__skin${selected ? ' is-selected' : ''}`}
+                  className={`garden__skin${selected ? ' is-selected' : ''}${owned ? '' : ' is-locked'}`}
+                  aria-disabled={!owned}
                   onClick={() => chooseSkin(skin.id)}
                   title={skin.desc}
                 >
@@ -354,7 +355,7 @@ export function GardenOverlay() {
                     <span className="garden__skin-name">{skin.name}</span>
                     <span className="garden__skin-sub">{skin.nameVi}</span>
                   </span>
-                  <span className="garden__ink-state">{selected ? 'worn' : owned ? 'wear' : 'Coming soon'}</span>
+                  <span className="garden__skin-state">{selected ? 'worn' : owned ? 'wear' : '🔒 Coming soon'}</span>
                 </button>
               )
             })}
