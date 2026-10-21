@@ -495,7 +495,7 @@ kbd {
   font-weight: 700;
   letter-spacing: 0.05em;
   cursor: pointer;
-  touch-action: manipulation;
+  touch-action: none;
   box-shadow: 0 10px 28px rgba(255, 152, 0, 0.45);
   transition: all 0.12s ease;
 }
@@ -517,6 +517,8 @@ kbd {
   grid-template-columns: repeat(3, 58px);
   grid-template-rows: repeat(3, 58px);
   gap: 8px;
+  /* T10f: the whole pad is a play surface — no pinch/double-tap zoom here. */
+  touch-action: none;
 }
 
 .dbtn {
@@ -529,7 +531,7 @@ kbd {
   display: grid;
   place-items: center;
   cursor: pointer;
-  touch-action: manipulation;
+  touch-action: none;
   backdrop-filter: blur(8px);
   transition: transform 0.08s ease, background 0.12s ease, border-color 0.12s ease;
 }

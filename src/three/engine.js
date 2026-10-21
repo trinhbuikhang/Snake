@@ -818,7 +818,10 @@ export function createEngine(canvas, { reduced } = {}) {
         // The Jade Carp: caught when the snake's head enters its cell.
         if (spirit && logic.snake[0].x === spirit.x && logic.snake[0].y === spirit.y) catchSpirit()
         interval.v = speedInterval(logic.foodsEaten, isBoosting, moonSpeedMult, modeSpeedMult, eventSpeedMult)
-        accum -= interval.v
+        // Consume THIS tick's span (AUDIT L6): subtracting the freshly
+        // recomputed interval.v here would over/under-pay the accumulator
+        // whenever the step changed the speed (e.g. right after eating).
+        accum -= tickDt
         if (++guard > 6) {
           accum = 0
           break
