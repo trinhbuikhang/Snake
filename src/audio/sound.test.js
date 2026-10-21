@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, afterEach } from 'vitest'
-import { __test__ } from './sound.js'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { __test__, unlockAudio, setMuted, setPadOn, setWaterOn, setAmbientOn } from './sound.js'
 
 // Minimal mock AudioContext: records every oscillator start time so a
 // test can see exactly what one planning pass scheduled. Gain/filter
@@ -82,5 +82,208 @@ describe('ambient phrase scheduler (planPhrases)', () => {
     __test__.mockAmbient(fake, { on: false, nextAt: 0 })
     __test__.planPhrases()
     expect(fake.starts).toEqual([])
+  })
+})
+
+// ---- T10d: voice toggle edge cases (AUDIT L5) ----------------------------
+
+class MockParam {
+  constructor(value = 0) {
+    this.value = value
+    this.targets = []
+  }
+  setValueAtTime(v) {
+    this.value = v
+  }
+  linearRampToValueAtTime(v) {
+    this.value = v
+  }
+  exponentialRampToValueAtTime(v) {
+    this.value = v
+  }
+  setTargetAtTime(v) {
+    this.targets.push(v)
+    this.value = v
+  }
+}
+
+// A fuller mock AudioContext than the scheduler's above: every created
+// node is recorded and remembers whether it was stopped/disconnected, so
+// a test can prove exactly which generation a teardown disposed of.
+function trackedCtx(now = 0) {
+  const created = { oscillators: [], gains: [], filters: [], sources: [] }
+  const node = (extra) =>
+    Object.assign(
+      {
+        disconnected: false,
+        stopped: false,
+        connect() {},
+        disconnect() {
+          this.disconnected = true
+        },
+        start() {},
+        stop() {
+          this.stopped = true
+        },
+      },
+      extra,
+    )
+  return {
+    currentTime: now,
+    sampleRate: 44100,
+    state: 'running',
+    destination: {},
+    created,
+    resume: () => Promise.resolve(),
+    createGain() {
+      const n = node({ gain: new MockParam(0) })
+      created.gains.push(n)
+      return n
+    },
+    createOscillator() {
+      const n = node({ type: '', frequency: new MockParam(0) })
+      created.oscillators.push(n)
+      return n
+    },
+    createBiquadFilter() {
+      const n = node({ type: '', frequency: new MockParam(0), Q: new MockParam(0.5) })
+      created.filters.push(n)
+      return n
+    },
+    createBufferSource() {
+      const n = node({ buffer: null, loop: false, playbackRate: new MockParam(1) })
+      created.sources.push(n)
+      return n
+    },
+    createDynamicsCompressor() {
+      return node({ threshold: new MockParam(0), ratio: new MockParam(0) })
+    },
+    createBuffer: (channels, len) => ({ getChannelData: () => new Float32Array(len) }),
+  }
+}
+
+describe('voice toggles (AUDIT L5)', () => {
+  // Boot the module the way the browser does: a window with an
+  // AudioContext appears, then unlockAudio() creates the real context.
+  function boot(now = 0) {
+    const fake = trackedCtx(now)
+    globalThis.window = {
+      AudioContext: function () {
+        return fake
+      },
+    }
+    unlockAudio()
+    return fake
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    __test__.reset()
+  })
+
+  afterEach(() => {
+    delete globalThis.window
+    __test__.reset()
+    vi.clearAllTimers()
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
+  it('rapid ambient on/off/on disconnects the first voice and keeps the second live', () => {
+    const fake = boot(0)
+    setAmbientOn(true)
+    const gen1Gain = fake.created.gains[1] // gains[0] is the master bus
+    const gen1Filter = fake.created.filters[0]
+    setAmbientOn(false)
+    setAmbientOn(true) // 0ms later — deep inside the 1600ms teardown window
+    const gen2Gain = fake.created.gains[2]
+    const gen2Filter = fake.created.filters[1]
+    expect(gen2Gain).toBeDefined()
+    vi.advanceTimersByTime(2000)
+    // The first generation was torn down even though the voice is on
+    // again — the old teardown checked the flag, saw "on", and leaked
+    // both nodes into the graph instead.
+    expect(gen1Gain.disconnected).toBe(true)
+    expect(gen1Filter.disconnected).toBe(true)
+    // The live second generation is untouched and still the module's voice.
+    expect(gen2Gain.disconnected).toBe(false)
+    expect(gen2Filter.disconnected).toBe(false)
+    expect(__test__.state().ambientGain).toBe(gen2Gain)
+    expect(__test__.state().ambientTimer).not.toBe(null)
+  })
+
+  it('rapid pad on/off/on builds a fresh voice instead of wedging the fading one silent', () => {
+    const fake = boot(0)
+    setPadOn(true)
+    const gen1Oscs = fake.created.oscillators.slice()
+    const gen1Src = fake.created.sources[0]
+    expect(gen1Oscs.length).toBe(4) // o1, o2, o3 + the LFO
+    setPadOn(false)
+    setPadOn(true) // inside the 1200ms teardown window
+    // A whole fresh voice was built — the old code created nothing here
+    // (the fading pad object was still referenced) and left the pad
+    // flagged on but silent until a later slow off/on cycle.
+    expect(fake.created.oscillators.length).toBe(8)
+    const gen2Oscs = fake.created.oscillators.slice(4)
+    vi.advanceTimersByTime(1300)
+    expect(gen1Oscs.every((o) => o.stopped)).toBe(true)
+    expect(gen1Src.stopped).toBe(true) // the pad's noise loop stops too
+    expect(gen2Oscs.every((o) => !o.stopped)).toBe(true)
+    expect(__test__.state().pad).not.toBe(null)
+  })
+
+  it('rapid water on/off/on restarts the voice instead of reviving the fading one', () => {
+    const fake = boot(0)
+    setWaterOn(true)
+    const gen1Gain = fake.created.gains[1] // [0] master, [1] water gain
+    const gen1Src = fake.created.sources[0]
+    setWaterOn(false)
+    setWaterOn(true) // inside the 1500ms teardown window
+    expect(fake.created.sources.length).toBe(2) // a fresh source was built
+    vi.advanceTimersByTime(1600)
+    expect(gen1Src.stopped).toBe(true)
+    expect(gen1Gain.disconnected).toBe(true)
+    expect(fake.created.sources[1].stopped).toBe(false)
+    expect(__test__.state().waterNodes).not.toBe(null)
+  })
+
+  it('setAmbientOn(true) before the context exists starts the voice once audio unlocks', () => {
+    delete globalThis.window // no AudioContext anywhere yet
+    setAmbientOn(true)
+    // Intent recorded, nothing started — and not wedged: the flag alone
+    // used to make every later setAmbientOn(true) a no-op.
+    expect(__test__.state().ambientOn).toBe(true)
+    expect(__test__.state().ambientTimer).toBe(null)
+    const fake = boot(5)
+    expect(__test__.state().ambientTimer).not.toBe(null)
+    expect(fake.created.filters.length).toBe(1)
+    expect(__test__.state().ambientGain).toBe(fake.created.gains[1])
+  })
+
+  it('enabling voices while muted creates no oscillators; they start on unmute', () => {
+    const fake = boot(0)
+    setMuted(true)
+    setPadOn(true)
+    setWaterOn(true)
+    setAmbientOn(true)
+    expect(fake.created.oscillators.length).toBe(0)
+    expect(fake.created.sources.length).toBe(0)
+    expect(__test__.state().padOn).toBe(true) // intent recorded for all three
+    setMuted(false)
+    // Pad (3 oscs + LFO) and water (LFO) start now; ambient runs its timer.
+    expect(fake.created.oscillators.length).toBe(5)
+    expect(fake.created.sources.length).toBe(2)
+    expect(__test__.state().ambientTimer).not.toBe(null)
+  })
+
+  it('turning a voice off while muted still tears it down', () => {
+    const fake = boot(0)
+    setPadOn(true)
+    const oscs = fake.created.oscillators.slice()
+    setMuted(true)
+    setPadOn(false)
+    vi.advanceTimersByTime(1300)
+    expect(oscs.every((o) => o.stopped)).toBe(true)
+    expect(__test__.state().pad).toBe(null)
   })
 })
