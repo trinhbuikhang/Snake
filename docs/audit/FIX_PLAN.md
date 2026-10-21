@@ -345,7 +345,7 @@ Mỗi mục con là **một PR riêng**, làm theo thứ tự a → f. Tham chi�
 - [x] **T10d** · Thấp (AUDIT L5) · Branch: `fix/10d-ambient-edge-cases`
   - **Vấn đề:** `src/audio/sound.js` L444–478: bật lại trong 1.6s sau khi tắt làm rò gain/filter cũ; `setAmbientOn(true)` khi chưa có `ctx` làm kẹt trạng thái; vẫn tạo oscillator khi mute.
   - **Nghiệm thu:** test với mock `AudioContext`: bật/tắt/bật nhanh không để node cũ còn kết nối; gọi khi chưa có ctx rồi có ctx → ambient chạy; khi mute không tạo oscillator mới.
-- [ ] **T10e** · Thấp (AUDIT L3, L7, L8) · Branch: `chore/10e-perf-hygiene`
+- [x] **T10e** · Thấp (AUDIT L3, L7, L8) · Branch: `chore/10e-perf-hygiene`
   - **Vấn đề:** claim "zero per-frame allocations" sai (`engine.js` L790 tạo object mỗi frame, L298–299 cấp phát mỗi tick); chunk `engine` 580 KB; `setTimeout` coach (`store.js` L533–537) không được clear.
   - **Nghiệm thu:** tái sử dụng object tham số `paint`; sửa comment cho đúng; build không còn cảnh báo chunk > 500 KB hoặc ghi lý do chấp nhận; timeout coach được lưu và clear khi rời `playing`. Dán output `npm run build`.
 - [ ] **T10f** · Thấp (AUDIT L6 + "Vấn đề có từ trước") · Branch: `fix/10f-misc`

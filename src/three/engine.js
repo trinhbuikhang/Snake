@@ -75,9 +75,15 @@ export function createEngine(canvas, { reduced } = {}) {
 
   // Camera shake
   let camShake = 0
-  // Reused scratch vectors — the frame loop must not allocate per frame.
+  // Reused scratch state — the frame loop must not allocate per frame:
+  // scratch vectors plus the one paint-param object below (rig.paint()
+  // destructures its argument and never retains it, so the same object is
+  // refilled every frame). Per-tick simulation arrays (cloneXZ(),
+  // worldCells()) are a different story: they allocate at tick rate
+  // (~4-8x/s), not per frame (AUDIT L3).
   const _shake = new THREE.Vector3()
   const _headOff = new THREE.Vector3(0, 1.2, 0)
+  const paintParams = { cur: null, prev: null, t: 0, death: null, animT: 0, dt: 0, isBoosting: false }
 
   // ---- adaptive quality ------------------------------------------------------
   // The garden is a heavy frame: UnrealBloom + 4x-MSAA composer targets +
@@ -312,7 +318,14 @@ export function createEngine(canvas, { reduced } = {}) {
     interval.v = BASE_INTERVAL
     rig.reset(logic.snake.length)
     rig.setDir(1, 0)
-    rig.paint({ cur: curCells, prev: prevCells, t: 1, death: null, animT, dt: 0, isBoosting: false })
+    paintParams.cur = curCells
+    paintParams.prev = prevCells
+    paintParams.t = 1
+    paintParams.death = null
+    paintParams.animT = animT
+    paintParams.dt = 0
+    paintParams.isBoosting = false
+    rig.paint(paintParams)
     if (logic.food) {
       const w = gridToWorld(logic.food.x, logic.food.y)
       garden.setFood(w.x, w.z, logic.foodIsBloom, logic.foodPlanet)
@@ -844,16 +857,24 @@ export function createEngine(canvas, { reduced } = {}) {
     }
 
     let paintT = 0
-    let death = null
     if (st.status === 'playing' && !dying) paintT = clamp01(accum / interval.v)
     else if (st.status === 'ready') paintT = 0 // the snake holds its opening pose
     else if (st.status === 'title' || st.status === 'prologue') paintT = clamp01(demoAccum / DEMO_INTERVAL)
     else if (st.status === 'paused' || dying) paintT = 1 // dying: hold the death pose, don't snap back a tick
-    if (rig.death) death = { t: rig.death.t }
 
     const cells = (st.status === 'title' || st.status === 'prologue') ? demoCur : curCells
     const precells = (st.status === 'title' || st.status === 'prologue') ? prevDemoCells : prevCells
-    rig.paint({ cur: cells, prev: precells, t: paintT, death, animT, dt, isBoosting })
+    // Reuse the shared params object — no allocation per frame (AUDIT L3).
+    // rig.death passes through directly: paint only reads its truthiness
+    // and .t, exactly like the old { t: rig.death.t } wrapper.
+    paintParams.cur = cells
+    paintParams.prev = precells
+    paintParams.t = paintT
+    paintParams.death = rig.death || null
+    paintParams.animT = animT
+    paintParams.dt = dt
+    paintParams.isBoosting = isBoosting
+    rig.paint(paintParams)
 
     // Headlight follows snake head
     headLight.position.copy(rig.group.position).add(_headOff)

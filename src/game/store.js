@@ -44,6 +44,16 @@ export const READY_BEAT_S = 1.8
 // guide never covers the player's first orienting seconds.
 export const COACH_DELAY_MS = 2000
 
+// The coach mark's delayed show — stored so leaving `playing` can cancel
+// it instead of letting a dead timer fire into another status (AUDIT L8).
+let coachTimer = null
+function clearCoachTimer() {
+  if (coachTimer !== null) {
+    clearTimeout(coachTimer)
+    coachTimer = null
+  }
+}
+
 function readJSON(key) {
   try {
     const v = localStorage.getItem(key)
@@ -234,6 +244,8 @@ export const readSeen = () => {
 // updates the current mode's best, and moves to the 'dead' status so the
 // game-over overlay (and the moon card) can present the result.
 function completeRun(get, set, cause) {
+  // The run is over (dead) — the pending coach mark must not fire later.
+  clearCoachTimer()
   const mode = get().gameMode
   const score = get().score
   // P6: the first night's coach marks end with the run, finished or not.
@@ -561,7 +573,9 @@ export const useGame = create((set, get) => ({
     // until the snake is already moving, so the guide never covers the
     // player's first orienting seconds.
     if (get().night === 1 && !readOnboarded()) {
-      setTimeout(() => {
+      clearCoachTimer()
+      coachTimer = setTimeout(() => {
+        coachTimer = null
         if (get().status === 'playing' && get().coachStep < 0) set({ coachStep: 0 })
       }, COACH_DELAY_MS)
     }
@@ -677,7 +691,10 @@ export const useGame = create((set, get) => ({
     get().checkVerses('garden')
   },
   pause() {
-    if (get().status === 'playing') set({ status: 'paused', isBoosting: false })
+    if (get().status === 'playing') {
+      clearCoachTimer()
+      set({ status: 'paused', isBoosting: false })
+    }
   },
   resume() {
     if (get().status === 'paused') set({ status: 'playing' })
@@ -686,6 +703,7 @@ export const useGame = create((set, get) => ({
     get().status === 'playing' ? get().pause() : get().resume()
   },
   toTitle() {
+    clearCoachTimer()
     set({ status: 'title', showHowTo: false, isNewBest: false, isBoosting: false })
   },
 
