@@ -1,0 +1,2033 @@
+diff --git a/src/components/Hud.jsx b/src/components/Hud.jsx
+index 8a16244..3f2783b 100644
+--- a/src/components/Hud.jsx
++++ b/src/components/Hud.jsx
+@@ -12,6 +12,7 @@ import {
+   lanternCount, bloomCount,
+   journeyReady, JOURNEY_GOAL, MOONLIGHT_GLYPH,
+ } from '../game/garden.js'
++import { SKINS } from '../game/skins.js'
+ import { composeMoonCard, composeVerseCard, composeHighlightCard } from '../game/moonCard.js'
+ 
+ const arr = (d) => (
+@@ -269,6 +270,8 @@ export function GardenOverlay() {
+   const upgradeLanterns = useGame((s) => s.upgradeLanterns)
+   const upgradeBlooms = useGame((s) => s.upgradeBlooms)
+   const chooseInk = useGame((s) => s.chooseInk)
++  const skins = useGame((s) => s.skins)
++  const chooseSkin = useGame((s) => s.chooseSkin)
+   const startMoonrise = useGame((s) => s.startMoonrise)
+ 
+   const moonriseReady = journeyReady(journey.progress)
+@@ -327,6 +330,37 @@ export function GardenOverlay() {
+           )}
+         </div>
+ 
++        <div className="garden__section">
++          <h3>🐍 Serpent skin</h3>
++          <p className="garden__desc">How the serpent looks tonight. Ink tints its glow.</p>
++          <div className="garden__skins" role="radiogroup" aria-label="Serpent skin">
++            {SKINS.map((skin) => {
++              const owned = skins.owned.includes(skin.id)
++              const selected = skins.selected === skin.id
++              return (
++                <button
++                  key={skin.id}
++                  type="button"
++                  role="radio"
++                  aria-checked={selected}
++                  className={`garden__skin${selected ? ' is-selected' : ''}`}
++                  onClick={() => chooseSkin(skin.id)}
++                  title={skin.desc}
++                >
++                  <span className={`garden__skin-preview garden__skin-preview--${skin.id}`} style={{ background: skin.swatch }}>
++                    <span className="garden__skin-accent" style={{ background: skin.accent }} />
++                  </span>
++                  <span className="garden__skin-text">
++                    <span className="garden__skin-name">{skin.name}</span>
++                    <span className="garden__skin-en">{skin.en}</span>
++                  </span>
++                  <span className="garden__ink-state">{selected ? 'worn' : owned ? 'wear' : 'locked'}</span>
++                </button>
++              )
++            })}
++          </div>
++        </div>
++
+         <div className="garden__section">
+           <h3>🖋 Serpent ink</h3>
+           <p className="garden__desc">The color of the serpent's glow.</p>
+diff --git a/src/game/skins.js b/src/game/skins.js
+new file mode 100644
+index 0000000..55b046f
+--- /dev/null
++++ b/src/game/skins.js
+@@ -0,0 +1,42 @@
++// Serpent skins — pure data (no THREE, no DOM). The 3D builders live in
++// three/skins/; the store owns ownership + selection persistence.
++//
++// unlock: { type: 'default' } is owned from the start. Other rule types are
++// placeholders for the economy (e.g. { type: 'moonlight', cost }, or
++// { type: 'journey', completed }) — canUnlockSkin() is the single place to
++// implement them. For now every skin is unlocked.
++export const SKINS = [
++  {
++    id: 'moonJade',
++    name: 'Ngọc trăng',
++    en: 'Moon Jade',
++    desc: 'Pearly white jade with moonstone beads along the spine.',
++    unlock: { type: 'default' },
++    swatch: 'radial-gradient(circle at 35% 30%, #ffffff 0%, #e6eee8 45%, #bfe6d3 80%), #e6eee8',
++    accent: 'radial-gradient(circle, #f3e9ff 0%, #c9b6f0 70%)',
++  },
++  {
++    id: 'plushMoon',
++    name: 'Gấu bông',
++    en: 'Plush Moon',
++    desc: 'A soft felt plush with gold-stitched stars and a crescent moon.',
++    unlock: { type: 'placeholder', cost: 0 },
++    swatch: 'linear-gradient(180deg, #8cc2ee 0%, #8cc2ee 58%, #f7f0e2 60%, #f7f0e2 100%)',
++    accent: 'radial-gradient(circle, #ffe7a6 0%, #e2bd68 70%)',
++  },
++]
++
++export const SKIN_IDS = SKINS.map((s) => s.id)
++export const DEFAULT_SKIN = 'moonJade'
++
++export function skinById(id) {
++  return SKINS.find((s) => s.id === id) || SKINS[0]
++}
++
++// Placeholder unlock rule: default skins and (for now) every placeholder rule pass.
++// eslint-disable-next-line no-unused-vars
++export function canUnlockSkin(skin, state) {
++  if (!skin) return false
++  if (skin.unlock.type === 'default') return true
++  return true
++}
+diff --git a/src/game/store.js b/src/game/store.js
+index 78e3c2a..f3d9c47 100644
+--- a/src/game/store.js
++++ b/src/game/store.js
+@@ -11,6 +11,7 @@ import {
+   BLOOM_MAX_TIER, BLOOM_COSTS, bloomCount,
+   earnMoonlight, nextStreak, toDayString, journeyReady, JOURNEY_GOAL,
+ } from './garden.js'
++import { SKIN_IDS, DEFAULT_SKIN, skinById, canUnlockSkin } from './skins.js'
+ 
+ export const BEST_KEY = 'ran-xinh-best' // legacy single best, migrated into BESTS_KEY
+ export const BESTS_KEY = 'ran-xinh-bests'
+@@ -28,6 +29,7 @@ export const TONIGHT_KEY = 'ran-xinh-tonight'
+ // P4 "The Garden Remembers"
+ export const MOONLIGHT_KEY = 'ran-xinh-moonlight' // { balance, earned }
+ export const GARDEN_KEY = 'ran-xinh-garden' // { lantern, lotus, inks, ink }
++export const SKIN_KEY = 'ran-xinh-skin' // { owned: [ids], selected: id }
+ export const JOURNEY_KEY = 'ran-xinh-journey' // { progress, completed }
+ export const KEEPSAKE_KEY = 'ran-xinh-keepsakes' // [{ id, night, date }]
+ export const STREAK_KEY = 'ran-xinh-streak' // { count, lastDay }
+@@ -102,6 +104,20 @@ export const readBests = () => {
+   return fresh
+ }
+ export const readMuted = () => readItem(MUTE_KEY) === '1'
++// Serpent skins: owned + selected, validated against the registry.
++export const readSkins = () => {
++  const fresh = { owned: SKIN_IDS.filter((id) => canUnlockSkin(skinById(id), null)), selected: DEFAULT_SKIN }
++  try {
++    const parsed = JSON.parse(readItem(SKIN_KEY) || 'null')
++    if (parsed && typeof parsed === 'object') {
++      if (Array.isArray(parsed.owned)) fresh.owned = [...new Set([...fresh.owned, ...parsed.owned.filter((id) => SKIN_IDS.includes(id))])]
++      if (fresh.owned.includes(parsed.selected)) fresh.selected = parsed.selected
++    }
++  } catch {
++    /* corrupt entry: fall back to defaults */
++  }
++  return fresh
++}
+ const CAM_MODES = ['aligned', 'topdown', 'cinematic']
+ export const readCam = () => {
+   const v = readItem(CAM_KEY)
+@@ -427,6 +443,8 @@ export const useGame = create((set, get) => ({
+   // P4 "The Garden Remembers"
+   moonlight: { balance: 0, earned: 0 },
+   garden: { lantern: 0, lotus: 0, inks: ['jade'], ink: 'jade' },
++  // Serpent skins (see game/skins.js): owned ids + the one being worn
++  skins: { owned: [DEFAULT_SKIN], selected: DEFAULT_SKIN },
+   journey: { progress: 0, completed: 0 },
+   keepsakes: [],
+   streak: { count: 0, lastDay: null },
+@@ -464,6 +482,7 @@ export const useGame = create((set, get) => ({
+       best: bests[gameMode] || 0,
+       muted: readMuted(),
+       cameraMode: readCam(),
++      skins: readSkins(),
+       showControls: readCtrls(),
+       moonPhase: readMoon(),
+       gameMode,
+@@ -685,6 +704,22 @@ export const useGame = create((set, get) => ({
+     get().checkVerses('garden')
+   },
+ 
++  // Wear a skin. Unowned skins go through canUnlockSkin() (placeholder rule)
++  // and become owned on success; the choice persists under SKIN_KEY.
++  chooseSkin(id) {
++    if (!SKIN_IDS.includes(id)) return
++    const cur = get().skins
++    let owned = cur.owned
++    if (!owned.includes(id)) {
++      if (!canUnlockSkin(skinById(id), get())) return
++      owned = [...owned, id]
++    }
++    if (cur.selected === id && owned === cur.owned) return
++    const skins = { owned, selected: id }
++    writeItem(SKIN_KEY, JSON.stringify(skins))
++    set({ skins })
++  },
++
+   // Buying an ink also selects it; re-tapping an owned ink just selects it.
+   chooseInk(id) {
+     const ink = inkById(id)
+diff --git a/src/styles.css b/src/styles.css
+index 7bb49eb..66d6647 100644
+--- a/src/styles.css
++++ b/src/styles.css
+@@ -1730,6 +1730,74 @@ kbd {
+   color: rgba(234, 247, 239, 0.65);
+ }
+ 
++.garden__skins {
++  display: grid;
++  grid-template-columns: repeat(2, 1fr);
++  gap: 0.6rem;
++}
++
++.garden__skin {
++  display: flex;
++  align-items: center;
++  gap: 0.7rem;
++  padding: 0.6rem 0.75rem;
++  border-radius: 0.8rem;
++  background: rgba(22, 44, 35, 0.55);
++  border: 1px solid rgba(78, 237, 184, 0.22);
++  color: #eaf7ef;
++  cursor: pointer;
++  font-size: 0.82rem;
++  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
++}
++
++.garden__skin:hover {
++  transform: translateY(-1px);
++}
++
++.garden__skin.is-selected {
++  border-color: #ffd54f;
++  box-shadow: 0 0 14px rgba(255, 213, 79, 0.25);
++}
++
++.garden__skin-preview {
++  position: relative;
++  width: 2.6rem;
++  height: 1.7rem;
++  border-radius: 1rem 1.2rem 1.2rem 1rem;
++  flex-shrink: 0;
++  box-shadow: inset 0 -3px 6px rgba(0, 0, 0, 0.18), 0 0 12px rgba(200, 230, 255, 0.25);
++}
++
++.garden__skin-accent {
++  position: absolute;
++  top: 0.18rem;
++  right: 0.4rem;
++  width: 0.5rem;
++  height: 0.5rem;
++  border-radius: 50%;
++  box-shadow: -0.62rem 0.05rem 0 -0.04rem rgba(255, 255, 255, 0.0);
++}
++
++.garden__skin-text {
++  flex: 1;
++  display: flex;
++  flex-direction: column;
++  text-align: left;
++  line-height: 1.2;
++}
++
++.garden__skin-name {
++  font-family: 'Cormorant Garamond', serif;
++  font-size: 1.05rem;
++  font-weight: 700;
++}
++
++.garden__skin-en {
++  font-size: 0.72rem;
++  letter-spacing: 0.06em;
++  color: rgba(234, 247, 239, 0.65);
++}
++
+ .garden__journey .journey-bar__track {
+   margin: 0.4rem 0 0.2rem;
+ }
+diff --git a/src/three/engine.js b/src/three/engine.js
+index c2d6028..1216465 100644
+--- a/src/three/engine.js
++++ b/src/three/engine.js
+@@ -33,7 +33,11 @@ import { lanternCount, bloomCount, inkById } from '../game/garden.js'
+ import { nightEventById } from '../game/nightEvents.js'
+ 
+ const FOV = 42
+-const FIT_HALF = 11.8
++// Fit the 20-cell board (half = 10) plus a slim margin; was 11.8, which left
++// the snake tiny on screen. The aligned view also sits a touch lower so the
++// serpent's face reads from the front instead of the crown.
++const FIT_HALF = 10.7
++const BOARD_HALF = 10.25 // board edge (+ rim) for the perspective-correct fit
+ const DEMO_INTERVAL = 0.15
+ const DEATH_DURATION = 1.6
+ const BLOOM_BASE = 0.42
+@@ -43,9 +47,9 @@ const BLOOM_BASE = 0.42
+ // 'topdown': Overhead tactical 2.5D view for maximum precision.
+ // 'cinematic': Gentle isometric tilt for artistic elegance.
+ const CAM_PRESETS = {
+-  aligned: { az: 0, el: 1.05, fov: 42, distMult: 1.08 },
+-  topdown: { az: 0, el: 1.48, fov: 44, distMult: 1.15 },
+-  cinematic: { az: 0.54, el: 0.88, fov: 42, distMult: 1.12 },
++  aligned: { az: 0, el: 1.0, fov: 42, distMult: 1, perspFit: { x: 0.97, top: 0.8, bottom: 0.93 } },
++  topdown: { az: 0, el: 1.48, fov: 44, distMult: 1.15, fit: 11.8 },
++  cinematic: { az: 0.54, el: 0.88, fov: 42, distMult: 1.12, fit: 11.8 },
+ }
+ 
+ const clamp01 = (v) => Math.max(0, Math.min(1, v))
+@@ -187,7 +191,7 @@ export function createEngine(canvas, { reduced } = {}) {
+   const envTex = pmrem.fromScene(roomEnv, 0.04).texture
+ 
+   const garden = buildGarden(scene, { envTex, reduced })
+-  const rig = createSnakeRig(scene)
++  let rig = createSnakeRig(scene, useGame.getState().skins?.selected)
+   const decor = buildDecor(scene)
+ 
+   // P4 "The Garden Remembers": apply purchased decorations, the serpent's
+@@ -201,8 +205,21 @@ export function createEngine(canvas, { reduced } = {}) {
+     garden.moonGroup.scale.setScalar(st.moonriseActive ? 2.4 : 1)
+   }
+   applyGarden()
++  // Skins: swap the serpent rig live when the worn skin changes (the old
++  // rig's meshes/materials are released; ink + pose carry over).
++  function swapRig(skinId) {
++    const old = rig
++    if (!old.dispose) return // debug ?rig=old pearls (and test doubles) don't swap
++    rig = createSnakeRig(scene, skinId)
++    if (rig === old) return
++    old.dispose?.()
++    applyGarden()
++    rig.reset(curCells.length || logic.snake.length)
++    rig.setDir(DIR[logic.dir].x, DIR[logic.dir].y)
++  }
+   const unsubGarden = useGame.subscribe((s, prev) => {
+     if (s.garden !== prev.garden || s.moonriseActive !== prev.moonriseActive) applyGarden()
++    if (s.skins?.selected !== prev.skins?.selected) swapRig(s.skins?.selected)
+   })
+ 
+   // ---- postprocessing ----------------------------------------------------
+@@ -216,6 +233,9 @@ export function createEngine(canvas, { reduced } = {}) {
+     composer.addPass(new OutputPass())
+   }
+ 
++  // PERF-HARNESS (throwaway, uncommitted)
++  if (typeof location !== 'undefined' && location.search.includes('perf')) window.__perf = { THREE, renderer, scene, camera, get composer() { return composer }, get bloomPass() { return bloomPass }, get rig() { return rig }, moon, garden, getQ: () => qualityIdx, getGov: () => gov, camPosTarget, camLookTarget, get logic() { return logic } }
++
+   // ---- game state ---------------------------------------------------------
+   let logic = createGame()
+   let curCells = []
+@@ -712,15 +732,45 @@ export function createEngine(canvas, { reduced } = {}) {
+     let maxU = 0
+     for (const sx of [-1, 1]) {
+       for (const sz of [-1, 1]) {
+-        const v = new THREE.Vector3(sx * FIT_HALF, 0, sz * FIT_HALF)
++        const v = new THREE.Vector3(sx * (preset.fit ?? FIT_HALF), 0, sz * (preset.fit ?? FIT_HALF))
+         maxR = Math.max(maxR, Math.abs(v.dot(right)))
+         maxU = Math.max(maxU, Math.abs(v.dot(up)) + 0.3)
+       }
+     }
+ 
+     const tanHalf = Math.tan((camera.fov * Math.PI) / 360)
+-    const dist = Math.max(maxU / tanHalf, maxR / (tanHalf * camera.aspect)) * preset.distMult
+-    camPosTarget.copy(viewDir).multiplyScalar(dist)
++    let lookZ = 0
++    let dist = Math.max(maxU / tanHalf, maxR / (tanHalf * camera.aspect)) * preset.distMult
++    if (preset.perspFit) {
++      // Perspective-correct fit: the closest distance at which every board
++      // corner still lands inside the given NDC margins (the top margin
++      // leaves room for the HUD pills). The old ortho-style fit needed a fat margin to cover the
++      // near edge, which kept the serpent small on screen.
++      // The look point slides toward the near edge so the board is centred
++      // vertically (looking at the origin leaves the far half of the screen
++      // empty and the near edge binding).
++      const fitsAt = (d, lz) => {
++        for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
++          const px = sx * BOARD_HALF - viewDir.x * d, py = -viewDir.y * d, pz = sz * BOARD_HALF - lz - viewDir.z * d
++          const depth = -(px * viewDir.x + py * viewDir.y + pz * viewDir.z)
++          const x = px * right.x + py * right.y + pz * right.z
++          const y = px * up.x + py * up.y + pz * up.z
++          if (Math.abs(x) / (depth * tanHalf * camera.aspect) > preset.perspFit.x) return false
++          if (y / (depth * tanHalf) > preset.perspFit.top || -y / (depth * tanHalf) > preset.perspFit.bottom) return false
++        }
++        return true
++      }
++      let best = Infinity, bestZ = 0
++      for (let lz = -1; lz <= 4; lz += 0.25) {
++        let lo = 4, hi = 120
++        for (let i = 0; i < 26; i++) { const mid = (lo + hi) / 2; if (fitsAt(mid, lz)) hi = mid; else lo = mid }
++        if (hi < best - 1e-3) { best = hi; bestZ = lz }
++      }
++      dist = best * preset.distMult
++      lookZ = bestZ
++    }
++    camLookTarget.set(0, 0, lookZ)
++    camPosTarget.copy(viewDir).multiplyScalar(dist).add(camLookTarget)
+     camera.updateProjectionMatrix()
+   }
+ 
+diff --git a/src/three/skins/index.js b/src/three/skins/index.js
+new file mode 100644
+index 0000000..c14e365
+--- /dev/null
++++ b/src/three/skins/index.js
+@@ -0,0 +1,8 @@
++// Skin rig registry (3D side). Data (names, unlock rules) lives in game/skins.js.
++import { createMoonJadeRig } from './moonJade.js'
++import { createPlushMoonRig } from './plushMoon.js'
++
++export const SKIN_RIGS = {
++  moonJade: createMoonJadeRig,
++  plushMoon: createPlushMoonRig,
++}
+diff --git a/src/three/skins/moonJade.js b/src/three/skins/moonJade.js
+new file mode 100644
+index 0000000..e17dde8
+--- /dev/null
++++ b/src/three/skins/moonJade.js
+@@ -0,0 +1,189 @@
++// Skin "moonJade" — Ngọc trăng: pearly white-jade vinyl-toy serpent, mint
++// belly band, iridescent moonstone beads along the spine, big teal eyes,
++// soft blush, gentle smile, a cherry-blossom petal on the head.
++import * as THREE from 'three'
++import { createSerpent, patchSerpentMaterial } from './serpentBase.js'
++
++const BASE = 0xeaf2ec
++const MINT = 0xa9dfc6
++const RIM = 0xd9c8ff
++const BEAD_GLOW = 0x8a6fb0
++
++function eyeTexture() {
++  const c = document.createElement('canvas')
++  c.width = c.height = 256
++  const g = c.getContext('2d')
++  g.fillStyle = '#0e2a2d'
++  g.beginPath(); g.arc(128, 128, 127, 0, Math.PI * 2); g.fill()
++  const ir = g.createRadialGradient(128, 160, 10, 128, 140, 118)
++  ir.addColorStop(0, '#a6f2e2'); ir.addColorStop(0.45, '#33b5aa'); ir.addColorStop(0.85, '#11666b'); ir.addColorStop(1, '#0b4247')
++  g.fillStyle = ir
++  g.beginPath(); g.arc(128, 132, 114, 0, Math.PI * 2); g.fill()
++  g.fillStyle = '#061312'
++  g.beginPath(); g.arc(128, 126, 76, 0, Math.PI * 2); g.fill()
++  g.fillStyle = 'rgba(255,255,255,0.97)'
++  g.beginPath(); g.ellipse(86, 84, 34, 30, -0.4, 0, Math.PI * 2); g.fill()
++  g.beginPath(); g.arc(170, 176, 13, 0, Math.PI * 2); g.fill()
++  g.fillStyle = 'rgba(255,255,255,0.7)'
++  g.beginPath(); g.arc(150, 70, 7, 0, Math.PI * 2); g.fill()
++  const t = new THREE.CanvasTexture(c)
++  t.colorSpace = THREE.SRGBColorSpace
++  t.anisotropy = 4
++  return t
++}
++
++export function createMoonJadeRig(scene) {
++  const uniforms = {
++    uBase: { value: new THREE.Color(BASE) },
++    uMint: { value: new THREE.Color(MINT) },
++    uBlush: { value: new THREE.Color(0xf7a6b8) },
++    uCheek: { value: new THREE.Vector3() },
++    uRim: { value: new THREE.Color(RIM) },
++    uRimK: { value: 0.22 },
++    uPulse: { value: new THREE.Vector4(-1, -1, -1, -1) },
++    uGold: { value: new THREE.Color(0xffd98a) },
++    uGlowA: { value: new THREE.Color(0x9fe8cf) }, // inner scatter: mint ...
++    uGlowB: { value: new THREE.Color(0xc9b8f2) }, // ... to lilac
++    uGlowK: { value: 0.42 },
++  }
++  const material = new THREE.MeshPhysicalMaterial({
++    color: 0xffffff, roughness: 0.34, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.06,
++    sheen: 0.55, sheenColor: new THREE.Color(0xd6f7ea), sheenRoughness: 0.45,
++    iridescence: 0.3, iridescenceIOR: 1.3, iridescenceThicknessRange: [180, 420],
++  })
++  patchSerpentMaterial(material, uniforms, {
++    common: 'uniform vec3 uBase; uniform vec3 uMint; uniform vec3 uBlush; uniform vec3 uCheek; uniform vec3 uRim; uniform float uRimK; uniform vec4 uPulse; uniform vec3 uGold; uniform vec3 uGlowA; uniform vec3 uGlowB; uniform float uGlowK;',
++    color: `
++  float top = sTop();
++  float belly = (1.0 - smoothstep(-0.3, -0.02, top)) * smoothstep(0.3, 0.75, vBody.y);
++  // belly scutes: soft transverse grooves, a little deeper mint
++  float seg = smoothstep(0.36, 0.5, abs(fract(vBody.y * 3.2) - 0.5));
++  // milky internal gradient: faint mint low on the flank, faint lilac high up
++  vec3 col = uBase * mix(vec3(0.95, 1.0, 0.97), vec3(1.0, 0.985, 1.02), smoothstep(-0.3, 0.9, top));
++  col = mix(col, uMint * mix(1.0, 0.8, seg), belly * 0.95);
++  col *= 0.86; // leave room for the scatter glow so bloom doesn't clip it to white
++  if (vBody.y < 0.0) {
++    vec3 q = vec3(abs(vLocal.x), vLocal.y, vLocal.z) - uCheek;
++    col = mix(col, uBlush, exp(-dot(q, q) / 0.007) * 0.9);
++  }
++  diffuseColor.rgb *= col;`,
++    emissive: `
++  float ndv = clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0);
++  totalEmissiveRadiance += uRim * pow(1.0 - ndv, 2.4) * uRimK;
++  // fake subsurface: light that soaked in glows out of the shaded side and
++  // the thick core (inverted fresnel), mint low -> lilac high, like lit jade
++  float topG = sTop();
++  vec3 glowC = mix(uGlowA, uGlowB, smoothstep(-0.4, 0.9, topG));
++  float scatter = 0.55;
++  #if NUM_DIR_LIGHTS > 0
++    float nl = dot(normal, directionalLights[0].direction);
++    scatter = 0.35 + 0.65 * smoothstep(0.45, -0.55, nl); // wrap: strongest where direct light falls off
++  #endif
++  float core = 0.45 + 0.55 * pow(ndv, 1.5);
++  totalEmissiveRadiance += glowC * uGlowK * scatter * core;
++  // pearly glitter: sparse flecks that twinkle as the view changes
++  vec2 gc = floor(vec2(vBody.x * 170.0, vBody.y * 62.0));
++  float gh = sHash(gc);
++  float tw = 0.5 + 0.5 * sin(dot(vViewPosition, vec3(2.3, 1.7, 2.9)) + gh * 40.0);
++  totalEmissiveRadiance += vec3(1.0, 0.94, 1.0) * step(0.975, gh) * tw * tw * 0.55 * (0.4 + 0.6 * ndv) * smoothstep(0.0, 0.25, vBody.y); // none on the face
++  for (int i = 0; i < 4; i++) { float p = uPulse[i]; if (p > 0.0) totalEmissiveRadiance += uGold * exp(-pow((vBody.y - p) * 2.0, 2.0)) * 0.5; }`,
++  }, 'skin-moonJade')
++
++  const eyeTex = eyeTexture()
++  const eyeMat = new THREE.MeshPhysicalMaterial({ map: eyeTex, emissiveMap: eyeTex, emissive: 0xffffff, emissiveIntensity: 0.16, roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.02 })
++  const CAP = 0.95
++  const capGeo = new THREE.SphereGeometry(1, 32, 12, 0, Math.PI * 2, 0, CAP).rotateX(Math.PI / 2)
++  {
++    const p = capGeo.attributes.position, uv = capGeo.attributes.uv, s = Math.sin(CAP)
++    for (let i = 0; i < p.count; i++) uv.setXY(i, 0.5 + p.getX(i) / (2 * s), 0.5 + p.getY(i) / (2 * s))
++  }
++  const eyes = []
++  const ER = 0.17
++  const EYE = { phi: 1.17, th: 0.36 }
++
++  const beadMat = new THREE.MeshPhysicalMaterial({
++    color: 0xe4d6fb, roughness: 0.1, clearcoat: 1, clearcoatRoughness: 0.03,
++    iridescence: 1, iridescenceIOR: 1.6, iridescenceThicknessRange: [240, 720],
++    sheen: 0.6, sheenColor: new THREE.Color(0xffc9e8),
++  })
++  // moonstone: a soft inner glow whose hue drifts pink -> lilac -> blue with view angle
++  const beadU = { uBeadTint: { value: new THREE.Color(BEAD_GLOW) }, uBeadK: { value: 0.4 } }
++  beadMat.onBeforeCompile = (sh) => {
++    Object.assign(sh.uniforms, beadU)
++    sh.fragmentShader = sh.fragmentShader
++      .replace('#include <common>', '#include <common>\nuniform vec3 uBeadTint; uniform float uBeadK;')
++      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
++  {
++    float ndv = clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0);
++    float h = 1.0 - ndv;
++    vec3 shift = mix(vec3(1.0, 0.72, 0.9), vec3(0.78, 0.7, 1.0), smoothstep(0.0, 0.55, h));
++    shift = mix(shift, vec3(0.62, 0.82, 1.0), smoothstep(0.5, 1.0, h));
++    totalEmissiveRadiance += mix(shift, uBeadTint * 2.0, 0.4) * uBeadK * (0.35 + 0.65 * pow(ndv, 0.7));
++    // milky translucent core + moonstone glitter
++    totalEmissiveRadiance += vec3(1.0, 0.95, 1.0) * pow(ndv, 3.0) * 0.18;
++    vec3 gn = floor(normalize(normal) * 22.0);
++    float gh = fract(sin(dot(gn, vec3(12.9898, 78.233, 37.719))) * 43758.5453);
++    totalEmissiveRadiance += vec3(1.0, 0.9, 1.0) * step(0.93, gh) * 0.6;
++  }`)
++  }
++  beadMat.customProgramCacheKey = () => 'skin-moonJade-bead'
++  const beadMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 20, 12), beadMat, 720)
++
++  return createSerpent(scene, {
++    id: 'moonJade',
++    bodyR: 0.42, flat: 0.9, tailTip: 0.34, neckR: 0.42,
++    head: { rx: 0.66, ry: 0.53, len: 1.12, rear: 0.86, rearPow: 1.6, blend: 6, front: 2.4 },
++    material, uniforms,
++    beads: { mesh: beadMesh, spacing: 0.5, start: 0.95, end: 1.7, size: [0.27, 0.17, 0.24], lift: 0.86 },
++    tailCurl: { len: 0.85, turn: 2.5, side: 1 },
++    buildFace(api) {
++      for (const s of [1, -1]) {
++        const eye = new THREE.Mesh(capGeo, eyeMat)
++        eye.scale.set(ER, ER * 1.06, ER * 0.55)
++        const g = new THREE.Group()
++        g.add(eye)
++        eye.position.z = -(Math.cos(CAP) * 0.55 * ER + 0.018)
++        api.place(g, EYE.phi, s > 0 ? EYE.th : Math.PI - EYE.th)
++        eyes.push(g)
++      }
++      // cheek (blush) centre in head space, below/outside the eye
++      const p = new THREE.Vector3(), n = new THREE.Vector3()
++      api.surf(api.zAt(1.02), -0.2, p, n)
++      uniforms.uCheek.value.set(Math.abs(p.x), p.y, p.z)
++      // gentle closed smile
++      const smile = new THREE.Mesh(new THREE.TorusGeometry(0.055, 0.01, 6, 18, Math.PI), new THREE.MeshBasicMaterial({ color: 0x6e4452 }))
++      smile.rotation.z = Math.PI
++      const sg = new THREE.Group(); sg.add(smile)
++      api.place(sg, 1.43, -Math.PI / 2, -0.002)
++      // cherry-blossom petal
++      // cherry-blossom petal: teardrop outline with a notch at the tip, gently cupped
++      const ps = new THREE.Shape()
++      ps.moveTo(-1, 0)
++      ps.bezierCurveTo(-0.7, 0.62, 0.35, 0.66, 0.86, 0.2)
++      ps.lineTo(0.7, 0)
++      ps.lineTo(0.86, -0.2)
++      ps.bezierCurveTo(0.35, -0.66, -0.7, -0.62, -1, 0)
++      const petalGeo = new THREE.ShapeGeometry(ps, 10)
++      { const a = petalGeo.attributes.position; for (let i = 0; i < a.count; i++) { const x = a.getX(i), y = a.getY(i); a.setZ(i, 0.18 * (x * x * 0.3 + y * y)) } }
++      petalGeo.computeVertexNormals()
++      const petal = new THREE.Mesh(petalGeo, new THREE.MeshPhysicalMaterial({ color: 0xf28aad, roughness: 0.4, sheen: 0.6, sheenColor: new THREE.Color(0xffe0ea), emissive: 0x6a1a34, emissiveIntensity: 0.35, side: THREE.DoubleSide }))
++      petal.scale.set(0.15, 0.15, 0.15)
++      petal.rotation.z = 0.35
++      const pg = new THREE.Group(); pg.add(petal)
++      api.place(pg, 0.72, Math.PI / 2 - 0.42, 0.014)
++    },
++    applyInk(ink) {
++      const def = ink.id === 'jade'
++      uniforms.uRim.value.set(RIM)
++      beadU.uBeadTint.value.set(BEAD_GLOW)
++      if (!def) {
++        uniforms.uRim.value.lerp(new THREE.Color(ink.emissive), 0.55)
++        beadU.uBeadTint.value.lerp(new THREE.Color(ink.emissive), 0.6)
++      }
++    },
++    update(st) {
++      for (const e of eyes) e.scale.y = st.blink
++      uniforms.uRimK.value = st.isBoosting ? 0.5 : 0.22
++    },
++  })
++}
+diff --git a/src/three/skins/plushMoon.js b/src/three/skins/plushMoon.js
+new file mode 100644
+index 0000000..4f78d55
+--- /dev/null
++++ b/src/three/skins/plushMoon.js
+@@ -0,0 +1,193 @@
++// Skin "plushMoon" — Gấu bông: felt plush serpent, sky-blue back, cream
++// belly with segment seams, gold-embroidered stars and crescents, a stitch
++// seam along the top, sleepy closed eyes with lashes, blush, cream muzzle.
++import * as THREE from 'three'
++import { createSerpent, patchSerpentMaterial } from './serpentBase.js'
++
++const GOLD = 0xe2bd68
++const RIM = 0xbfe3ff
++const MUZZLE_H = 0.1
++
++export function createPlushMoonRig(scene) {
++  const uniforms = {
++    uBlue: { value: new THREE.Color(0x78b2e6) },
++    uCream: { value: new THREE.Color(0xf7f0e2) },
++    uGoldC: { value: new THREE.Color(GOLD) },
++    uThread: { value: new THREE.Color(0x6f8fb0) },
++    uBlush: { value: new THREE.Color(0xf4a0b4) },
++    uCheek: { value: new THREE.Vector3() },
++    uHeadCy: { value: 0.5 },
++    uRim: { value: new THREE.Color(RIM) },
++    uRimK: { value: 0.18 },
++    uGoldGlow: { value: 0.22 },
++    uPulse: { value: new THREE.Vector4(-1, -1, -1, -1) },
++    uGold: { value: new THREE.Color(0xffd98a) },
++    uHeadR: { value: new THREE.Vector3(1, 1, 1) }, // rx, ry, half-length (muzzle mask)
++    uHeadC: { value: new THREE.Vector2(0.5, 0.04) }, // head centre y, z
++    uFuzz: { value: 0.3 },
++  }
++  const material = new THREE.MeshPhysicalMaterial({
++    color: 0xffffff, roughness: 0.95, metalness: 0,
++    sheen: 1, sheenColor: new THREE.Color(0xd8ecff), sheenRoughness: 0.82,
++  })
++  patchSerpentMaterial(material, uniforms, {
++    common: `uniform vec3 uBlue; uniform vec3 uCream; uniform vec3 uGoldC; uniform vec3 uThread; uniform vec3 uBlush;
++uniform vec3 uCheek; uniform float uHeadCy; uniform vec3 uRim; uniform float uRimK; uniform float uGoldGlow;
++uniform vec4 uPulse; uniform vec3 uGold; uniform vec3 uHeadR; uniform vec2 uHeadC; uniform float uFuzz;
++float gGold = 0.0; float gThread = 0.0;
++// raised cream muzzle (same gaussian as the JS sculpt, in head-normalised coords)
++float muzzleW(vec3 p) {
++  vec3 q = vec3(p.x / uHeadR.x, (p.y - uHeadC.x) / uHeadR.y, (p.z - uHeadC.y) / uHeadR.z);
++  vec3 d = q - vec3(0.0, -0.26, 0.9);
++  return exp(-(d.x * d.x / 0.17 + d.y * d.y / 0.11 + d.z * d.z / 0.16));
++}
++float sdStar5(vec2 p, float r, float rf) {
++  const vec2 k1 = vec2(0.809016994375, -0.587785252292);
++  const vec2 k2 = vec2(-k1.x, k1.y);
++  p.x = abs(p.x);
++  p -= 2.0 * max(dot(k1, p), 0.0) * k1;
++  p -= 2.0 * max(dot(k2, p), 0.0) * k2;
++  p.x = abs(p.x);
++  p.y -= r;
++  vec2 ba = rf * vec2(-k1.y, k1.x) - vec2(0, 1);
++  float h = clamp(dot(p, ba) / dot(ba, ba), 0.0, r);
++  return length(p - ba * h) * sign(p.y * ba.x - p.x * ba.y);
++}
++// gold embroidery coverage (stars + crescent moons) on the back/flanks
++float plushGold() {
++  if (vBody.y < 0.9) return 0.0;
++  float top = sTop();
++  float region = smoothstep(-0.15, 0.1, top);
++  float circ = 2.7; // ~ body circumference in cells
++  vec2 g = vec2(vBody.x * 11.0, vBody.y * 1.9);
++  vec2 cell = floor(g);
++  float h = sHash(cell);
++  vec2 jit = vec2(sHash(cell + 7.1), sHash(cell + 3.3)) - 0.5;
++  vec2 f = fract(g) - 0.5 - jit * 0.35;
++  f.y *= (circ / 11.0) > 0.0 ? (1.0 / 1.9) / (circ / 11.0) : 1.0;
++  float sz = 0.3 + 0.14 * sHash(cell + 1.7);
++  float star = (1.0 - smoothstep(-0.01, 0.02, sdStar5(f, sz, 0.48))) * step(0.5, h);
++  // tiny embroidered sparkle dots between the stars
++  vec2 g2 = vec2(vBody.x * 26.0, vBody.y * 4.6);
++  vec2 c2 = floor(g2);
++  vec2 f2 = (fract(g2) - 0.5 - (vec2(sHash(c2 + 2.3), sHash(c2 + 5.9)) - 0.5) * 0.5) * vec2(1.0, 2.09);
++  float dotS = (1.0 - smoothstep(0.1, 0.16, length(f2))) * step(0.72, sHash(c2));
++  star = max(star, dotS);
++  // crescent every 4 cells, on alternating flanks
++  float k = floor((vBody.y + 1.2) / 3.0);
++  float dd = mod(vBody.y + 1.2, 3.0) - 1.5;
++  float side = mod(k, 2.0) < 1.0 ? 0.1 : 0.4;
++  vec2 p = vec2((vBody.x - side) * circ, dd);
++  float moon = (1.0 - smoothstep(0.3, 0.315, length(p))) * smoothstep(0.235, 0.25, length(p - vec2(0.13, 0.09)));
++  return max(star, moon) * region;
++}`,
++    color: `
++  float top = sTop();
++  // on the head the cream belly drops under the chin so the muzzle shape reads
++  float hb = smoothstep(0.1, 0.7, vBody.y);
++  float belly = 1.0 - smoothstep(mix(-0.62, -0.22, hb), mix(-0.4, 0.0, hb), top);
++  float seg = smoothstep(0.44, 0.5, abs(fract(vBody.y * 2.8) - 0.5)) * step(0.6, vBody.y);
++  float muzzle = 0.0;
++  if (vBody.y < 0.0) muzzle = smoothstep(0.16, 0.28, muzzleW(vLocal));
++  vec3 col = mix(uBlue, uCream * mix(1.0, 0.84, seg * belly), max(belly, muzzle));
++  float n = sNoise(vec2(vBody.x * 120.0, vBody.y * 44.0)) * 0.55 + sNoise(vec2(vBody.x * 300.0, vBody.y * 110.0)) * 0.45;
++  col *= 0.95 + 0.08 * n;
++  float seam = (1.0 - smoothstep(0.0022, 0.0055, abs(vBody.x - 0.25))) * step(0.42, fract(vBody.y * 8.0)) * (1.0 - belly);
++  if (vBody.y < 0.0) seam *= 1.0 - smoothstep(0.18, 0.3, vLocal.z); // stops at the forehead
++  col = mix(col, uThread, seam * 0.85);
++  gGold = plushGold();
++  // satin-stitch threads: fine diagonal ridges inside the embroidery
++  gThread = 0.5 + 0.5 * sin(vBody.x * 1300.0 + vBody.y * 200.0);
++  col = mix(col, uGoldC * (0.86 + 0.2 * gThread), gGold);
++  if (vBody.y < 0.0) {
++    vec3 q = vec3(abs(vLocal.x), vLocal.y, vLocal.z) - uCheek;
++    col = mix(col, uBlush, (1.0 - smoothstep(0.045, 0.07, length(q))) * 0.85);
++  }
++  diffuseColor.rgb *= col;`,
++    roughness: `
++  roughnessFactor = mix(roughnessFactor, 0.3 + 0.2 * gThread, gGold);
++  metalnessFactor = mix(metalnessFactor, 0.85, gGold);`,
++    normal: `
++  // embroidery relief: bump the normal with the screen-space gradient of the thread height
++  float hgt = gGold * (0.014 + 0.004 * gThread);
++  vec2 dH = vec2(dFdx(hgt), dFdy(hgt));
++  vec3 sX = dFdx(-vViewPosition), sY = dFdy(-vViewPosition);
++  vec3 r1 = cross(sY, normal), r2 = cross(normal, sX);
++  float det = dot(sX, r1) * faceDirection;
++  vec3 grad = sign(det) * (dH.x * r1 + dH.y * r2);
++  normal = normalize(abs(det) * normal - grad);`,
++    emissive: `
++  float ndv = clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0);
++  totalEmissiveRadiance += uRim * pow(1.0 - ndv, 2.0) * uRimK;
++  totalEmissiveRadiance += uGoldC * gGold * uGoldGlow;
++  // felt fuzz: broken, noisy halo on the silhouette
++  float fz = sNoise(vec2(vBody.x * 160.0, vBody.y * 60.0));
++  totalEmissiveRadiance += mix(uBlue, vec3(1.0), 0.55) * pow(1.0 - ndv, 3.0) * (0.45 + 0.55 * fz) * uFuzz * (1.0 - gGold);
++  for (int i = 0; i < 4; i++) { float p = uPulse[i]; if (p > 0.0) totalEmissiveRadiance += uGold * exp(-pow((vBody.y - p) * 2.0, 2.0)) * 0.5; }`,
++  }, 'skin-plushMoon')
++
++  const lashMat = new THREE.MeshBasicMaterial({ color: 0x2b2230 })
++  const EYE = { phi: 1.13, th: 0.48 }
++
++  return createSerpent(scene, {
++    id: 'plushMoon',
++    bodyR: 0.44, flat: 0.9, tailTip: 0.42, neckR: 0.44,
++    head: {
++      rx: 0.8, ry: 0.68, len: 1.42, rear: 0.92, rearPow: 1.6, blend: 6, front: 2.0,
++      sculpt: (x, y, z) => MUZZLE_H * Math.exp(-(x * x / 0.17 + (y + 0.26) ** 2 / 0.11 + (z - 0.9) ** 2 / 0.16)),
++    },
++    material, uniforms,
++    buildFace(api) {
++      uniforms.uHeadCy.value = api.HEAD_CY
++      uniforms.uHeadR.value.set(api.H.rx, api.H.ry, api.HL)
++      uniforms.uHeadC.value.set(api.HEAD_CY, api.ZC)
++      // eyelid bumps (felt) + closed sleepy lash line
++      const bumpGeo = new THREE.SphereGeometry(1, 24, 16)
++      const arc = new THREE.TorusGeometry(0.08, 0.011, 6, 22, Math.PI)
++      const lashGeo = new THREE.CylinderGeometry(0.006, 0.004, 0.045, 5)
++      for (const s of [1, -1]) {
++        const g = new THREE.Group()
++        const bump = new THREE.Mesh(bumpGeo, material)
++        bump.scale.set(0.15, 0.13, 0.06)
++        g.add(bump)
++        const line = new THREE.Mesh(arc, lashMat)
++        line.rotation.z = Math.PI
++        line.position.set(0, 0.025, 0.051)
++        g.add(line)
++        for (const a of [0.12, 0.42, 0.72]) {
++          const l = new THREE.Mesh(lashGeo, lashMat)
++          const cx = Math.cos(a) * 0.08 * s, cy = 0.025 - Math.sin(a) * 0.08
++          l.position.set(cx + Math.cos(a) * 0.02 * s, cy - Math.sin(a) * 0.02, 0.05)
++          l.rotation.z = s > 0 ? Math.PI / 2 + a : -(Math.PI / 2 + a)
++          g.add(l)
++        }
++        g.scale.setScalar(1.3)
++        api.place(g, EYE.phi, s > 0 ? EYE.th : Math.PI - EYE.th, -0.026)
++      }
++      const p = new THREE.Vector3(), n = new THREE.Vector3()
++      api.surf(api.zAt(1.0), -0.12, p, n)
++      uniforms.uCheek.value.set(Math.abs(p.x), p.y, p.z)
++      // tiny nostrils + small smile
++      const dot = new THREE.SphereGeometry(0.017, 8, 6)
++      for (const th of [-0.42, Math.PI + 0.42]) {
++        const g = new THREE.Group(); g.add(new THREE.Mesh(dot, lashMat))
++        api.place(g, 1.38, th, -0.004)
++      }
++      const smile = new THREE.Mesh(new THREE.TorusGeometry(0.04, 0.008, 6, 16, Math.PI), new THREE.MeshBasicMaterial({ color: 0x6a5060 }))
++      smile.rotation.z = Math.PI
++      const sg = new THREE.Group(); sg.add(smile)
++      api.place(sg, 1.33, -Math.PI / 2, -0.001)
++    },
++    applyInk(ink) {
++      uniforms.uGoldC.value.set(GOLD)
++      uniforms.uRim.value.set(RIM)
++      if (ink.id !== 'jade') {
++        uniforms.uGoldC.value.lerp(new THREE.Color(ink.ridge), 0.45)
++        uniforms.uRim.value.lerp(new THREE.Color(ink.emissive), 0.5)
++      }
++    },
++    update(st) {
++      uniforms.uRimK.value = st.isBoosting ? 0.45 : 0.18
++    },
++  })
++}
+diff --git a/src/three/skins/serpentBase.js b/src/three/skins/serpentBase.js
+new file mode 100644
+index 0000000..59c309b
+--- /dev/null
++++ b/src/three/skins/serpentBase.js
+@@ -0,0 +1,503 @@
++// Skinned serpent rig shared by every skin (PROTOTYPE, uncommitted).
++//
++// Body: one preallocated tube rebuilt in place each frame from the grid
++// path (rounded corners, linear constant-speed motion, tapered tail with a
++// round cap) — 1 draw + 1 shadow draw at any length, no per-frame allocation.
++// Head: a sculpted lathe (bean-shaped bulb smooth-unioned with the neck) whose
++// rear tapers into the tube, so head and body read as one creature. The face
++// is placed ON the lathe surface via surf(); skins add their own features.
++// Optional instanced "beads" ride the spine (1 extra draw).
++import * as THREE from 'three'
++
++const MAX_SEGMENTS = 400
++const RADIAL = 20
++const STEP = 0.2
++const ARC_K = 6
++const CORNER_R = 0.48
++const CAP = 6
++const HEAD_RADIAL = 40
++const MAX_PTS = MAX_SEGMENTS + 2
++const MAX_RINGS = MAX_PTS * (Math.ceil(1 / STEP) + ARC_K + 1) + CAP + 40
++const easeOutCubic = (t) => 1 - (1 - t) ** 3
++const smoothstep = (e0, e1, x) => {
++  const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0)))
++  return t * t * (3 - 2 * t)
++}
++const smax = (a, b, k) => (b < 1e-4 ? a : Math.log(Math.exp(k * a) + Math.exp(k * b)) / k)
++
++// Patch a lit material with the serpent varyings + the skin's GLSL chunks.
++// chunks: { common, color, roughness, emissive } (each optional GLSL source)
++export function patchSerpentMaterial(mat, uniforms, chunks, key) {
++  mat.onBeforeCompile = (sh) => {
++    Object.assign(sh.uniforms, uniforms)
++    sh.vertexShader = sh.vertexShader
++      .replace('#include <common>', '#include <common>\nattribute vec2 aBody;\nvarying vec2 vBody;\nvarying vec3 vLocal;')
++      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvBody = aBody;\nvLocal = position;')
++    let fs = sh.fragmentShader.replace('#include <common>', `#include <common>
++varying vec2 vBody;
++varying vec3 vLocal;
++float sHash(vec2 c) { return fract(sin(dot(c, vec2(12.9898, 78.233))) * 43758.5453); }
++float sNoise(vec2 p) {
++  vec2 i = floor(p), f = fract(p);
++  vec2 u = f * f * (3.0 - 2.0 * f);
++  return mix(mix(sHash(i), sHash(i + vec2(1, 0)), u.x), mix(sHash(i + vec2(0, 1)), sHash(i + vec2(1, 1)), u.x), u.y);
++}
++float sTop() { return sin(vBody.x * 6.2831853); }
++${chunks.common || ''}`)
++    if (chunks.color) fs = fs.replace('#include <color_fragment>', `#include <color_fragment>\n{\n${chunks.color}\n}`)
++    if (chunks.roughness) fs = fs.replace('#include <metalnessmap_fragment>', `#include <metalnessmap_fragment>\n{\n${chunks.roughness}\n}`)
++    if (chunks.normal) fs = fs.replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>\n{\n${chunks.normal}\n}`)
++    if (chunks.emissive) fs = fs.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>\n{\n${chunks.emissive}\n}`)
++    sh.fragmentShader = fs
++  }
++  mat.customProgramCacheKey = () => key
++}
++
++/**
++ * cfg = {
++ *   bodyR, flat, tailTip, neckR,            // body profile
++ *   head: { rx, ry, len, front },           // lathe bulb (front = superellipse power of the face)
++ *   material,                               // lit material shared by head + body (already patched)
++ *   uniforms,                               // must contain uPulse (vec4)
++ *   buildFace(api),                         // add eyes / mouth / accessories using api.place()
++ *   beads: { mesh, spacing, start, size:[sx,sy,sz], lift } | null,
++ *   applyInk(ink), update(rigState) optional
++ * }
++ */
++export function createSerpent(scene, cfg) {
++  const R = cfg.bodyR
++  const FLAT = cfg.flat ?? 0.9
++  const BODY_Y = R * FLAT + 0.02
++  const NECK = cfg.neckR ?? R * 0.86
++  const H = cfg.head
++  const HEAD_CY = H.ry + 0.02
++  const ZC = 0.04 // bulb centre, ahead of the path point
++  const HL = H.len / 2
++  const HLR = H.rear ?? HL // rear half-length: longer = the skull flows into the neck
++  const BLEND = H.blend ?? 7
++  const Z_BACK = ZC - HLR - 0.06
++  const disposables = []
++  const track = (x) => (disposables.push(x), x)
++
++  // ---- head lathe profile ------------------------------------------------
++  function profile(z, out) {
++    const t = z > ZC ? (z - ZC) / HL : (z - ZC) / HLR
++    const p = t > 0 ? H.front ?? 2.4 : H.rearPow ?? 1.7
++    const at = Math.min(1, Math.abs(t))
++    const e = at >= 1 ? 0 : Math.pow(1 - Math.pow(at, p), 1 / p)
++    const neck = NECK * 0.97 * (1 - smoothstep(ZC - 0.1, ZC + 0.5, z))
++    out.rx = smax(H.rx * e, neck, BLEND)
++    out.ry = smax(H.ry * e, neck * FLAT, BLEND)
++    out.cy = BODY_Y + (HEAD_CY - BODY_Y) * smoothstep(Z_BACK + 0.04, ZC, z)
++    return out
++  }
++  const pr = { rx: 0, ry: 0, cy: 0 }
++  // optional sculpt: H.sculpt(nx, ny, nz) -> outward offset, in head-normalised coords
++  function sculptAt(arr, o) {
++    const x = arr[o], y = arr[o + 1] - HEAD_CY, z = arr[o + 2] - ZC
++    const d = H.sculpt(x / H.rx, y / H.ry, z / HL)
++    if (!d) return 0
++    const l = Math.hypot(x, y, z) || 1
++    arr[o] += (x / l) * d; arr[o + 1] += (y / l) * d; arr[o + 2] += (z / l) * d
++    return d
++  }
++  const _sc = new Float32Array(3)
++  const headGeo = (() => {
++    const zs = []
++    const N1 = 16, N2 = 32
++    for (let i = 0; i < N1; i++) zs.push(Z_BACK + ((ZC - Z_BACK) * i) / N1)
++    for (let i = 0; i <= N2; i++) zs.push(ZC + HL * Math.sin((i / N2) * Math.PI * 0.5))
++    const VPR = HEAD_RADIAL + 1
++    const pos = new Float32Array(zs.length * VPR * 3)
++    const bod = new Float32Array(zs.length * VPR * 2)
++    zs.forEach((z, r) => {
++      profile(z, pr)
++      for (let k = 0; k <= HEAD_RADIAL; k++) {
++        const th = (k / HEAD_RADIAL) * Math.PI * 2
++        const v = r * VPR + k
++        pos[v * 3] = pr.rx * Math.cos(th)
++        pos[v * 3 + 1] = pr.cy + pr.ry * Math.sin(th)
++        pos[v * 3 + 2] = z
++        if (H.sculpt) sculptAt(pos, v * 3)
++        bod[v * 2] = k / HEAD_RADIAL
++        bod[v * 2 + 1] = -z // continuous with the body's distance-from-head coordinate
++      }
++    })
++    const idx = []
++    for (let r = 0; r < zs.length - 1; r++) {
++      for (let k = 0; k < HEAD_RADIAL; k++) {
++        const a = r * VPR + k, b = a + VPR
++        idx.push(a, a + 1, b, b, a + 1, b + 1)
++      }
++    }
++    const g = new THREE.BufferGeometry()
++    g.setAttribute('position', new THREE.BufferAttribute(pos, 3))
++    g.setAttribute('aBody', new THREE.BufferAttribute(bod, 2))
++    g.setIndex(idx)
++    g.computeVertexNormals()
++    // weld the seam normals (k = 0 and k = HEAD_RADIAL share a position)
++    const nrm = g.attributes.normal
++    for (let r = 0; r < zs.length; r++) {
++      const a = r * VPR, b = a + HEAD_RADIAL
++      const x = nrm.getX(a) + nrm.getX(b), y = nrm.getY(a) + nrm.getY(b), z = nrm.getZ(a) + nrm.getZ(b)
++      const l = Math.hypot(x, y, z) || 1
++      nrm.setXYZ(a, x / l, y / l, z / l); nrm.setXYZ(b, x / l, y / l, z / l)
++    }
++    return g
++  })()
++  track(headGeo)
++
++  // point + outward normal on the head surface at (z, theta)
++  const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3()
++  function surf(z, th, outP, outN) {
++    profile(z, pr)
++    outP.set(pr.rx * Math.cos(th), pr.cy + pr.ry * Math.sin(th), z)
++    _a.set(-pr.rx * Math.sin(th), pr.ry * Math.cos(th), 0) // d/dtheta
++    const dz = 0.003
++    profile(Math.min(z + dz, ZC + HL - 1e-4), pr)
++    _b.set(pr.rx * Math.cos(th), pr.cy + pr.ry * Math.sin(th), z + dz).sub(outP) // d/dz
++    outN.crossVectors(_a, _b).normalize()
++    _c.set(outP.x, outP.y - HEAD_CY, outP.z - ZC)
++    if (outN.dot(_c) < 0) outN.negate()
++    if (outN.lengthSq() < 0.5) outN.set(0, 0, 1)
++    if (H.sculpt) { _sc[0] = outP.x; _sc[1] = outP.y; _sc[2] = outP.z; sculptAt(_sc, 0); outP.set(_sc[0], _sc[1], _sc[2]) }
++  }
++  // param helper: phi in [0, pi/2] walks from the bulb equator to the snout tip
++  const zAt = (phi) => ZC + HL * Math.sin(phi)
++
++  const head = new THREE.Group()
++  const headMesh = new THREE.Mesh(headGeo, cfg.material)
++  headMesh.castShadow = true
++  head.add(headMesh)
++  const _p = new THREE.Vector3(), _n = new THREE.Vector3(), _zAxis = new THREE.Vector3(0, 0, 1)
++  const _q = new THREE.Quaternion(), _up = new THREE.Vector3()
++  const api = {
++    THREE, track, headMesh, H, ZC, HL, HEAD_CY, zAt, surf,
++    // put obj on the face at (phi, theta), pushed `lift` along the normal; local +z = outward,
++    // local +y kept as close to head-up as possible (so decals/eyes stay upright)
++    place(obj, phi, th, lift = 0) {
++      surf(zAt(phi), th, _p, _n)
++      obj.position.copy(_p).addScaledVector(_n, lift)
++      _q.setFromUnitVectors(_zAxis, _n)
++      obj.quaternion.copy(_q)
++      _up.set(0, 1, 0).applyQuaternion(_q)
++      // roll so the object's up points toward world up projected on the tangent plane
++      const want = new THREE.Vector3(0, 1, 0).addScaledVector(_n, -_n.y).normalize()
++      const ang = Math.atan2(_up.clone().cross(want).dot(_n), _up.dot(want))
++      obj.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(_n, ang))
++      headMesh.add(obj)
++      return obj
++    },
++  }
++  cfg.buildFace(api)
++  scene.add(head)
++  const lightAnchor = new THREE.Object3D() // engine hangs its head light at group + 1.2y
++
++  // ---- BODY tube ---------------------------------------------------------
++  const VPR = RADIAL + 1
++  const pos = new Float32Array(MAX_RINGS * VPR * 3)
++  const nor = new Float32Array(MAX_RINGS * VPR * 3)
++  const bod = new Float32Array(MAX_RINGS * VPR * 2)
++  const idx = new Uint32Array((MAX_RINGS - 1) * RADIAL * 6)
++  for (let r = 0, o = 0; r < MAX_RINGS - 1; r++) {
++    for (let k = 0; k < RADIAL; k++) {
++      const a = r * VPR + k, b = a + VPR
++      idx[o++] = a; idx[o++] = a + 1; idx[o++] = b
++      idx[o++] = b; idx[o++] = a + 1; idx[o++] = b + 1
++    }
++  }
++  const geo = track(new THREE.BufferGeometry())
++  const posAttr = new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage)
++  const norAttr = new THREE.BufferAttribute(nor, 3).setUsage(THREE.DynamicDrawUsage)
++  const bodAttr = new THREE.BufferAttribute(bod, 2).setUsage(THREE.DynamicDrawUsage)
++  geo.setAttribute('position', posAttr)
++  geo.setAttribute('normal', norAttr)
++  geo.setAttribute('aBody', bodAttr)
++  geo.setIndex(new THREE.BufferAttribute(idx, 1))
++  geo.setDrawRange(0, 0)
++  const body = new THREE.Mesh(geo, cfg.material)
++  body.frustumCulled = false
++  body.castShadow = true
++  scene.add(body)
++  const cosT = new Float32Array(VPR), sinT = new Float32Array(VPR)
++  for (let k = 0; k <= RADIAL; k++) {
++    const th = (k / RADIAL) * Math.PI * 2
++    cosT[k] = Math.cos(th); sinT[k] = Math.sin(th)
++  }
++
++  // ---- beads (instanced, optional) -----------------------------------------
++  const beads = cfg.beads || null
++  if (beads) {
++    beads.mesh.frustumCulled = false
++    beads.mesh.count = 0
++    beads.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
++    scene.add(beads.mesh)
++  }
++
++  // ---- path scratch ------------------------------------------------------
++  const P = new Float32Array(MAX_PTS * 3)
++  const C = new Float32Array(MAX_PTS)
++  const S = new Float32Array(MAX_RINGS * 3)
++  const D = new Float32Array(MAX_RINGS)
++  const RX = new Float32Array(MAX_RINGS) // per-sample radius (for beads)
++  const FR = new Float32Array(MAX_RINGS * 9) // per-sample frame: side, up, tangent
++  const CY = new Float32Array(MAX_RINGS)
++  let nS = 0
++  const eatPulses = []
++
++  function pushS(x, y, z) {
++    const o = nS * 3
++    if (nS > 0) {
++      const l = Math.hypot(x - S[o - 3], y - S[o - 2], z - S[o - 1])
++      if (l < 1e-4) return
++      D[nS] = D[nS - 1] + l
++    } else D[0] = 0
++    S[o] = x; S[o + 1] = y; S[o + 2] = z
++    nS++
++  }
++
++  function buildPath(m) {
++    nS = 0
++    for (let j = 0; j < m; j++) C[j] = 0
++    for (let j = 1; j < m - 1; j++) {
++      const ax = P[j * 3] - P[j * 3 - 3], az = P[j * 3 + 2] - P[j * 3 - 1]
++      const bx = P[j * 3 + 3] - P[j * 3], bz = P[j * 3 + 5] - P[j * 3 + 2]
++      const la = Math.hypot(ax, az), lb = Math.hypot(bx, bz)
++      if (la < 1e-4 || lb < 1e-4) continue
++      if ((ax * bx + az * bz) / (la * lb) < 0.999) C[j] = Math.min(CORNER_R, la * 0.5, lb * 0.5)
++    }
++    pushS(P[0], P[1], P[2])
++    for (let j = 0; j < m - 1; j++) {
++      const ax = P[j * 3], ay = P[j * 3 + 1], az = P[j * 3 + 2]
++      const bx = P[j * 3 + 3], by = P[j * 3 + 4], bz = P[j * 3 + 5]
++      const L = Math.hypot(bx - ax, by - ay, bz - az)
++      if (L < 1e-5) continue
++      const ux = (bx - ax) / L, uy = (by - ay) / L, uz = (bz - az) / L
++      const s0 = C[j], s1 = L - C[j + 1]
++      const cnt = Math.max(1, Math.ceil((s1 - s0) / STEP))
++      for (let k = 1; k <= cnt; k++) {
++        const s = s0 + ((s1 - s0) * k) / cnt
++        pushS(ax + ux * s, ay + uy * s, az + uz * s)
++      }
++      if (C[j + 1] > 0 && j + 2 < m) {
++        const r = C[j + 1]
++        const cx = P[j * 3 + 6], cy = P[j * 3 + 7], cz = P[j * 3 + 8]
++        const L2 = Math.hypot(cx - bx, cy - by, cz - bz)
++        const qx = bx + ((cx - bx) / L2) * r, qy = by + ((cy - by) / L2) * r, qz = bz + ((cz - bz) / L2) * r
++        const px = bx - ux * r, py = by - uy * r, pz = bz - uz * r
++        for (let k = 1; k <= ARC_K; k++) {
++          const t = k / ARC_K, it = 1 - t
++          pushS(it * it * px + 2 * it * t * bx + t * t * qx, it * it * py + 2 * it * t * by + t * t * qy, it * it * pz + 2 * it * t * bz + t * t * qz)
++        }
++      }
++    }
++    // decorative tail curl past the last point (visual only, grid logic untouched)
++    const curl = cfg.tailCurl
++    if (curl && nS > 1) {
++      const o = (nS - 1) * 3
++      let dx = S[o] - S[o - 3], dz = S[o + 2] - S[o - 1]
++      const l = Math.hypot(dx, dz) || 1
++      dx /= l; dz /= l
++      let x = S[o], z = S[o + 2]
++      const steps = Math.ceil(curl.len / (STEP * 0.5))
++      const ds = curl.len / steps
++      for (let k = 1; k <= steps; k++) {
++        const u = k / steps
++        const a = curl.turn * ds / curl.len * (0.4 + 1.2 * u) * (curl.side ?? 1) // tightens toward the tip
++        const c = Math.cos(a), s = Math.sin(a)
++        const nx = dx * c - dz * s, nz = dx * s + dz * c
++        dx = nx; dz = nz
++        x += dx * ds; z += dz * ds
++        pushS(x, S[o + 1], z)
++      }
++    }
++  }
++
++  function radiusAt(d, total, bulge) {
++    const u = d / Math.max(total, 1e-3)
++    // inside the head (d < 0.6) the tube shrinks so the lathe swallows it; then neck -> body
++    const inner = 0.72 + 0.28 * smoothstep(0.05, -Z_BACK, d)
++    const neckToBody = NECK + (R - NECK) * smoothstep(-Z_BACK, 1.9, d)
++    const tail = 1 - (1 - (cfg.tailTip ?? 0.35)) * smoothstep(0.42, 1.0, u)
++    return neckToBody * inner * tail * bulge
++  }
++
++  let v = 0
++  function ring(cx, cy, cz, sx, sz, ux, uy, uz, rx, d) {
++    const ry = rx * FLAT
++    for (let k = 0; k <= RADIAL; k++) {
++      const c = cosT[k], s = sinT[k]
++      const vo = v * 3
++      pos[vo] = cx + sx * c * rx + ux * s * ry
++      pos[vo + 1] = cy + uy * s * ry
++      pos[vo + 2] = cz + sz * c * rx + uz * s * ry
++      const nx = sx * c * FLAT + ux * s, ny = uy * s, nz = sz * c * FLAT + uz * s
++      const nl = Math.hypot(nx, ny, nz) || 1
++      nor[vo] = nx / nl; nor[vo + 1] = ny / nl; nor[vo + 2] = nz / nl
++      bod[v * 2] = k / RADIAL
++      bod[v * 2 + 1] = d
++      v++
++    }
++  }
++
++  const bob = (animT, d) => Math.sin(animT * 2.6 - d * 0.9) * 0.022
++
++  function writeTube(animT) {
++    const total = D[nS - 1]
++    v = 0
++    let tx = 0, ty = 0, tz = 0, sx = 0, sz = 0, ux = 0, uy = 1, uz = 0, rx = R, cy = 0
++    for (let i = 0; i < nS; i++) {
++      const o = i * 3
++      const a = Math.max(0, i - 1), b = Math.min(nS - 1, i + 1)
++      tx = S[a * 3] - S[b * 3]; ty = S[a * 3 + 1] - S[b * 3 + 1]; tz = S[a * 3 + 2] - S[b * 3 + 2]
++      const tl = Math.hypot(tx, ty, tz) || 1
++      tx /= tl; ty /= tl; tz /= tl
++      sx = -tz; sz = tx
++      const sl = Math.hypot(sx, sz) || 1
++      sx /= sl; sz /= sl
++      ux = -sz * ty; uy = sz * tx - sx * tz; uz = sx * ty
++      let bulge = 1
++      for (let p = 0; p < eatPulses.length; p++) {
++        const dd = Math.abs(eatPulses[p].progress - D[i])
++        if (dd < 1.2) bulge = Math.max(bulge, 1 + (1 - dd / 1.2) * 0.28)
++      }
++      rx = radiusAt(D[i], total, bulge)
++      cy = S[o + 1] + bob(animT, D[i])
++      RX[i] = rx; CY[i] = cy
++      const f = i * 9
++      FR[f] = sx; FR[f + 1] = 0; FR[f + 2] = sz
++      FR[f + 3] = ux; FR[f + 4] = uy; FR[f + 5] = uz
++      FR[f + 6] = tx; FR[f + 7] = ty; FR[f + 8] = tz
++      ring(S[o], cy, S[o + 2], sx, sz, ux, uy, uz, rx, D[i])
++    }
++    const lo = (nS - 1) * 3
++    for (let j = 1; j <= CAP; j++) {
++      const ang = (j / CAP) * Math.PI * 0.5
++      const off = rx * Math.sin(ang)
++      ring(S[lo] - tx * off, cy - ty * off, S[lo + 2] - tz * off, sx, sz, ux, uy, uz, rx * Math.cos(ang), total + off)
++    }
++    geo.setDrawRange(0, Math.max(0, nS + CAP - 1) * RADIAL * 6)
++    posAttr.clearUpdateRanges(); posAttr.addUpdateRange(0, v * 3); posAttr.needsUpdate = true
++    norAttr.clearUpdateRanges(); norAttr.addUpdateRange(0, v * 3); norAttr.needsUpdate = true
++    bodAttr.clearUpdateRanges(); bodAttr.addUpdateRange(0, v * 2); bodAttr.needsUpdate = true
++  }
++
++  function writeBeads() {
++    const m = beads.mesh
++    const arr = m.instanceMatrix.array
++    const total = D[nS - 1]
++    const [bx, by, bz] = beads.size
++    let count = 0, i = 0
++    for (let d = beads.start; d < total - (beads.end ?? 0.5) && count < m.instanceMatrix.count; d += beads.spacing) {
++      while (i < nS - 2 && D[i + 1] < d) i++
++      const t = Math.max(0, Math.min(1, (d - D[i]) / Math.max(D[i + 1] - D[i], 1e-5)))
++      const f = i * 9
++      const rx = RX[i] + (RX[i + 1] - RX[i]) * t
++      const k = rx / R
++      const lift = rx * FLAT * (beads.lift ?? 0.86)
++      const px = S[i * 3] + (S[i * 3 + 3] - S[i * 3]) * t + FR[f + 3] * lift
++      const py = CY[i] + (CY[i + 1] - CY[i]) * t + FR[f + 4] * lift
++      const pz = S[i * 3 + 2] + (S[i * 3 + 5] - S[i * 3 + 2]) * t + FR[f + 5] * lift
++      const o = count * 16
++      arr[o] = FR[f] * bx * k; arr[o + 1] = FR[f + 1] * bx * k; arr[o + 2] = FR[f + 2] * bx * k; arr[o + 3] = 0
++      arr[o + 4] = FR[f + 3] * by * k; arr[o + 5] = FR[f + 4] * by * k; arr[o + 6] = FR[f + 5] * by * k; arr[o + 7] = 0
++      arr[o + 8] = -FR[f + 6] * bz * k; arr[o + 9] = -FR[f + 7] * bz * k; arr[o + 10] = -FR[f + 8] * bz * k; arr[o + 11] = 0
++      arr[o + 12] = px; arr[o + 13] = py; arr[o + 14] = pz; arr[o + 15] = 1
++      count++
++    }
++    m.count = count
++    m.instanceMatrix.clearUpdateRanges()
++    m.instanceMatrix.addUpdateRange(0, count * 16)
++    m.instanceMatrix.needsUpdate = true
++  }
++
++  const state = { animT: 0, dt: 0, isBoosting: false, death: null, blink: 1 }
++  let blinkT = 3
++  const rig = {
++    cur: [], prev: [], yawView: 0, yawTarget: 0, rollView: 0, flick: 0, chomp: 0, death: null,
++    group: lightAnchor,
++    skin: cfg.id,
++    setSnapshots(prev, cur) { rig.prev = prev; rig.cur = cur },
++    setInk(ink) { if (ink) cfg.applyInk?.(ink) },
++    setDir(dx, dz) { rig.yawTarget = Math.atan2(dx, dz) },
++    onStep() { rig.flick = 1 },
++    onEat() { rig.chomp = 1.35; eatPulses.push({ progress: 0, speed: 9 }) },
++    startDeath(pose, center) { rig.death = { pose, center, t: 0 } },
++    advanceDeath(dt, duration, reduced) {
++      if (!rig.death) return
++      rig.death.t = Math.min(1, rig.death.t + (reduced ? dt / Math.max(duration / 2, 0.001) : dt / duration))
++    },
++    reset() { rig.death = null; rig.flick = 0; rig.chomp = 0; eatPulses.length = 0 },
++    deathCoil(i) {
++      const d = rig.death
++      const ang = i * 0.55
++      const r = 0.55 + i * 0.09
++      return { x: d.center.x + Math.cos(ang) * r, z: d.center.z + Math.sin(ang) * r }
++    },
++    dispose() {
++      scene.remove(head, body)
++      if (beads) scene.remove(beads.mesh)
++      const mats = new Set()
++      head.traverse((o) => { if (o.geometry) disposables.push(o.geometry); if (o.material) mats.add(o.material) })
++      if (beads) { disposables.push(beads.mesh.geometry); mats.add(beads.mesh.material) }
++      mats.add(cfg.material)
++      for (const m of mats) { for (const k in m) if (m[k] && m[k].isTexture) m[k].dispose(); m.dispose() }
++      for (const d of new Set(disposables)) d.dispose?.()
++    },
++    paint({ cur, prev, t, death, animT, dt, isBoosting = false }) {
++      const n = cur.length
++      if (!n) return
++      rig.chomp = Math.max(0, rig.chomp - dt * 3.8)
++      for (let p = eatPulses.length - 1; p >= 0; p--) {
++        eatPulses[p].progress += dt * eatPulses[p].speed
++        if (eatPulses[p].progress > n + 2) eatPulses.splice(p, 1)
++      }
++      const pu = cfg.uniforms.uPulse.value
++      pu.set(eatPulses[0]?.progress ?? -1, eatPulses[1]?.progress ?? -1, eatPulses[2]?.progress ?? -1, eatPulses[3]?.progress ?? -1)
++
++      const lt = Math.max(0, Math.min(1, t))
++      const p0 = prev[0] || cur[0]
++      let m = 0
++      const put = (x, z) => { P[m * 3] = x; P[m * 3 + 1] = BODY_Y; P[m * 3 + 2] = z; m++ }
++      put(p0.x + (cur[0].x - p0.x) * lt, p0.z + (cur[0].z - p0.z) * lt)
++      for (let i = 1; i < n; i++) put(cur[i].x, cur[i].z)
++      if (n > 1) {
++        const pl = prev[Math.min(n - 1, prev.length - 1)] || cur[n - 1]
++        put(pl.x + (cur[n - 1].x - pl.x) * lt, pl.z + (cur[n - 1].z - pl.z) * lt)
++      } else put(cur[0].x - 0.6, cur[0].z)
++      if (death) {
++        const e = easeOutCubic(death.t)
++        for (let i = 0; i < m; i++) {
++          const dc = rig.deathCoil(i)
++          P[i * 3] += (dc.x - P[i * 3]) * e
++          P[i * 3 + 2] += (dc.z - P[i * 3 + 2]) * e
++        }
++      }
++      buildPath(m)
++      writeTube(animT)
++      if (beads) writeBeads()
++
++      const hx = S[0], hz = S[2]
++      let k = 1
++      while (k < nS - 1 && D[k] < 0.35) k++
++      const yaw = Math.atan2(hx - S[k * 3], hz - S[k * 3 + 2])
++      let dyaw = yaw - rig.yawView
++      while (dyaw > Math.PI) dyaw -= Math.PI * 2
++      while (dyaw < -Math.PI) dyaw += Math.PI * 2
++      rig.yawView += dyaw * Math.min(1, dt * 20)
++      rig.rollView = THREE.MathUtils.lerp(rig.rollView, -Math.max(-0.2, Math.min(0.2, dyaw * 1.4)), Math.min(1, dt * 8))
++      const sq = Math.sin(rig.chomp * Math.PI) * 0.1
++      headMesh.scale.set(1 + sq, 1 - sq * 0.5, 1 + sq * 0.3)
++      head.position.set(hx, bob(animT, 0), hz)
++      head.rotation.set(death ? -0.08 : 0, rig.yawView, rig.rollView)
++      lightAnchor.position.set(hx, HEAD_CY + 0.75, hz)
++
++      blinkT -= dt
++      if (blinkT < -0.13) blinkT = 2.8 + ((animT * 7.13) % 2)
++      state.animT = animT; state.dt = dt; state.isBoosting = isBoosting; state.death = death
++      state.blink = death ? 0.15 : blinkT < 0 && !globalThis.__serpentNoBlink ? 0.1 : 1
++      cfg.update?.(state)
++    },
++  }
++  return rig
++}
+diff --git a/src/three/snakeRig.js b/src/three/snakeRig.js
+index b5d4dba..1b6b96f 100644
+--- a/src/three/snakeRig.js
++++ b/src/three/snakeRig.js
+@@ -1,352 +1,16 @@
+-import * as THREE from 'three'
+-
+-const ROSE = new THREE.Color(0xd47585)
+-const ROSE_HEAD = new THREE.Color(0xe88a9a)
+-const ROSE_TAIL = new THREE.Color(0x993d52)
+-const CREAM = new THREE.Color(0xfff5ea)
+-const INK = new THREE.Color(0x0a1411)
+-const JADE_GLOW = new THREE.Color(0x4eedb8)
+-const GOLD_PULSE = new THREE.Color(0xffd54f)
+-
+-const MAX_SEGMENTS = 400 // matches the 20x20 grid: the snake can never exceed 400 cells
+-const BODY_Y = 0.36
+-const HEAD_Y = 0.50
+-const HEAD_R = 0.64
+-const BODY_R = 0.58
+-const TAIL_R = 0.44
+-
+-const easeOutQuad = (t) => 1 - (1 - t) * (1 - t)
+-const easeOutCubic = (t) => {
+-  const u = 1 - t
+-  return 1 - u * u * u
+-}
+-
+-function roundedSphereGeometry(segIndex = 0, total = 30) {
+-  // Sphere with gradient vertex colors: rose on top, cream on underside
+-  const geo = new THREE.SphereGeometry(1, 24, 18)
+-  const pos = geo.attributes.position
+-  const colors = new Float32Array(pos.count * 3)
+-
+-  const t = segIndex / Math.max(total, 1)
+-  const topColor = ROSE_HEAD.clone().lerp(ROSE_TAIL, t)
+-
+-  for (let i = 0; i < pos.count; i++) {
+-    const y = pos.getY(i)
+-    const mix = THREE.MathUtils.smoothstep(y, -0.65, 0.45)
+-    const c = topColor.clone().lerp(CREAM, 1 - mix)
+-    colors[i * 3] = c.r
+-    colors[i * 3 + 1] = c.g
+-    colors[i * 3 + 2] = c.b
+-  }
+-  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+-  return geo
++// Serpent rig entry point: builds the rig for a skin id (see skins/ and
++// game/skins.js). Debug only: ?rig=old restores the original pearl rig.
++import { SKIN_RIGS } from './skins/index.js'
++import { createSnakeRig as createOldPearls } from './snakeRig.old.js'
++import { DEFAULT_SKIN } from '../game/skins.js'
++
++export function isDebugOldRig() {
++  return typeof location !== 'undefined' && new URLSearchParams(location.search).get('rig') === 'old'
+ }
+ 
+-function bodyMaterial() {
+-  return new THREE.MeshPhysicalMaterial({
+-    vertexColors: true,
+-    roughness: 0.28,
+-    metalness: 0.08,
+-    clearcoat: 0.95,
+-    clearcoatRoughness: 0.14,
+-    emissive: new THREE.Color(0xd47585),
+-    emissiveIntensity: 0.18,
+-  })
+-}
+-
+-function eyeMaterial() {
+-  return new THREE.MeshStandardMaterial({
+-    color: 0xffffff,
+-    emissive: 0xffffff,
+-    emissiveIntensity: 0.8,
+-    roughness: 0.2,
+-  })
+-}
+-
+-function pupilMaterial() {
+-  return new THREE.MeshStandardMaterial({ color: INK, roughness: 0.5 })
+-}
+-
+-export function createSnakeRig(scene) {
+-  const sharedGeo = roundedSphereGeometry(5, 30)
+-  const sharedMat = bodyMaterial()
+-
+-  // Scale ridge geometry (dorsal gem on each segment)
+-  const ridgeGeo = new THREE.OctahedronGeometry(0.12, 0)
+-  const ridgeMat = new THREE.MeshStandardMaterial({
+-    color: 0xffe082,
+-    emissive: 0x4eedb8,
+-    emissiveIntensity: 0.85,
+-    roughness: 0.2,
+-  })
+-
+-  const bodyMeshes = []
+-  const bodyRidges = []
+-
+-  for (let i = 0; i < MAX_SEGMENTS; i++) {
+-    const m = new THREE.Mesh(sharedGeo, sharedMat.clone())
+-    m.visible = false
+-    m.castShadow = true
+-    scene.add(m)
+-    bodyMeshes.push(m)
+-
+-    // Dorsal scale crest on each body segment
+-    const ridge = new THREE.Mesh(ridgeGeo, ridgeMat)
+-    ridge.position.y = 0.88
+-    ridge.scale.set(0.8, 1.4, 0.8)
+-    m.add(ridge)
+-    bodyRidges.push(ridge)
+-  }
+-
+-  // ---- HEAD ----
+-  const head = new THREE.Group()
+-  const headMesh = new THREE.Mesh(sharedGeo, sharedMat.clone())
+-  headMesh.scale.set(HEAD_R * 1.05, HEAD_R * 0.86, HEAD_R * 1.1)
+-  headMesh.castShadow = true
+-  head.add(headMesh)
+-
+-  // Cute glowing dragon/serpent crest on forehead
+-  const crestGeo = new THREE.ConeGeometry(0.08, 0.28, 4)
+-  const crestMat = new THREE.MeshStandardMaterial({
+-    color: 0xffffff,
+-    emissive: JADE_GLOW,
+-    emissiveIntensity: 2.2,
+-    roughness: 0.2,
+-  })
+-  const crest = new THREE.Mesh(crestGeo, crestMat)
+-  crest.position.set(0, 0.44, 0.1)
+-  crest.rotation.x = -0.35
+-  head.add(crest)
+-
+-  // Little side horns
+-  for (const sx of [-0.24, 0.24]) {
+-    const horn = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.18, 4), crestMat)
+-    horn.position.set(sx, 0.38, -0.05)
+-    horn.rotation.z = sx < 0 ? 0.4 : -0.4
+-    horn.rotation.x = -0.2
+-    head.add(horn)
+-  }
+-
+-  // Cute expressive anime/chibi eyes
+-  const eyeGeo = new THREE.SphereGeometry(0.12, 16, 12)
+-  const pupilGeo = new THREE.SphereGeometry(0.065, 12, 10)
+-  const highlightGeo = new THREE.SphereGeometry(0.024, 8, 8)
+-
+-  const eyeMat = eyeMaterial()
+-  const pupilMat = pupilMaterial()
+-  const hiMat = new THREE.MeshBasicMaterial({ color: 0xffffff })
+-
+-  const eyes = []
+-  for (const sx of [-0.22, 0.22]) {
+-    const eye = new THREE.Mesh(eyeGeo, eyeMat)
+-    eye.scale.set(0.85, 1.25, 0.65)
+-    eye.position.set(sx, 0.24, 0.46)
+-    head.add(eye)
+-
+-    const pupil = new THREE.Mesh(pupilGeo, pupilMat)
+-    pupil.position.set(sx, 0.25, 0.52)
+-    head.add(pupil)
+-
+-    // Eye catch-light (sparkle)
+-    const hi = new THREE.Mesh(highlightGeo, hiMat)
+-    hi.position.set(sx + (sx > 0 ? 0.02 : -0.02), 0.27, 0.55)
+-    head.add(hi)
+-
+-    eyes.push(eye)
+-  }
+-
+-  // Cute smile
+-  const smile = new THREE.Mesh(
+-    new THREE.TorusGeometry(0.14, 0.024, 10, 24, Math.PI),
+-    new THREE.MeshStandardMaterial({ color: INK, roughness: 0.6 }),
+-  )
+-  smile.position.set(0, -0.08, 0.55)
+-  smile.rotation.z = Math.PI
+-  head.add(smile)
+-
+-  // Flickering forked tongue
+-  const tongue = new THREE.Group()
+-  const forkGeo = new THREE.BoxGeometry(0.018, 0.012, 0.28)
+-  const forkMat = new THREE.MeshStandardMaterial({ color: 0xba3c58, roughness: 0.4 })
+-  for (const sx of [-0.022, 0.022]) {
+-    const fork = new THREE.Mesh(forkGeo, forkMat)
+-    fork.position.set(sx, 0, 0.12)
+-    fork.rotation.y = sx < 0 ? -0.18 : 0.18
+-    tongue.add(fork)
+-  }
+-  tongue.position.set(0, -0.22, 0.5)
+-  head.add(tongue)
+-
+-  scene.add(head)
+-
+-  // Digestion pulses queue
+-  const eatPulses = []
+-
+-  const rig = {
+-    cur: [],
+-    prev: [],
+-    yawView: 0,
+-    yawTarget: 0,
+-    rollView: 0,
+-    flick: 0,
+-    chomp: 0,
+-    death: null,
+-    group: head,
+-
+-    setSnapshots(prev, cur) {
+-      rig.prev = prev
+-      rig.cur = cur
+-    },
+-
+-    // P4 "The Garden Remembers": re-tint the serpent's glow for purchased inks.
+-    // 'jade' restores the original rose/gold look.
+-    setInk(ink) {
+-      if (!ink) return
+-      sharedMat.emissive.set(ink.emissive)
+-      ridgeMat.color.set(ink.ridge)
+-    },
+-
+-    setDir(dx, dz) {      const prevYaw = rig.yawTarget
+-      rig.yawTarget = Math.atan2(dx, dz)
+-      // Calculate angular delta for banking roll
+-      let diff = rig.yawTarget - prevYaw
+-      while (diff > Math.PI) diff -= Math.PI * 2
+-      while (diff < -Math.PI) diff += Math.PI * 2
+-      rig.rollView = -Math.max(-0.45, Math.min(0.45, diff * 0.8))
+-    },
+-
+-    onStep() {
+-      rig.flick = 1
+-    },
+-
+-    onEat() {
+-      rig.chomp = 1.35 // Chomp squash & stretch
+-      eatPulses.push({ progress: 0, speed: 14 }) // Speed of digestion wave down body
+-    },
+-
+-    startDeath(pose, center) {
+-      rig.death = { pose, center, t: 0 }
+-    },
+-
+-    advanceDeath(dt, duration, reduced) {
+-      if (!rig.death) return
+-      rig.death.t = Math.min(1, rig.death.t + (reduced ? dt / Math.max(duration / 2, 0.001) : dt / duration))
+-    },
+-
+-    reset(length) {
+-      rig.death = null
+-      rig.flick = 0
+-      rig.chomp = 0
+-      eatPulses.length = 0
+-      if (length) for (let i = 0; i < MAX_SEGMENTS; i++) bodyMeshes[i].visible = i < length - 1
+-    },
+-
+-    deathCoil(i, n) {
+-      const d = rig.death
+-      const ring = Math.floor(i / 7)
+-      const k = i % 7
+-      const r = 0.46 + ring * 0.6 + k * 0.06
+-      const ang = i * 0.82 + ring * 0.44
+-      const y = 0.06 + ring * 0.08 + (k === 0 ? 0.02 : 0)
+-      return {
+-        x: d.center.x + Math.cos(ang) * r,
+-        y,
+-        z: d.center.z + Math.sin(ang) * r,
+-      }
+-    },
+-
+-    paint({ cur, prev, t, death, animT, dt, isBoosting = false }) {
+-      const n = cur.length
+-      const liveBob = Math.sin(animT * 2.8) * 0.025
+-      rig.yawView = THREEEaseAngle(rig.yawView, rig.yawTarget, dt, 14)
+-      rig.rollView = THREE.MathUtils.lerp(rig.rollView, 0, dt * 5)
+-      rig.flick = Math.max(0, rig.flick - dt * 4.5)
+-      rig.chomp = Math.max(0, rig.chomp - dt * 3.8)
+-
+-      tongue.scale.z = 1 + rig.flick * 0.85
+-      tongue.position.y = -0.22 + Math.sin(animT * 12) * 0.02 * rig.flick
+-
+-      // Advance digestion pulse waves
+-      for (let p = eatPulses.length - 1; p >= 0; p--) {
+-        eatPulses[p].progress += dt * eatPulses[p].speed
+-        if (eatPulses[p].progress > n + 3) {
+-          eatPulses.splice(p, 1)
+-        }
+-      }
+-
+-      // Head chomp bounce
+-      const headScaleBump = 1 + Math.sin(rig.chomp * Math.PI) * 0.22
+-      headMesh.scale.set(HEAD_R * 1.05 * headScaleBump, HEAD_R * 0.86 * headScaleBump, HEAD_R * 1.1 * headScaleBump)
+-
+-      for (let i = 0; i < n; i++) {
+-        const c = cur[i]
+-        const p = prev[Math.min(i, prev.length - 1)]
+-        const px = p ? p.x : c.x
+-        const pz = p ? p.z : c.z
+-        const bt = easeOutQuad(t)
+-        let x = px + (c.x - px) * bt
+-        let z = pz + (c.z - pz) * bt
+-        let y = (i === 0 ? HEAD_Y : BODY_Y) + liveBob * (i === 0 ? 0.5 : 1)
+-
+-        // Calculate digestion wave bulge on segment i
+-        let digestionBulge = 1
+-        for (const pulse of eatPulses) {
+-          const dist = Math.abs(pulse.progress - i)
+-          if (dist < 1.8) {
+-            const wave = 1 - dist / 1.8
+-            digestionBulge = Math.max(digestionBulge, 1 + wave * 0.28)
+-          }
+-        }
+-
+-        if (death) {
+-          const dc = rig.deathCoil(i, n)
+-          const e = easeOutCubic(death.t)
+-          const bounce = Math.sin(Math.min(death.t, 1) * Math.PI) * 0.24 * (1 - death.t * 0.6)
+-          x = x + (dc.x - x) * e
+-          z = z + (dc.z - z) * e
+-          y = y + (dc.y + bounce - y) * e
+-        }
+-
+-        if (i === 0) {
+-          head.position.set(x, y + 0.05 + Math.sin(animT * 2.6) * 0.02, z)
+-          head.rotation.y = rig.yawView
+-          head.rotation.z = rig.rollView
+-        } else {
+-          const m = bodyMeshes[i - 1]
+-          m.visible = true
+-
+-          // Graceful taper from head to tail
+-          const baseR = BODY_R - (BODY_R - TAIL_R) * (i / Math.max(n - 1, 1))
+-          const finalR = baseR * digestionBulge
+-
+-          m.position.set(x, y + Math.sin(animT * 2.8 + i * 0.48) * 0.015, z)
+-          m.scale.set(finalR, finalR * 0.84, finalR)
+-
+-          // Glowing pulse on digestion
+-          if (digestionBulge > 1.05) {
+-            m.material.emissive.copy(GOLD_PULSE)
+-            m.material.emissiveIntensity = 0.65
+-          } else {
+-            m.material.emissive.set(0xd47585)
+-            m.material.emissiveIntensity = isBoosting ? 0.38 : 0.18
+-          }
+-        }
+-      }
+-
+-      for (let i = n; i <= MAX_SEGMENTS; i++) {
+-        if (bodyMeshes[i - 1]) bodyMeshes[i - 1].visible = false
+-      }
+-    },
+-  }
+-
+-  function THREEEaseAngle(cur, target, dt, speed) {
+-    let d = target - cur
+-    while (d > Math.PI) d -= Math.PI * 2
+-    while (d < -Math.PI) d += Math.PI * 2
+-    return cur + d * Math.min(1, dt * speed)
+-  }
+-
+-  return rig
++export function createSnakeRig(scene, skinId = DEFAULT_SKIN) {
++  if (isDebugOldRig()) return createOldPearls(scene)
++  return (SKIN_RIGS[skinId] || SKIN_RIGS[DEFAULT_SKIN])(scene)
+ }
+ 
+-export { easeOutQuad }
+\ No newline at end of file
++export const easeOutQuad = (t) => 1 - (1 - t) * (1 - t)
+diff --git a/src/three/snakeRig.old.js b/src/three/snakeRig.old.js
+new file mode 100644
+index 0000000..b5d4dba
+--- /dev/null
++++ b/src/three/snakeRig.old.js
+@@ -0,0 +1,352 @@
++import * as THREE from 'three'
++
++const ROSE = new THREE.Color(0xd47585)
++const ROSE_HEAD = new THREE.Color(0xe88a9a)
++const ROSE_TAIL = new THREE.Color(0x993d52)
++const CREAM = new THREE.Color(0xfff5ea)
++const INK = new THREE.Color(0x0a1411)
++const JADE_GLOW = new THREE.Color(0x4eedb8)
++const GOLD_PULSE = new THREE.Color(0xffd54f)
++
++const MAX_SEGMENTS = 400 // matches the 20x20 grid: the snake can never exceed 400 cells
++const BODY_Y = 0.36
++const HEAD_Y = 0.50
++const HEAD_R = 0.64
++const BODY_R = 0.58
++const TAIL_R = 0.44
++
++const easeOutQuad = (t) => 1 - (1 - t) * (1 - t)
++const easeOutCubic = (t) => {
++  const u = 1 - t
++  return 1 - u * u * u
++}
++
++function roundedSphereGeometry(segIndex = 0, total = 30) {
++  // Sphere with gradient vertex colors: rose on top, cream on underside
++  const geo = new THREE.SphereGeometry(1, 24, 18)
++  const pos = geo.attributes.position
++  const colors = new Float32Array(pos.count * 3)
++
++  const t = segIndex / Math.max(total, 1)
++  const topColor = ROSE_HEAD.clone().lerp(ROSE_TAIL, t)
++
++  for (let i = 0; i < pos.count; i++) {
++    const y = pos.getY(i)
++    const mix = THREE.MathUtils.smoothstep(y, -0.65, 0.45)
++    const c = topColor.clone().lerp(CREAM, 1 - mix)
++    colors[i * 3] = c.r
++    colors[i * 3 + 1] = c.g
++    colors[i * 3 + 2] = c.b
++  }
++  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
++  return geo
++}
++
++function bodyMaterial() {
++  return new THREE.MeshPhysicalMaterial({
++    vertexColors: true,
++    roughness: 0.28,
++    metalness: 0.08,
++    clearcoat: 0.95,
++    clearcoatRoughness: 0.14,
++    emissive: new THREE.Color(0xd47585),
++    emissiveIntensity: 0.18,
++  })
++}
++
++function eyeMaterial() {
++  return new THREE.MeshStandardMaterial({
++    color: 0xffffff,
++    emissive: 0xffffff,
++    emissiveIntensity: 0.8,
++    roughness: 0.2,
++  })
++}
++
++function pupilMaterial() {
++  return new THREE.MeshStandardMaterial({ color: INK, roughness: 0.5 })
++}
++
++export function createSnakeRig(scene) {
++  const sharedGeo = roundedSphereGeometry(5, 30)
++  const sharedMat = bodyMaterial()
++
++  // Scale ridge geometry (dorsal gem on each segment)
++  const ridgeGeo = new THREE.OctahedronGeometry(0.12, 0)
++  const ridgeMat = new THREE.MeshStandardMaterial({
++    color: 0xffe082,
++    emissive: 0x4eedb8,
++    emissiveIntensity: 0.85,
++    roughness: 0.2,
++  })
++
++  const bodyMeshes = []
++  const bodyRidges = []
++
++  for (let i = 0; i < MAX_SEGMENTS; i++) {
++    const m = new THREE.Mesh(sharedGeo, sharedMat.clone())
++    m.visible = false
++    m.castShadow = true
++    scene.add(m)
++    bodyMeshes.push(m)
++
++    // Dorsal scale crest on each body segment
++    const ridge = new THREE.Mesh(ridgeGeo, ridgeMat)
++    ridge.position.y = 0.88
++    ridge.scale.set(0.8, 1.4, 0.8)
++    m.add(ridge)
++    bodyRidges.push(ridge)
++  }
++
++  // ---- HEAD ----
++  const head = new THREE.Group()
++  const headMesh = new THREE.Mesh(sharedGeo, sharedMat.clone())
++  headMesh.scale.set(HEAD_R * 1.05, HEAD_R * 0.86, HEAD_R * 1.1)
++  headMesh.castShadow = true
++  head.add(headMesh)
++
++  // Cute glowing dragon/serpent crest on forehead
++  const crestGeo = new THREE.ConeGeometry(0.08, 0.28, 4)
++  const crestMat = new THREE.MeshStandardMaterial({
++    color: 0xffffff,
++    emissive: JADE_GLOW,
++    emissiveIntensity: 2.2,
++    roughness: 0.2,
++  })
++  const crest = new THREE.Mesh(crestGeo, crestMat)
++  crest.position.set(0, 0.44, 0.1)
++  crest.rotation.x = -0.35
++  head.add(crest)
++
++  // Little side horns
++  for (const sx of [-0.24, 0.24]) {
++    const horn = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.18, 4), crestMat)
++    horn.position.set(sx, 0.38, -0.05)
++    horn.rotation.z = sx < 0 ? 0.4 : -0.4
++    horn.rotation.x = -0.2
++    head.add(horn)
++  }
++
++  // Cute expressive anime/chibi eyes
++  const eyeGeo = new THREE.SphereGeometry(0.12, 16, 12)
++  const pupilGeo = new THREE.SphereGeometry(0.065, 12, 10)
++  const highlightGeo = new THREE.SphereGeometry(0.024, 8, 8)
++
++  const eyeMat = eyeMaterial()
++  const pupilMat = pupilMaterial()
++  const hiMat = new THREE.MeshBasicMaterial({ color: 0xffffff })
++
++  const eyes = []
++  for (const sx of [-0.22, 0.22]) {
++    const eye = new THREE.Mesh(eyeGeo, eyeMat)
++    eye.scale.set(0.85, 1.25, 0.65)
++    eye.position.set(sx, 0.24, 0.46)
++    head.add(eye)
++
++    const pupil = new THREE.Mesh(pupilGeo, pupilMat)
++    pupil.position.set(sx, 0.25, 0.52)
++    head.add(pupil)
++
++    // Eye catch-light (sparkle)
++    const hi = new THREE.Mesh(highlightGeo, hiMat)
++    hi.position.set(sx + (sx > 0 ? 0.02 : -0.02), 0.27, 0.55)
++    head.add(hi)
++
++    eyes.push(eye)
++  }
++
++  // Cute smile
++  const smile = new THREE.Mesh(
++    new THREE.TorusGeometry(0.14, 0.024, 10, 24, Math.PI),
++    new THREE.MeshStandardMaterial({ color: INK, roughness: 0.6 }),
++  )
++  smile.position.set(0, -0.08, 0.55)
++  smile.rotation.z = Math.PI
++  head.add(smile)
++
++  // Flickering forked tongue
++  const tongue = new THREE.Group()
++  const forkGeo = new THREE.BoxGeometry(0.018, 0.012, 0.28)
++  const forkMat = new THREE.MeshStandardMaterial({ color: 0xba3c58, roughness: 0.4 })
++  for (const sx of [-0.022, 0.022]) {
++    const fork = new THREE.Mesh(forkGeo, forkMat)
++    fork.position.set(sx, 0, 0.12)
++    fork.rotation.y = sx < 0 ? -0.18 : 0.18
++    tongue.add(fork)
++  }
++  tongue.position.set(0, -0.22, 0.5)
++  head.add(tongue)
++
++  scene.add(head)
++
++  // Digestion pulses queue
++  const eatPulses = []
++
++  const rig = {
++    cur: [],
++    prev: [],
++    yawView: 0,
++    yawTarget: 0,
++    rollView: 0,
++    flick: 0,
++    chomp: 0,
++    death: null,
++    group: head,
++
++    setSnapshots(prev, cur) {
++      rig.prev = prev
++      rig.cur = cur
++    },
++
++    // P4 "The Garden Remembers": re-tint the serpent's glow for purchased inks.
++    // 'jade' restores the original rose/gold look.
++    setInk(ink) {
++      if (!ink) return
++      sharedMat.emissive.set(ink.emissive)
++      ridgeMat.color.set(ink.ridge)
++    },
++
++    setDir(dx, dz) {      const prevYaw = rig.yawTarget
++      rig.yawTarget = Math.atan2(dx, dz)
++      // Calculate angular delta for banking roll
++      let diff = rig.yawTarget - prevYaw
++      while (diff > Math.PI) diff -= Math.PI * 2
++      while (diff < -Math.PI) diff += Math.PI * 2
++      rig.rollView = -Math.max(-0.45, Math.min(0.45, diff * 0.8))
++    },
++
++    onStep() {
++      rig.flick = 1
++    },
++
++    onEat() {
++      rig.chomp = 1.35 // Chomp squash & stretch
++      eatPulses.push({ progress: 0, speed: 14 }) // Speed of digestion wave down body
++    },
++
++    startDeath(pose, center) {
++      rig.death = { pose, center, t: 0 }
++    },
++
++    advanceDeath(dt, duration, reduced) {
++      if (!rig.death) return
++      rig.death.t = Math.min(1, rig.death.t + (reduced ? dt / Math.max(duration / 2, 0.001) : dt / duration))
++    },
++
++    reset(length) {
++      rig.death = null
++      rig.flick = 0
++      rig.chomp = 0
++      eatPulses.length = 0
++      if (length) for (let i = 0; i < MAX_SEGMENTS; i++) bodyMeshes[i].visible = i < length - 1
++    },
++
++    deathCoil(i, n) {
++      const d = rig.death
++      const ring = Math.floor(i / 7)
++      const k = i % 7
++      const r = 0.46 + ring * 0.6 + k * 0.06
++      const ang = i * 0.82 + ring * 0.44
++      const y = 0.06 + ring * 0.08 + (k === 0 ? 0.02 : 0)
++      return {
++        x: d.center.x + Math.cos(ang) * r,
++        y,
++        z: d.center.z + Math.sin(ang) * r,
++      }
++    },
++
++    paint({ cur, prev, t, death, animT, dt, isBoosting = false }) {
++      const n = cur.length
++      const liveBob = Math.sin(animT * 2.8) * 0.025
++      rig.yawView = THREEEaseAngle(rig.yawView, rig.yawTarget, dt, 14)
++      rig.rollView = THREE.MathUtils.lerp(rig.rollView, 0, dt * 5)
++      rig.flick = Math.max(0, rig.flick - dt * 4.5)
++      rig.chomp = Math.max(0, rig.chomp - dt * 3.8)
++
++      tongue.scale.z = 1 + rig.flick * 0.85
++      tongue.position.y = -0.22 + Math.sin(animT * 12) * 0.02 * rig.flick
++
++      // Advance digestion pulse waves
++      for (let p = eatPulses.length - 1; p >= 0; p--) {
++        eatPulses[p].progress += dt * eatPulses[p].speed
++        if (eatPulses[p].progress > n + 3) {
++          eatPulses.splice(p, 1)
++        }
++      }
++
++      // Head chomp bounce
++      const headScaleBump = 1 + Math.sin(rig.chomp * Math.PI) * 0.22
++      headMesh.scale.set(HEAD_R * 1.05 * headScaleBump, HEAD_R * 0.86 * headScaleBump, HEAD_R * 1.1 * headScaleBump)
++
++      for (let i = 0; i < n; i++) {
++        const c = cur[i]
++        const p = prev[Math.min(i, prev.length - 1)]
++        const px = p ? p.x : c.x
++        const pz = p ? p.z : c.z
++        const bt = easeOutQuad(t)
++        let x = px + (c.x - px) * bt
++        let z = pz + (c.z - pz) * bt
++        let y = (i === 0 ? HEAD_Y : BODY_Y) + liveBob * (i === 0 ? 0.5 : 1)
++
++        // Calculate digestion wave bulge on segment i
++        let digestionBulge = 1
++        for (const pulse of eatPulses) {
++          const dist = Math.abs(pulse.progress - i)
++          if (dist < 1.8) {
++            const wave = 1 - dist / 1.8
++            digestionBulge = Math.max(digestionBulge, 1 + wave * 0.28)
++          }
++        }
++
++        if (death) {
++          const dc = rig.deathCoil(i, n)
++          const e = easeOutCubic(death.t)
++          const bounce = Math.sin(Math.min(death.t, 1) * Math.PI) * 0.24 * (1 - death.t * 0.6)
++          x = x + (dc.x - x) * e
++          z = z + (dc.z - z) * e
++          y = y + (dc.y + bounce - y) * e
++        }
++
++        if (i === 0) {
++          head.position.set(x, y + 0.05 + Math.sin(animT * 2.6) * 0.02, z)
++          head.rotation.y = rig.yawView
++          head.rotation.z = rig.rollView
++        } else {
++          const m = bodyMeshes[i - 1]
++          m.visible = true
++
++          // Graceful taper from head to tail
++          const baseR = BODY_R - (BODY_R - TAIL_R) * (i / Math.max(n - 1, 1))
++          const finalR = baseR * digestionBulge
++
++          m.position.set(x, y + Math.sin(animT * 2.8 + i * 0.48) * 0.015, z)
++          m.scale.set(finalR, finalR * 0.84, finalR)
++
++          // Glowing pulse on digestion
++          if (digestionBulge > 1.05) {
++            m.material.emissive.copy(GOLD_PULSE)
++            m.material.emissiveIntensity = 0.65
++          } else {
++            m.material.emissive.set(0xd47585)
++            m.material.emissiveIntensity = isBoosting ? 0.38 : 0.18
++          }
++        }
++      }
++
++      for (let i = n; i <= MAX_SEGMENTS; i++) {
++        if (bodyMeshes[i - 1]) bodyMeshes[i - 1].visible = false
++      }
++    },
++  }
++
++  function THREEEaseAngle(cur, target, dt, speed) {
++    let d = target - cur
++    while (d > Math.PI) d -= Math.PI * 2
++    while (d < -Math.PI) d += Math.PI * 2
++    return cur + d * Math.min(1, dt * speed)
++  }
++
++  return rig
++}
++
++export { easeOutQuad }
+\ No newline at end of file

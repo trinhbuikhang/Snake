@@ -1,0 +1,17 @@
+import { chromium } from 'playwright-core'
+const sleep = (ms) => new Promise(r => setTimeout(r, ms))
+const [url, out, skin] = process.argv.slice(2)
+const b = await chromium.launch({ executablePath: '/usr/bin/google-chrome', args: ['--use-gl=angle','--use-angle=swiftshader','--enable-unsafe-swiftshader'] })
+const ctx = await b.newContext({ viewport: { width: 1280, height: 800 }, deviceScaleFactor: 1, serviceWorkers: 'block' })
+const page = await ctx.newPage(); const errs = []; page.on('pageerror', e => errs.push(e.message))
+await page.addInitScript((skin) => { localStorage.setItem('ran-xinh-skin', JSON.stringify({ owned: ['moonJade', 'plushMoon'], selected: skin })) }, skin)
+await page.goto(url, { waitUntil: 'load' })
+await page.waitForFunction(() => document.querySelector('.garden-canvas--ready'), null, { timeout: 30000 })
+await sleep(1500)
+await page.click('.btn--primary')
+for (let i = 0; i < 10; i++) { await sleep(300); const bb = await page.$('.prologue-begin'); if (!bb) break; await bb.click() }
+await page.waitForFunction(() => !document.querySelector('.ready-veil'), null, { timeout: 20000 }).catch(() => {})
+await sleep(2500)
+await page.screenshot({ path: out })
+console.log('rig', await page.evaluate(() => window.__perf?.rig?.skin ?? 'n/a'), 'errors', errs)
+await b.close()

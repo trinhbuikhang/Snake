@@ -1,0 +1,120 @@
+diff --git a/src/three/engine.js b/src/three/engine.js
+index c2d6028..1216465 100644
+--- a/src/three/engine.js
++++ b/src/three/engine.js
+@@ -33,7 +33,11 @@ import { lanternCount, bloomCount, inkById } from '../game/garden.js'
+ import { nightEventById } from '../game/nightEvents.js'
+ 
+ const FOV = 42
+-const FIT_HALF = 11.8
++// Fit the 20-cell board (half = 10) plus a slim margin; was 11.8, which left
++// the snake tiny on screen. The aligned view also sits a touch lower so the
++// serpent's face reads from the front instead of the crown.
++const FIT_HALF = 10.7
++const BOARD_HALF = 10.25 // board edge (+ rim) for the perspective-correct fit
+ const DEMO_INTERVAL = 0.15
+ const DEATH_DURATION = 1.6
+ const BLOOM_BASE = 0.42
+@@ -43,9 +47,9 @@ const BLOOM_BASE = 0.42
+ // 'topdown': Overhead tactical 2.5D view for maximum precision.
+ // 'cinematic': Gentle isometric tilt for artistic elegance.
+ const CAM_PRESETS = {
+-  aligned: { az: 0, el: 1.05, fov: 42, distMult: 1.08 },
+-  topdown: { az: 0, el: 1.48, fov: 44, distMult: 1.15 },
+-  cinematic: { az: 0.54, el: 0.88, fov: 42, distMult: 1.12 },
++  aligned: { az: 0, el: 1.0, fov: 42, distMult: 1, perspFit: { x: 0.97, top: 0.8, bottom: 0.93 } },
++  topdown: { az: 0, el: 1.48, fov: 44, distMult: 1.15, fit: 11.8 },
++  cinematic: { az: 0.54, el: 0.88, fov: 42, distMult: 1.12, fit: 11.8 },
+ }
+ 
+ const clamp01 = (v) => Math.max(0, Math.min(1, v))
+@@ -187,7 +191,7 @@ export function createEngine(canvas, { reduced } = {}) {
+   const envTex = pmrem.fromScene(roomEnv, 0.04).texture
+ 
+   const garden = buildGarden(scene, { envTex, reduced })
+-  const rig = createSnakeRig(scene)
++  let rig = createSnakeRig(scene, useGame.getState().skins?.selected)
+   const decor = buildDecor(scene)
+ 
+   // P4 "The Garden Remembers": apply purchased decorations, the serpent's
+@@ -201,8 +205,21 @@ export function createEngine(canvas, { reduced } = {}) {
+     garden.moonGroup.scale.setScalar(st.moonriseActive ? 2.4 : 1)
+   }
+   applyGarden()
++  // Skins: swap the serpent rig live when the worn skin changes (the old
++  // rig's meshes/materials are released; ink + pose carry over).
++  function swapRig(skinId) {
++    const old = rig
++    if (!old.dispose) return // debug ?rig=old pearls (and test doubles) don't swap
++    rig = createSnakeRig(scene, skinId)
++    if (rig === old) return
++    old.dispose?.()
++    applyGarden()
++    rig.reset(curCells.length || logic.snake.length)
++    rig.setDir(DIR[logic.dir].x, DIR[logic.dir].y)
++  }
+   const unsubGarden = useGame.subscribe((s, prev) => {
+     if (s.garden !== prev.garden || s.moonriseActive !== prev.moonriseActive) applyGarden()
++    if (s.skins?.selected !== prev.skins?.selected) swapRig(s.skins?.selected)
+   })
+ 
+   // ---- postprocessing ----------------------------------------------------
+@@ -216,6 +233,9 @@ export function createEngine(canvas, { reduced } = {}) {
+     composer.addPass(new OutputPass())
+   }
+ 
++  // PERF-HARNESS (throwaway, uncommitted)
++  if (typeof location !== 'undefined' && location.search.includes('perf')) window.__perf = { THREE, renderer, scene, camera, get composer() { return composer }, get bloomPass() { return bloomPass }, get rig() { return rig }, moon, garden, getQ: () => qualityIdx, getGov: () => gov, camPosTarget, camLookTarget, get logic() { return logic } }
++
+   // ---- game state ---------------------------------------------------------
+   let logic = createGame()
+   let curCells = []
+@@ -712,15 +732,45 @@ export function createEngine(canvas, { reduced } = {}) {
+     let maxU = 0
+     for (const sx of [-1, 1]) {
+       for (const sz of [-1, 1]) {
+-        const v = new THREE.Vector3(sx * FIT_HALF, 0, sz * FIT_HALF)
++        const v = new THREE.Vector3(sx * (preset.fit ?? FIT_HALF), 0, sz * (preset.fit ?? FIT_HALF))
+         maxR = Math.max(maxR, Math.abs(v.dot(right)))
+         maxU = Math.max(maxU, Math.abs(v.dot(up)) + 0.3)
+       }
+     }
+ 
+     const tanHalf = Math.tan((camera.fov * Math.PI) / 360)
+-    const dist = Math.max(maxU / tanHalf, maxR / (tanHalf * camera.aspect)) * preset.distMult
+-    camPosTarget.copy(viewDir).multiplyScalar(dist)
++    let lookZ = 0
++    let dist = Math.max(maxU / tanHalf, maxR / (tanHalf * camera.aspect)) * preset.distMult
++    if (preset.perspFit) {
++      // Perspective-correct fit: the closest distance at which every board
++      // corner still lands inside the given NDC margins (the top margin
++      // leaves room for the HUD pills). The old ortho-style fit needed a fat margin to cover the
++      // near edge, which kept the serpent small on screen.
++      // The look point slides toward the near edge so the board is centred
++      // vertically (looking at the origin leaves the far half of the screen
++      // empty and the near edge binding).
++      const fitsAt = (d, lz) => {
++        for (const sx of [-1, 1]) for (const sz of [-1, 1]) {
++          const px = sx * BOARD_HALF - viewDir.x * d, py = -viewDir.y * d, pz = sz * BOARD_HALF - lz - viewDir.z * d
++          const depth = -(px * viewDir.x + py * viewDir.y + pz * viewDir.z)
++          const x = px * right.x + py * right.y + pz * right.z
++          const y = px * up.x + py * up.y + pz * up.z
++          if (Math.abs(x) / (depth * tanHalf * camera.aspect) > preset.perspFit.x) return false
++          if (y / (depth * tanHalf) > preset.perspFit.top || -y / (depth * tanHalf) > preset.perspFit.bottom) return false
++        }
++        return true
++      }
++      let best = Infinity, bestZ = 0
++      for (let lz = -1; lz <= 4; lz += 0.25) {
++        let lo = 4, hi = 120
++        for (let i = 0; i < 26; i++) { const mid = (lo + hi) / 2; if (fitsAt(mid, lz)) hi = mid; else lo = mid }
++        if (hi < best - 1e-3) { best = hi; bestZ = lz }
++      }
++      dist = best * preset.distMult
++      lookZ = bestZ
++    }
++    camLookTarget.set(0, 0, lookZ)
++    camPosTarget.copy(viewDir).multiplyScalar(dist).add(camLookTarget)
+     camera.updateProjectionMatrix()
+   }
+ 

@@ -1,0 +1,81 @@
+diff --git a/src/game/store.js b/src/game/store.js
+index 78e3c2a..f3d9c47 100644
+--- a/src/game/store.js
++++ b/src/game/store.js
+@@ -11,6 +11,7 @@ import {
+   BLOOM_MAX_TIER, BLOOM_COSTS, bloomCount,
+   earnMoonlight, nextStreak, toDayString, journeyReady, JOURNEY_GOAL,
+ } from './garden.js'
++import { SKIN_IDS, DEFAULT_SKIN, skinById, canUnlockSkin } from './skins.js'
+ 
+ export const BEST_KEY = 'ran-xinh-best' // legacy single best, migrated into BESTS_KEY
+ export const BESTS_KEY = 'ran-xinh-bests'
+@@ -28,6 +29,7 @@ export const TONIGHT_KEY = 'ran-xinh-tonight'
+ // P4 "The Garden Remembers"
+ export const MOONLIGHT_KEY = 'ran-xinh-moonlight' // { balance, earned }
+ export const GARDEN_KEY = 'ran-xinh-garden' // { lantern, lotus, inks, ink }
++export const SKIN_KEY = 'ran-xinh-skin' // { owned: [ids], selected: id }
+ export const JOURNEY_KEY = 'ran-xinh-journey' // { progress, completed }
+ export const KEEPSAKE_KEY = 'ran-xinh-keepsakes' // [{ id, night, date }]
+ export const STREAK_KEY = 'ran-xinh-streak' // { count, lastDay }
+@@ -102,6 +104,20 @@ export const readBests = () => {
+   return fresh
+ }
+ export const readMuted = () => readItem(MUTE_KEY) === '1'
++// Serpent skins: owned + selected, validated against the registry.
++export const readSkins = () => {
++  const fresh = { owned: SKIN_IDS.filter((id) => canUnlockSkin(skinById(id), null)), selected: DEFAULT_SKIN }
++  try {
++    const parsed = JSON.parse(readItem(SKIN_KEY) || 'null')
++    if (parsed && typeof parsed === 'object') {
++      if (Array.isArray(parsed.owned)) fresh.owned = [...new Set([...fresh.owned, ...parsed.owned.filter((id) => SKIN_IDS.includes(id))])]
++      if (fresh.owned.includes(parsed.selected)) fresh.selected = parsed.selected
++    }
++  } catch {
++    /* corrupt entry: fall back to defaults */
++  }
++  return fresh
++}
+ const CAM_MODES = ['aligned', 'topdown', 'cinematic']
+ export const readCam = () => {
+   const v = readItem(CAM_KEY)
+@@ -427,6 +443,8 @@ export const useGame = create((set, get) => ({
+   // P4 "The Garden Remembers"
+   moonlight: { balance: 0, earned: 0 },
+   garden: { lantern: 0, lotus: 0, inks: ['jade'], ink: 'jade' },
++  // Serpent skins (see game/skins.js): owned ids + the one being worn
++  skins: { owned: [DEFAULT_SKIN], selected: DEFAULT_SKIN },
+   journey: { progress: 0, completed: 0 },
+   keepsakes: [],
+   streak: { count: 0, lastDay: null },
+@@ -464,6 +482,7 @@ export const useGame = create((set, get) => ({
+       best: bests[gameMode] || 0,
+       muted: readMuted(),
+       cameraMode: readCam(),
++      skins: readSkins(),
+       showControls: readCtrls(),
+       moonPhase: readMoon(),
+       gameMode,
+@@ -685,6 +704,22 @@ export const useGame = create((set, get) => ({
+     get().checkVerses('garden')
+   },
+ 
++  // Wear a skin. Unowned skins go through canUnlockSkin() (placeholder rule)
++  // and become owned on success; the choice persists under SKIN_KEY.
++  chooseSkin(id) {
++    if (!SKIN_IDS.includes(id)) return
++    const cur = get().skins
++    let owned = cur.owned
++    if (!owned.includes(id)) {
++      if (!canUnlockSkin(skinById(id), get())) return
++      owned = [...owned, id]
++    }
++    if (cur.selected === id && owned === cur.owned) return
++    const skins = { owned, selected: id }
++    writeItem(SKIN_KEY, JSON.stringify(skins))
++    set({ skins })
++  },
++
+   // Buying an ink also selects it; re-tapping an owned ink just selects it.
+   chooseInk(id) {
+     const ink = inkById(id)
