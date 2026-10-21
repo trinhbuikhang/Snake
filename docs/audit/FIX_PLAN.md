@@ -348,7 +348,7 @@ Mỗi mục con là **một PR riêng**, làm theo thứ tự a → f. Tham chi�
 - [x] **T10e** · Thấp (AUDIT L3, L7, L8) · Branch: `chore/10e-perf-hygiene`
   - **Vấn đề:** claim "zero per-frame allocations" sai (`engine.js` L790 tạo object mỗi frame, L298–299 cấp phát mỗi tick); chunk `engine` 580 KB; `setTimeout` coach (`store.js` L533–537) không được clear.
   - **Nghiệm thu:** tái sử dụng object tham số `paint`; sửa comment cho đúng; build không còn cảnh báo chunk > 500 KB hoặc ghi lý do chấp nhận; timeout coach được lưu và clear khi rời `playing`. Dán output `npm run build`.
-- [ ] **T10f** · Thấp (AUDIT L6 + "Vấn đề có từ trước") · Branch: `fix/10f-misc`
+- [x] **T10f** · Thấp (AUDIT L6 + "Vấn đề có từ trước") · Branch: `fix/10f-misc`
   - **Vấn đề:** `index.html` L7 `maximum-scale=1, user-scalable=no` chặn zoom (accessibility); OG dùng domain workers.dev (L25–26, L33) nhưng chưa có `canonical`; `engine.js` L745 `accum -= interval.v` trừ khoảng tick mới thay vì `tickDt`; `readJSON`/`writeJSON` (`store.js` L46–60) đặt tên gây hiểu nhầm.
   - ✅ **Đã chốt:** origin chính thức `https://moonlit-serpent.trinhbuikhang060708.workers.dev/`; bỏ chặn zoom trong viewport nhưng chặn pinch/double-tap trên vùng chơi bằng CSS `touch-action`.
   - **Nghiệm thu:**

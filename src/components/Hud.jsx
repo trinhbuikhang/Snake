@@ -765,8 +765,26 @@ function NightBanner() {
 // Purely presentational — it never steals input, so a swipe during the beat
 // still pre-steers the snake on touch screens.
 function ReadyVeil() {
+  const [beat, setBeat] = useState(0)
+  useEffect(() => {
+    // T10c holds the ready beat while the window is blurred and replays
+    // the full 1.8s when focus returns — but this veil's one-shot CSS
+    // animation kept its own clock and was already spent, leaving a
+    // silent, cue-less wait (Codex P2 on PR #29). Remount on focus /
+    // visible so the animation replays in step with the beat.
+    const replay = () => setBeat((b) => b + 1)
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') replay()
+    }
+    window.addEventListener('focus', replay)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      window.removeEventListener('focus', replay)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [])
   return (
-    <div className="ready-veil" role="status" aria-label="The night begins">
+    <div key={beat} className="ready-veil" role="status" aria-label="The night begins">
       <p className="ready-veil__line">The night begins</p>
       <p className="ready-veil__sub">the garden holds its breath</p>
     </div>

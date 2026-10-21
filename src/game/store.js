@@ -54,7 +54,7 @@ function clearCoachTimer() {
   }
 }
 
-function readJSON(key) {
+function readItem(key) {
   try {
     const v = localStorage.getItem(key)
     return v === null ? null : v
@@ -63,7 +63,7 @@ function readJSON(key) {
   }
 }
 
-function writeJSON(key, value) {
+function writeItem(key, value) {
   try {
     localStorage.setItem(key, String(value))
   } catch {
@@ -71,12 +71,12 @@ function writeJSON(key, value) {
   }
 }
 
-export const readBest = () => Math.max(0, parseInt(readJSON(BEST_KEY) || '0', 10) || 0)
+export const readBest = () => Math.max(0, parseInt(readItem(BEST_KEY) || '0', 10) || 0)
 // Per-mode bests, with one-time migration from the legacy single best.
 export const readBests = () => {
   const fresh = { classic: 0, lantern: 0, zen: 0 }
   try {
-    const raw = readJSON(BESTS_KEY)
+    const raw = readItem(BESTS_KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
       for (const id of MODE_IDS) {
@@ -91,29 +91,29 @@ export const readBests = () => {
   fresh.classic = readBest()
   return fresh
 }
-export const readMuted = () => readJSON(MUTE_KEY) === '1'
+export const readMuted = () => readItem(MUTE_KEY) === '1'
 const CAM_MODES = ['aligned', 'topdown', 'cinematic']
 export const readCam = () => {
-  const v = readJSON(CAM_KEY)
+  const v = readItem(CAM_KEY)
   return CAM_MODES.includes(v) ? v : 'aligned'
 }
-export const readCtrls = () => readJSON(CTRLS_KEY) === '1'
+export const readCtrls = () => readItem(CTRLS_KEY) === '1'
 export const readMoon = () => {
-  const v = readJSON(MOON_KEY)
+  const v = readItem(MOON_KEY)
   return MOON_IDS.includes(v) ? v : 'half'
 }
 export const readMode = () => {
-  const v = readJSON(MODE_KEY)
+  const v = readItem(MODE_KEY)
   return MODE_IDS.includes(v) ? v : 'classic'
 }
-export const readNight = () => Math.max(0, parseInt(readJSON(NIGHT_KEY) || '0', 10) || 0)
-export const readOnboarded = () => readJSON(ONBOARDED_KEY) === '1'
+export const readNight = () => Math.max(0, parseInt(readItem(NIGHT_KEY) || '0', 10) || 0)
+export const readOnboarded = () => readItem(ONBOARDED_KEY) === '1'
 // Lifetime counters: { supernovas, planets, deaths, spiritCatches, zenSessions,
 // lanternFeasts }. Missing/corrupt → zeros.
 export const readTotals = () => {
   const fresh = { supernovas: 0, planets: 0, deaths: 0, spiritCatches: 0, zenSessions: 0, lanternFeasts: 0 }
   try {
-    const parsed = JSON.parse(readJSON(TOTALS_KEY) || 'null')
+    const parsed = JSON.parse(readItem(TOTALS_KEY) || 'null')
     for (const k of Object.keys(fresh)) {
       const v = parseInt(parsed?.[k], 10)
       if (Number.isFinite(v) && v > 0) fresh[k] = v
@@ -126,7 +126,7 @@ export const readTotals = () => {
 // Unlocked whisper ids (array of strings).
 export const readWhispers = () => {
   try {
-    const parsed = JSON.parse(readJSON(WHISPERS_KEY) || 'null')
+    const parsed = JSON.parse(readItem(WHISPERS_KEY) || 'null')
     return Array.isArray(parsed) ? parsed.filter((v) => typeof v === 'string') : []
   } catch {
     return []
@@ -135,7 +135,7 @@ export const readWhispers = () => {
 // Unlocked verse ids (array of strings) — "Biên niên trăng" collection.
 export const readVerses = () => {
   try {
-    const parsed = JSON.parse(readJSON(VERSES_KEY) || 'null')
+    const parsed = JSON.parse(readItem(VERSES_KEY) || 'null')
     return Array.isArray(parsed) ? parsed.filter((v) => typeof v === 'string') : []
   } catch {
     return []
@@ -145,7 +145,7 @@ export const readVerses = () => {
 // entries { kind, id, text?, lines? } waiting for the next prologue.
 export const readPendingUnlocks = () => {
   try {
-    const parsed = JSON.parse(readJSON(PENDING_UNLOCKS_KEY) || 'null')
+    const parsed = JSON.parse(readItem(PENDING_UNLOCKS_KEY) || 'null')
     if (!Array.isArray(parsed)) return []
     return parsed.filter(
       (p) => p && (p.kind === 'whisper' || p.kind === 'verse') && typeof p.id === 'string',
@@ -156,14 +156,14 @@ export const readPendingUnlocks = () => {
 }
 // The event rolled for the upcoming night ('none' = quiet night).
 export const readTonight = () => {
-  const v = readJSON(TONIGHT_KEY)
+  const v = readItem(TONIGHT_KEY)
   return v === 'none' || EVENT_IDS.includes(v) ? v : null
 }
 // P4 "The Garden Remembers" readers.
 export const readMoonlight = () => {
   const fresh = { balance: 0, earned: 0 }
   try {
-    const parsed = JSON.parse(readJSON(MOONLIGHT_KEY) || 'null')
+    const parsed = JSON.parse(readItem(MOONLIGHT_KEY) || 'null')
     for (const k of Object.keys(fresh)) {
       const v = parseInt(parsed?.[k], 10)
       if (Number.isFinite(v) && v > 0) fresh[k] = v
@@ -174,7 +174,7 @@ export const readMoonlight = () => {
 export const readGarden = () => {
   const fresh = { lantern: 0, lotus: 0, inks: ['jade'], ink: 'jade' }
   try {
-    const parsed = JSON.parse(readJSON(GARDEN_KEY) || 'null')
+    const parsed = JSON.parse(readItem(GARDEN_KEY) || 'null')
     if (parsed && typeof parsed === 'object') {
       const lan = parseInt(parsed.lantern, 10)
       if (Number.isFinite(lan)) fresh.lantern = Math.max(0, Math.min(LANTERN_MAX_TIER, lan))
@@ -192,7 +192,7 @@ export const readGarden = () => {
 export const readJourney = () => {
   const fresh = { progress: 0, completed: 0 }
   try {
-    const parsed = JSON.parse(readJSON(JOURNEY_KEY) || 'null')
+    const parsed = JSON.parse(readItem(JOURNEY_KEY) || 'null')
     for (const k of Object.keys(fresh)) {
       const v = parseInt(parsed?.[k], 10)
       if (Number.isFinite(v) && v > 0) fresh[k] = v
@@ -202,7 +202,7 @@ export const readJourney = () => {
 }
 export const readKeepsakes = () => {
   try {
-    const parsed = JSON.parse(readJSON(KEEPSAKE_KEY) || 'null')
+    const parsed = JSON.parse(readItem(KEEPSAKE_KEY) || 'null')
     return Array.isArray(parsed) ? parsed.filter((k) => k && typeof k.id === 'string') : []
   } catch {
     return []
@@ -211,7 +211,7 @@ export const readKeepsakes = () => {
 export const readStreak = () => {
   const fresh = { count: 0, lastDay: null }
   try {
-    const parsed = JSON.parse(readJSON(STREAK_KEY) || 'null')
+    const parsed = JSON.parse(readItem(STREAK_KEY) || 'null')
     const c = parseInt(parsed?.count, 10)
     if (Number.isFinite(c) && c > 0) fresh.count = c
     if (typeof parsed?.lastDay === 'string') fresh.lastDay = parsed.lastDay
@@ -221,7 +221,7 @@ export const readStreak = () => {
 // P5 "Shared Skies": the name the gardener signs shared cards with.
 export const readName = () => {
   try {
-    const v = readJSON(NAME_KEY)
+    const v = readItem(NAME_KEY)
     return typeof v === 'string' ? v.trim().slice(0, 24) : ''
   } catch {
     return ''
@@ -231,7 +231,7 @@ export const readName = () => {
 export const readSeen = () => {
   const fresh = { modes: [], phases: [] }
   try {
-    const parsed = JSON.parse(readJSON(SEEN_KEY) || 'null')
+    const parsed = JSON.parse(readItem(SEEN_KEY) || 'null')
     if (Array.isArray(parsed?.modes)) fresh.modes = parsed.modes.filter((v) => MODE_IDS.includes(v))
     if (Array.isArray(parsed?.phases)) fresh.phases = parsed.phases.filter((v) => MOON_IDS.includes(v))
   } catch {
@@ -250,14 +250,14 @@ function completeRun(get, set, cause) {
   const score = get().score
   // P6: the first night's coach marks end with the run, finished or not.
   if (get().coachStep >= 0) {
-    writeJSON(ONBOARDED_KEY, '1')
+    writeItem(ONBOARDED_KEY, '1')
     set({ coachStep: -1 })
   }
   const bests = { ...get().bests }
   const prevBest = bests[mode] || 0
   const newBest = Math.max(prevBest, score)
   bests[mode] = newBest
-  writeJSON(BESTS_KEY, JSON.stringify(bests))
+  writeItem(BESTS_KEY, JSON.stringify(bests))
 
   // P4 "The Garden Remembers": every night earns moonlight, feeds the
   // Journey to the Moon, and a completed Moonrise Night leaves a keepsake.
@@ -274,7 +274,7 @@ function completeRun(get, set, cause) {
     balance: (get().moonlight?.balance || 0) + ml,
     earned: (get().moonlight?.earned || 0) + ml,
   }
-  writeJSON(MOONLIGHT_KEY, JSON.stringify(moonlight))
+  writeItem(MOONLIGHT_KEY, JSON.stringify(moonlight))
   let journey = {
     progress: (get().journey?.progress || 0) + ml,
     completed: get().journey?.completed || 0,
@@ -286,11 +286,11 @@ function completeRun(get, set, cause) {
       ...keepsakes,
       { id: `keepsake-${get().night}-${Date.now()}`, night: get().night, date: toDayString() },
     ]
-    writeJSON(KEEPSAKE_KEY, JSON.stringify(keepsakes))
+    writeItem(KEEPSAKE_KEY, JSON.stringify(keepsakes))
     journey = { progress: 0, completed: journey.completed + 1 }
     moonriseCoda = { moonlight: ml, keepsake: keepsakes[keepsakes.length - 1] }
   }
-  writeJSON(JOURNEY_KEY, JSON.stringify(journey))
+  writeItem(JOURNEY_KEY, JSON.stringify(journey))
 
   // P5 "Shared Skies" — Tonight's Highlights: the run's most beautiful
   // moments, finalized here. Candidates were noted during play; keep the top
@@ -492,10 +492,10 @@ export const useGame = create((set, get) => ({
     // extend it. A broken streak simply stops the bonus; never a punishment.
     const advancedStreak = nextStreak(prev.streak, toDayString())
     const streak = advancedStreak || prev.streak
-    if (advancedStreak) writeJSON(STREAK_KEY, JSON.stringify(advancedStreak))
-    writeJSON(NIGHT_KEY, String(night))
-    writeJSON(SEEN_KEY, JSON.stringify({ modes: seenModes, phases: seenPhases }))
-    writeJSON(TONIGHT_KEY, tonightEvent)
+    if (advancedStreak) writeItem(STREAK_KEY, JSON.stringify(advancedStreak))
+    writeItem(NIGHT_KEY, String(night))
+    writeItem(SEEN_KEY, JSON.stringify({ modes: seenModes, phases: seenPhases }))
+    writeItem(TONIGHT_KEY, tonightEvent)
     set({
       status: 'prologue',
       score: 0,
@@ -598,7 +598,7 @@ export const useGame = create((set, get) => ({
     else set({ coachStep: step + 1 })
   },
   dismissCoach() {
-    writeJSON(ONBOARDED_KEY, '1')
+    writeItem(ONBOARDED_KEY, '1')
     set({ coachStep: -1 })
   },
 
@@ -631,7 +631,7 @@ export const useGame = create((set, get) => ({
 
   commitGardenerName() {
     const clean = (get().gardenerName || '').trim().slice(0, 24)
-    writeJSON(NAME_KEY, clean)
+    writeItem(NAME_KEY, clean)
     set({ gardenerName: clean })
   },
 
@@ -650,13 +650,13 @@ export const useGame = create((set, get) => ({
     const moonlight = get().moonlight
     if (moonlight.balance < cost) return null
     const next = { balance: moonlight.balance - cost, earned: moonlight.earned }
-    writeJSON(MOONLIGHT_KEY, JSON.stringify(next))
+    writeItem(MOONLIGHT_KEY, JSON.stringify(next))
     set({ moonlight: next })
     return next
   },
 
   _saveGarden(garden) {
-    writeJSON(GARDEN_KEY, JSON.stringify(garden))
+    writeItem(GARDEN_KEY, JSON.stringify(garden))
     set({ garden })
   },
 
@@ -729,24 +729,24 @@ export const useGame = create((set, get) => ({
     const modes = ['aligned', 'topdown', 'cinematic']
     const nextIdx = (modes.indexOf(get().cameraMode) + 1) % modes.length
     const nextMode = modes[nextIdx]
-    writeJSON(CAM_KEY, nextMode)
+    writeItem(CAM_KEY, nextMode)
     set({ cameraMode: nextMode })
   },
 
   setCameraMode(mode) {
-    writeJSON(CAM_KEY, mode)
+    writeItem(CAM_KEY, mode)
     set({ cameraMode: mode })
   },
 
   setMoonPhase(moonPhase) {
     if (!MOON_IDS.includes(moonPhase)) return
-    writeJSON(MOON_KEY, moonPhase)
+    writeItem(MOON_KEY, moonPhase)
     set({ moonPhase })
   },
 
   setGameMode(gameMode) {
     if (!MODE_IDS.includes(gameMode)) return
-    writeJSON(MODE_KEY, gameMode)
+    writeItem(MODE_KEY, gameMode)
     set({ gameMode, best: get().bests[gameMode] || 0 })
   },
 
@@ -760,7 +760,7 @@ export const useGame = create((set, get) => ({
 
   toggleControls() {
     const next = !get().showControls
-    writeJSON(CTRLS_KEY, next ? '1' : '0')
+    writeItem(CTRLS_KEY, next ? '1' : '0')
     set({ showControls: next })
   },
 
@@ -791,7 +791,7 @@ export const useGame = create((set, get) => ({
       totals.deaths += 1
     }
     if (cause === 'time') totals.lanternFeasts += 1
-    writeJSON(TOTALS_KEY, JSON.stringify(totals))
+    writeItem(TOTALS_KEY, JSON.stringify(totals))
     set({ totals })
     set({ score: result.score, length: result.length })
     // P5 "Shared Skies" — a lantern feast deserves a highlight of its own.
@@ -813,7 +813,7 @@ export const useGame = create((set, get) => ({
     if (st.gameMode !== 'zen') return
     if (st.status !== 'playing' && st.status !== 'paused') return
     const totals = { ...get().totals, zenSessions: get().totals.zenSessions + 1 }
-    writeJSON(TOTALS_KEY, JSON.stringify(totals))
+    writeItem(TOTALS_KEY, JSON.stringify(totals))
     set({ totals })
     completeRun(get, set, 'zen')
     get().checkWhispers('zenEnd')
@@ -851,7 +851,7 @@ export const useGame = create((set, get) => ({
       unlocked = [...unlocked, ...fresh.map((w) => w.id)]
     }
     if (freshAll.length === 0) return
-    writeJSON(WHISPERS_KEY, JSON.stringify(unlocked))
+    writeItem(WHISPERS_KEY, JSON.stringify(unlocked))
     // Routing by status (T10b): night-start unlocks ride the toast ferry
     // into the prologue queue, where they are read one at a time before
     // the run begins. Title-screen unlocks wait in pendingUnlocks
@@ -871,7 +871,7 @@ export const useGame = create((set, get) => ({
       for (const item of items) {
         if (!pending.some((p) => p.id === item.id)) pending.push(item)
       }
-      writeJSON(PENDING_UNLOCKS_KEY, JSON.stringify(pending))
+      writeItem(PENDING_UNLOCKS_KEY, JSON.stringify(pending))
       set({ unlockedWhispers: unlocked, pendingUnlocks: pending })
     } else {
       set((prev) => ({
@@ -894,7 +894,7 @@ export const useGame = create((set, get) => ({
       nightStats.planets += 1
     }
     if (get().isBoosting) nightStats.boostEats = (nightStats.boostEats || 0) + 1
-    writeJSON(TOTALS_KEY, JSON.stringify(totals))
+    writeItem(TOTALS_KEY, JSON.stringify(totals))
     set({ totals, nightStats })
     // P5 "Shared Skies" — note the night's beautiful moments for the reel.
     if (bloom && nightStats.supernovas === 1) {
@@ -947,7 +947,7 @@ export const useGame = create((set, get) => ({
       unlocked = [...unlocked, ...fresh.map((v) => v.id)]
     }
     if (freshAll.length === 0) return
-    writeJSON(VERSES_KEY, JSON.stringify(unlocked))
+    writeItem(VERSES_KEY, JSON.stringify(unlocked))
     // P6: a soft moon-chime marks the moment a verse joins the chronicle.
     // Audio feedback stays — it never covers the garden.
     playVerse()
@@ -967,7 +967,7 @@ export const useGame = create((set, get) => ({
       for (const item of items) {
         if (!pending.some((p) => p.id === item.id)) pending.push(item)
       }
-      writeJSON(PENDING_UNLOCKS_KEY, JSON.stringify(pending))
+      writeItem(PENDING_UNLOCKS_KEY, JSON.stringify(pending))
       set({ unlockedVerses: unlocked, pendingUnlocks: pending })
     } else {
       set((prev) => ({
@@ -980,7 +980,7 @@ export const useGame = create((set, get) => ({
   // Called by the engine when the snake catches the Jade Carp spirit.
   registerSpiritCatch() {
     const totals = { ...get().totals, spiritCatches: get().totals.spiritCatches + 1 }
-    writeJSON(TOTALS_KEY, JSON.stringify(totals))
+    writeItem(TOTALS_KEY, JSON.stringify(totals))
     set({ totals })
     get().noteHighlight('spirit', 'The Jade Carp chose to be caught.', 3)
     get().checkVerses('spirit')
@@ -999,6 +999,6 @@ export const useGame = create((set, get) => ({
 
   setMuted(m) {
     set({ muted: m })
-    writeJSON(MUTE_KEY, m ? '1' : '0')
+    writeItem(MUTE_KEY, m ? '1' : '0')
   },
 }))
