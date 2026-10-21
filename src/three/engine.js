@@ -174,7 +174,11 @@ export function createEngine(canvas, { reduced } = {}) {
 
   // ---- water reflection environment ------------------------------------
   const pmrem = new THREE.PMREMGenerator(renderer)
-  const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
+  // Kept around so destroy() can dispose the temporary room scene
+  // (Codex P2 on PR #25: fromScene's input scene is not part of the
+  // main traversal, so its geometries/materials would leak otherwise).
+  const roomEnv = new RoomEnvironment()
+  const envTex = pmrem.fromScene(roomEnv, 0.04).texture
 
   const garden = buildGarden(scene, { envTex, reduced })
   const rig = createSnakeRig(scene)
@@ -911,6 +915,7 @@ export function createEngine(canvas, { reduced } = {}) {
     // Every geometry/material/texture the garden, rig, decor and
     // spirit added to the scene, each disposed exactly once.
     disposeObject3D(scene)
+    roomEnv.dispose()
     envTex.dispose()
     pmrem.dispose()
     renderer.dispose()

@@ -19,6 +19,7 @@ const h = vi.hoisted(() => ({
   bloomPasses: [],
   renderPasses: [],
   outputPasses: [],
+  roomEnvs: [],
   roCallbacks: [],
   raf: new Map(),
   nextRafId: 1,
@@ -96,7 +97,14 @@ vi.mock('three/addons/postprocessing/OutputPass.js', () => ({
     }
   },
 }))
-vi.mock('three/addons/environments/RoomEnvironment.js', () => ({ RoomEnvironment: class {} }))
+vi.mock('three/addons/environments/RoomEnvironment.js', () => ({
+  RoomEnvironment: class {
+    constructor() {
+      this.dispose = vi.fn()
+      h.roomEnvs.push(this)
+    }
+  },
+}))
 
 vi.mock('./garden.js', () => ({
   buildGarden: (scene) => {
@@ -176,6 +184,7 @@ beforeEach(() => {
   h.bloomPasses = []
   h.renderPasses = []
   h.outputPasses = []
+  h.roomEnvs = []
   h.roCallbacks = []
   h.raf = new Map()
   h.scene = null
@@ -272,6 +281,16 @@ describe('createEngine lifecycle', () => {
 
     expect(shadowDispose).toHaveBeenCalledTimes(1)
     expect(mapDispose).toHaveBeenCalledTimes(1)
+  })
+
+  it('destroy() disposes the temporary RoomEnvironment (Codex P2 on PR #25)', () => {
+    const engine = createEngine(freshCanvas(), { reduced: false })
+    engine.start()
+    expect(h.roomEnvs).toHaveLength(1)
+
+    engine.destroy()
+
+    expect(h.roomEnvs[0].dispose).toHaveBeenCalledTimes(1)
   })
 
   it('destroy() disposes every composer pass exactly once (T08 review)', () => {
