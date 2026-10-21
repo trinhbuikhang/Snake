@@ -99,7 +99,7 @@ Prototype đầy đủ đã chạy được (xem `docs/plan/skins/reference/`). 
 
 ## P02 — Không khựng do biên dịch shader
 
-- [ ] **P02** · Mức: **Cao** · Branch: `perf/p02-shader-precompile`
+- [x] **P02** · Mức: **Cao** · Branch: `perf/p02-shader-precompile`
 
 **Vấn đề**
 - `src/three/garden.js` L917–919: `foodLight` (PointLight) nằm trong `planetsHolder` → `foodGroup` (L707, L724–726). `hideFood()` (L980–982) và màn title ẩn `foodGroup` → Three.js chỉ đếm đèn **đang hiện** → số point light đổi 1 ↔ 2 → **mọi vật liệu lit phải biên dịch lại** (`NUM_POINT_LIGHTS` là define của shader).

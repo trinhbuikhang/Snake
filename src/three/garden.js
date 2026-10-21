@@ -182,6 +182,30 @@ class ParticleField {
 
 // ---------- the garden ----------
 
+// ---- food light intensity (P02) -------------------------------------------
+// Base intensity of the food point light per planet, before the
+// moon-phase glow multiplier. Pure and exported for tests. The light's
+// intensity is the ONLY thing setFood / hideFood / setFoodGlow change
+// now: the light itself stays in the visible scene graph for the whole
+// session, so the point-light count three.js bakes into every lit
+// shader (NUM_POINT_LIGHTS) never changes — hiding the light's parent
+// used to drop the count and recompile every lit material whenever
+// food appeared or hid.
+const FOOD_LIGHT_BASE = {
+  sun: 4.5,
+  earth: 3.2,
+  mars: 3.0,
+  saturn: 3.2,
+  jupiter: 3.2,
+  neptune: 3.2,
+}
+
+export function foodLightIntensity(activeKey, glowMult = 1, visible = true) {
+  if (!visible) return 0
+  const base = FOOD_LIGHT_BASE[activeKey] ?? FOOD_LIGHT_BASE.earth
+  return base * (glowMult > 0 ? glowMult : 1)
+}
+
 export function buildGarden(scene, { envTex, reduced }) {
   const time = { t: 0, cam: new THREE.Vector3() }
 
@@ -913,13 +937,18 @@ export function buildGarden(scene, { envTex, reduced }) {
   planetsHolder.add(sunGroup)
   planets.sun = { group: sunGroup, mesh: sunMesh, ring1: plasmaRing1, ring2: plasmaRing2, speed: 2.0 }
 
-  // Point Light for active planet
+  // Point Light for active planet. P02: this light is never hidden —
+  // only its intensity changes (0 while food is hidden). Three.js
+  // counts visible lights into every lit shader's NUM_POINT_LIGHTS,
+  // so hiding an ancestor (hideFood used to hide foodGroup) recompiled
+  // every lit material whenever food appeared or hid.
   const foodLight = new THREE.PointLight(0x48cae4, 3.2, 9, 2)
   foodLight.position.set(0, 0.65, 0)
   planetsHolder.add(foodLight)
 
   let activePlanetKey = 'earth'
   let foodGlowMult = 1 // moon-phase multiplier for the food beacon light
+  let foodVisible = false // food visuals shown? (the light stays in the graph either way)
 
   // Particle systems
   const burst = new ParticleField(scene, { capacity: 450, size: 0.24, additive: true })
@@ -931,12 +960,13 @@ export function buildGarden(scene, { envTex, reduced }) {
     moonGroup,
 
     setFood(x, z, bloom, planetType = 'earth') {
-      foodGroup.visible = true
+      foodVisible = true
       foodGroup.position.set(x, 0.02, z)
 
       const activeKey = bloom ? 'sun' : (planetType || 'earth')
       activePlanetKey = activeKey
 
+      beaconMesh.visible = true
       for (const [key, planetObj] of Object.entries(planets)) {
         planetObj.group.visible = key === activeKey
       }
@@ -944,41 +974,59 @@ export function buildGarden(scene, { envTex, reduced }) {
       // Adapt light color & beacon to active planet
       if (activeKey === 'sun') {
         foodLight.color.set(0xff9800)
-        foodLight.intensity = 4.5
         beaconMat.color.set(0xff9800)
       } else if (activeKey === 'earth') {
         foodLight.color.set(0x00b4d8)
-        foodLight.intensity = 3.2
         beaconMat.color.set(0x00b4d8)
       } else if (activeKey === 'mars') {
         foodLight.color.set(0xff5722)
-        foodLight.intensity = 3.0
         beaconMat.color.set(0xff5722)
       } else if (activeKey === 'saturn') {
         foodLight.color.set(0xffca28)
-        foodLight.intensity = 3.2
         beaconMat.color.set(0xffca28)
       } else if (activeKey === 'jupiter') {
         foodLight.color.set(0xffa726)
-        foodLight.intensity = 3.2
         beaconMat.color.set(0xffa726)
       } else if (activeKey === 'neptune') {
         foodLight.color.set(0x29b6f6)
-        foodLight.intensity = 3.2
         beaconMat.color.set(0x29b6f6)
       }
-      foodLight.intensity *= foodGlowMult // new moon: food shines brighter in the dark
+      // New moon: food shines brighter in the dark (the glow multiplier).
+      foodLight.intensity = foodLightIntensity(activeKey, foodGlowMult, true)
     },
 
     // Moon-phase control: how strongly the food beacon glows (1 = normal)
     setFoodGlow(mult) {
-      const next = mult > 0 ? mult : 1
-      if (foodGroup.visible) foodLight.intensity = (foodLight.intensity / foodGlowMult) * next
-      foodGlowMult = next
+      foodGlowMult = mult > 0 ? mult : 1
+      foodLight.intensity = foodLightIntensity(activePlanetKey, foodGlowMult, foodVisible)
     },
 
     hideFood() {
-      foodGroup.visible = false
+      foodVisible = false
+      // P02: hide the visuals, never the group — foodLight lives under
+      // foodGroup, and three.js counts only visible lights. Hiding the
+      // group would drop the point-light count and force every lit
+      // material to recompile when food reappears; the light is turned
+      // off by intensity instead (see foodLightIntensity).
+      beaconMesh.visible = false
+      for (const planetObj of Object.values(planets)) planetObj.group.visible = false
+      foodLight.intensity = foodLightIntensity(activePlanetKey, foodGlowMult, false)
+    },
+
+    // P02: the engine calls this once at load so compileAsync() can
+    // build every planet's shader programs before the first food of a
+    // run appears: temporarily show every planet group + the beacon
+    // (compile only traverses visible objects), then restore exactly
+    // what was visible before. Returns the restore function.
+    prepareFoodForCompile() {
+      const saved = Object.values(planets).map((p) => [p.group, p.group.visible])
+      const beaconWas = beaconMesh.visible
+      for (const [group] of saved) group.visible = true
+      beaconMesh.visible = true
+      return () => {
+        for (const [group, was] of saved) group.visible = was
+        beaconMesh.visible = beaconWas
+      }
     },
 
     addRipple(x, z, maxScale = 2.4, color = 0x6eedc4) {

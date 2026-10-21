@@ -33,6 +33,8 @@ const h = vi.hoisted(() => ({
   garden: null,
   rig: null,
   decor: null,
+  noCompileAsync: false,
+  foodRestore: null,
 }))
 
 vi.mock('three', async () => {
@@ -40,11 +42,22 @@ vi.mock('three', async () => {
   class FakeRenderer {
     constructor() {
       this.shadowMap = {}
+      this.debug = {}
       this.disposeCalls = 0
+      this.compileCalls = []
+      this.compileAsyncCalls = []
+      if (h.noCompileAsync) this.compileAsync = undefined
       h.renderers.push(this)
     }
     setPixelRatio() {}
     setSize() {}
+    compile(scene, camera) {
+      this.compileCalls.push([scene, camera])
+    }
+    compileAsync(scene, camera) {
+      this.compileAsyncCalls.push([scene, camera])
+      return Promise.resolve(scene)
+    }
     dispose() {
       this.disposeCalls += 1
     }
@@ -218,11 +231,14 @@ beforeEach(() => {
   h.roCallbacks = []
   h.raf = new Map()
   h.scene = null
+  h.noCompileAsync = false
+  h.foodRestore = vi.fn()
   h.garden = {
     moonGroup: { scale: { setScalar: vi.fn() } },
     setFoodGlow: vi.fn(),
     setFood: vi.fn(),
     hideFood: vi.fn(),
+    prepareFoodForCompile: vi.fn(() => h.foodRestore),
     burstAt: vi.fn(),
     petalFall: vi.fn(),
     addRipple: vi.fn(),
@@ -360,6 +376,45 @@ describe('createEngine lifecycle', () => {
     runFrames(1000)
     expect(useGame.getState().status).toBe('playing')
     engine.destroy()
+  })
+
+  it('precompiles shaders once at init with all food shown, then restores visibility (P02)', async () => {
+    const engine = createEngine(freshCanvas(), { reduced: false })
+    const renderer = h.renderers[0]
+    expect(h.garden.prepareFoodForCompile).toHaveBeenCalledTimes(1)
+    expect(renderer.compileAsyncCalls).toHaveLength(1)
+    expect(renderer.compileAsyncCalls[0][0]).toBe(h.scene)
+    expect(renderer.compileAsyncCalls[0][1]).toBeInstanceOf(THREE.PerspectiveCamera)
+    expect(renderer.compileCalls).toHaveLength(0)
+    // The restore runs when the async compile settles.
+    await new Promise((r) => setTimeout(r, 0))
+    expect(h.foodRestore).toHaveBeenCalledTimes(1)
+    engine.destroy()
+  })
+
+  it('falls back to compile() when compileAsync is unavailable (P02)', async () => {
+    h.noCompileAsync = true
+    const engine = createEngine(freshCanvas(), { reduced: false })
+    const renderer = h.renderers[0]
+    expect(renderer.compileAsyncCalls).toHaveLength(0)
+    expect(renderer.compileCalls).toHaveLength(1)
+    await new Promise((r) => setTimeout(r, 0))
+    expect(h.foodRestore).toHaveBeenCalledTimes(1)
+    engine.destroy()
+  })
+
+  it('enables renderer shader-error checks only in dev (P02)', () => {
+    const dev = createEngine(freshCanvas(), { reduced: false })
+    expect(h.renderers[0].debug.checkShaderErrors).toBe(true) // vitest runs with DEV=true
+    dev.destroy()
+    vi.stubEnv('DEV', false)
+    try {
+      const prod = createEngine(freshCanvas(), { reduced: false })
+      expect(h.renderers[1].debug.checkShaderErrors).toBe(false)
+      prod.destroy()
+    } finally {
+      vi.unstubAllEnvs()
+    }
   })
 
   it('destroy() silences the audio and unsubscribes every store subscription', () => {

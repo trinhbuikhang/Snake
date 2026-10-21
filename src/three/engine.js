@@ -63,6 +63,10 @@ export function createEngine(canvas, { reduced } = {}) {
   renderer.toneMappingExposure = 1.15
   renderer.shadowMap.enabled = true
   renderer.shadowMap.type = THREE.PCFSoftShadowMap
+  // P02: shader-error checks are a dev aid. In production, every
+  // program link would otherwise pay synchronous getProgramParameter /
+  // getShaderInfoLog calls, which also block parallel compilation.
+  renderer.debug.checkShaderErrors = import.meta.env.DEV
 
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0x07110e)
@@ -216,6 +220,28 @@ export function createEngine(canvas, { reduced } = {}) {
     composer.addPass(bloomPass)
     composer.addPass(new OutputPass())
   }
+
+  // ---- shader precompilation (P02) ---------------------------------------
+  // The first appearance of each planet (and the supernova) used to
+  // stall a frame on shader compilation — worst on the first food of
+  // a run. Compile everything gameplay needs up front instead: the
+  // garden temporarily shows every planet group, compileAsync builds
+  // their programs (in parallel where the driver supports it), then
+  // the garden restores visibility. Fire-and-forget: first paint is
+  // not blocked, and if a run starts before this settles, any program
+  // still missing simply compiles lazily on first use, as before.
+  async function precompileShaders() {
+    const restoreFood = garden.prepareFoodForCompile()
+    try {
+      if (typeof renderer.compileAsync === 'function') await renderer.compileAsync(scene, camera)
+      else renderer.compile(scene, camera)
+    } catch {
+      // Optimization only — a failed precompile must never break boot.
+    } finally {
+      restoreFood()
+    }
+  }
+  precompileShaders()
 
   // ---- game state ---------------------------------------------------------
   let logic = createGame()
