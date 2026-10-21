@@ -304,7 +304,6 @@ body {
   border: 1px solid var(--hairline);
   color: var(--cream);
   cursor: pointer;
-  backdrop-filter: blur(10px);
   transition: all 0.16s ease;
 }
 
@@ -360,7 +359,6 @@ body {
   background: var(--panel);
   border: 1px solid var(--hairline);
   border-radius: var(--radius-md);
-  backdrop-filter: blur(12px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
@@ -451,7 +449,6 @@ body {
   border-radius: var(--radius-md);
   font-size: 0.84rem;
   color: rgba(244, 240, 230, 0.85);
-  backdrop-filter: blur(10px);
 }
 
 kbd {
@@ -532,7 +529,6 @@ kbd {
   place-items: center;
   cursor: pointer;
   touch-action: none;
-  backdrop-filter: blur(8px);
   transition: transform 0.08s ease, background 0.12s ease, border-color 0.12s ease;
 }
 
@@ -578,7 +574,7 @@ kbd {
   background: var(--panel-solid);
   border: 1px solid var(--hairline-strong);
   border-radius: var(--radius-xl);
-  backdrop-filter: blur(16px);
+  backdrop-filter: blur(8px);
   box-shadow: var(--shadow-soft), 0 0 40px rgba(78, 237, 184, 0.12);
   text-align: center;
   animation: card-in 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
@@ -958,8 +954,6 @@ kbd {
   box-shadow: var(--shadow-soft);
   padding: 12px 18px 10px;
   cursor: pointer;
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
   animation: coachIn 0.45s ease;
 }
 
@@ -1033,7 +1027,6 @@ kbd {
   border: 1px solid rgba(244, 233, 200, 0.28);
   border-radius: 999px;
   background: rgba(8, 12, 20, 0.72);
-  backdrop-filter: blur(6px);
   font-size: 0.75rem;
   letter-spacing: 0.08em;
   color: #f4e9c8;

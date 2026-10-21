@@ -180,7 +180,7 @@ Prototype đầy đủ đã chạy được (xem `docs/plan/skins/reference/`). 
 
 ## P05 — `backdrop-filter` trên HUD khi chơi
 
-- [ ] **P05** · Mức: **Trung bình** · Branch: `perf/p05-hud-blur`
+- [x] **P05** · Mức: **Trung bình** · Branch: `perf/p05-hud-blur`
 
 **Vấn đề**
 - `src/styles.css` dùng `backdrop-filter: blur(...)` ở: L122 `.sheet`, L307 `.icon-btn`, L363 `.chip`, L454 `.legend`, L535 `.dbtn`, L581 `.sheet-card`, L961–962 `.coach-card`, L1036 `.journal-ping`, L1343 `.prologue-card`.
