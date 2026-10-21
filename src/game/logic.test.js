@@ -50,8 +50,14 @@ describe('turn()', () => {
     expect(turn(g, 'up')).toBe(true)
     expect(turn(g, 'down')).toBe(false) // opposite of the queued 'up'
     expect(turn(g, 'left')).toBe(true)
-    expect(turn(g, 'down')).toBe(true) // perpendicular to 'left'
-    expect(g.queue).toEqual(['up', 'left', 'down'])
+    // The queue is now full (depth 2): a third turn is validated as a
+    // replacement against queue[0] — 'down' is opposite 'up', rejected.
+    expect(turn(g, 'down')).toBe(false)
+    expect(g.queue).toEqual(['up', 'left'])
+  })
+
+  it('queue depth is pinned at 2 (T10a)', () => {
+    expect(MAX_QUEUE).toBe(2)
   })
 
   it('never holds more than MAX_QUEUE turns', () => {
@@ -65,18 +71,38 @@ describe('turn()', () => {
     expect(g.queue.length).toBe(MAX_QUEUE)
   })
 
-  it('when full, replaces only the last turn, validated against the one before it', () => {
+  it('when full, replaces only the last turn, validated against queue[0]', () => {
     const g = freshGame()
     turn(g, 'up')
     turn(g, 'left')
-    turn(g, 'down')
-    expect(g.queue).toEqual(['up', 'left', 'down'])
-    // Full: the reference becomes 'left' (the turn before the last one).
-    expect(turn(g, 'right')).toBe(false) // opposite of 'left'
-    expect(turn(g, 'left')).toBe(false) // same as the reference
-    expect(turn(g, 'down')).toBe(false) // re-tap of the last queued turn
-    expect(turn(g, 'up')).toBe(true) // revises the latest intent
-    expect(g.queue).toEqual(['up', 'left', 'up'])
+    expect(g.queue).toEqual(['up', 'left'])
+    // Full (depth 2): the reference is queue[0], 'up'.
+    expect(turn(g, 'down')).toBe(false) // opposite of 'up'
+    expect(turn(g, 'up')).toBe(false) // same as queue[0]
+    expect(turn(g, 'left')).toBe(false) // re-tap of the last queued turn
+    expect(turn(g, 'right')).toBe(true) // revises the latest intent
+    expect(g.queue).toEqual(['up', 'right'])
+    expect(g.queue.length).toBeLessThanOrEqual(2)
+  })
+
+  it('a full-queue burst never queues adjacent opposites or self-bites (length 4)', () => {
+    const g = freshGame()
+    // Lengthen to 4 so a real reversal would bite the neck.
+    g.snake = [
+      { x: 10, y: 10 },
+      { x: 9, y: 10 },
+      { x: 8, y: 10 },
+      { x: 7, y: 10 },
+    ]
+    expect(turn(g, 'up')).toBe(true)
+    expect(turn(g, 'left')).toBe(true)
+    expect(turn(g, 'down')).toBe(false) // full: opposite of queue[0] 'up'
+    expect(g.queue).toEqual(['up', 'left'])
+    const r1 = step(g)
+    const r2 = step(g)
+    expect(r1.dead).toBe(false)
+    expect(r2.dead).toBe(false)
+    expect(r2.cause).not.toBe('self')
   })
 })
 

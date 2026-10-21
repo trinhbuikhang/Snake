@@ -157,15 +157,15 @@ export function createGame(moonId = 'half', modeId = 'classic', eventId = 'none'
 
 // Queue a turn with smart buffering:
 // - Ignores reverse turns (prevent suicide).
-// - Holds up to 3 queued turns; when full, a new valid turn replaces the
-//   last queued one instead of being silently dropped, so the snake always
-//   follows the player's latest steering intent. This matters at high speed:
-//   ticks can fly by in ~40ms, and without replacement a fast steering burst
-//   would lose inputs and the snake would feel unresponsive.
-// - The replacement is validated against the turn it would follow, so a
-//   suicide turn can never sneak in through the back door (step() re-checks
-//   too, as a second guard).
-export const MAX_QUEUE = 3
+// - Holds up to MAX_QUEUE (2) queued turns, applied on two consecutive
+//   ticks; when full, a new valid turn replaces the last queued one
+//   instead of being silently dropped, so the snake stays responsive at
+//   high speed without letting a third input lag three ticks behind
+//   the player's fingers (T10a: depth 3 → 2).
+// - The replacement is validated against the turn it would follow
+//   (queue[0] when full), so a suicide turn can never sneak in through
+//   the back door (step() re-checks too, as a second guard).
+export const MAX_QUEUE = 2
 export function turn(game, key) {
   const d = DIR[key]
   if (!d) return false

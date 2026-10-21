@@ -312,7 +312,7 @@ Commit bằng git thật (`git add` + `git commit`), không qua API dạng text.
 
 Mỗi mục con là **một PR riêng**, làm theo thứ tự a → f. Tham chiếu chi tiết: AUDIT mục "Thấp" (L1–L8) và "Vấn đề có từ trước".
 
-- [ ] **T10a** · Thấp (AUDIT L1) · Branch: `fix/10a-turn-queue`
+- [x] **T10a** · Thấp (AUDIT L1) · Branch: `fix/10a-turn-queue`
   - **Vấn đề:** `src/game/logic.js` L158–193 — hàng đợi sâu 3 làm lượt thứ 3 trễ 3 tick; comment nói quá ("always follows the player's latest steering intent").
   - ✅ **Đã chốt:** `MAX_QUEUE = 2`. Giữ nhánh "khi đầy thì thay lượt cuối" hiện có (hợp lệ hoá so với `queue[0]`, tức chỉ có thể thay lượt cuối bằng hướng ngược của nó).
   - **Hành vi mong muốn:** tối đa 2 lượt chờ; hai lượt được áp dụng ở **hai tick liên tiếp**; không bao giờ có lượt nào khiến rắn quay ngược vào thân.
