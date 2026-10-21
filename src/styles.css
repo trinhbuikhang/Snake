@@ -1676,8 +1676,14 @@ kbd {
 
 .garden__skins {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.6rem;
+}
+
+@media (max-width: 420px) {
+  .garden__skins {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .garden__skin {
@@ -1721,6 +1727,11 @@ kbd {
   border-radius: 50%;
 }
 
+.garden__skin,
+.garden__skin-text {
+  min-width: 0;
+}
+
 .garden__skin-text {
   flex: 1;
   display: flex;
@@ -1734,6 +1745,8 @@ kbd {
   font-size: 1.05rem;
   font-weight: 700;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .garden__skin-sub {
@@ -1741,18 +1754,26 @@ kbd {
   letter-spacing: 0.06em;
   color: rgba(234, 247, 239, 0.65);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
+/* Third line of the card text (worn / wear / lock state) — inside
+   the text column so the card never has to fit name + state side
+   by side; S06's price ("☾ 800") gets its room here too. */
 .garden__skin-state {
-  flex-shrink: 0;
+  margin-top: 0.15rem;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-size: 0.72rem;
   letter-spacing: 0.04em;
   color: rgba(234, 247, 239, 0.65);
 }
 
-/* Locked skin (not owned yet): clearly not tappable — dimmed art
-   and name, no hover lift, lock state stays fully legible. */
+/* Locked skin (not owned yet): clearly not tappable — dimmed art,
+   name and subtitle, no hover lift; the lock state line itself
+   stays fully legible. */
 .garden__skin.is-locked {
   cursor: not-allowed;
   border-color: rgba(78, 237, 184, 0.1);
@@ -1763,7 +1784,8 @@ kbd {
 }
 
 .garden__skin.is-locked .garden__skin-preview,
-.garden__skin.is-locked .garden__skin-text {
+.garden__skin.is-locked .garden__skin-name,
+.garden__skin.is-locked .garden__skin-sub {
   opacity: 0.45;
 }
 

@@ -354,8 +354,8 @@ export function GardenOverlay() {
                   <span className="garden__skin-text">
                     <span className="garden__skin-name">{skin.name}</span>
                     <span className="garden__skin-sub">{skin.nameVi}</span>
+                    <span className="garden__skin-state">{selected ? 'worn' : owned ? 'wear' : '🔒 Coming soon'}</span>
                   </span>
-                  <span className="garden__skin-state">{selected ? 'worn' : owned ? 'wear' : '🔒 Coming soon'}</span>
                 </button>
               )
             })}

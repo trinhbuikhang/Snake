@@ -289,6 +289,7 @@ beforeEach(() => {
     onEat: vi.fn(),
     advanceDeath: vi.fn(),
     startDeath: vi.fn(),
+    detach: vi.fn(),
     dispose: vi.fn(),
   }
   h.decor = { setLanternCount: vi.fn(), setBloomCount: vi.fn(), update: vi.fn() }
@@ -576,6 +577,7 @@ describe('skin swapping (S04)', () => {
     onEat: vi.fn(),
     advanceDeath: vi.fn(),
     startDeath: vi.fn(),
+    detach: vi.fn(),
     dispose: vi.fn(),
   })
 
@@ -637,6 +639,9 @@ describe('skin swapping (S04)', () => {
     useGame.setState({ skins: { owned: ['moonJade', 'plushMoon'], selected: 'plushMoon' } })
     expect(h.rigCalls).toEqual(['moonJade', 'plushMoon'])
     expect(plush.setInk).toHaveBeenCalled()
+    // The old rig leaves the scene immediately (no frozen twin)…
+    expect(h.rig.detach).toHaveBeenCalledTimes(1)
+    // …but its GPU dispose waits for the precompile to settle.
     expect(h.rig.dispose).not.toHaveBeenCalled()
 
     settle()

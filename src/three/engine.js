@@ -240,6 +240,10 @@ export function createEngine(canvas, { reduced } = {}) {
   // swap mid-game it has long settled and dispose is immediate.
   let precompilePending = null
   function disposeOldRig(old) {
+    // Out of the scene right away — no frozen twin snake standing
+    // in the garden while the dispose is deferred (S04 review,
+    // round 2). Only the GPU teardown waits for the settle.
+    old.detach?.()
     if (precompilePending) {
       const pending = precompilePending
       pending.then(
