@@ -25,6 +25,7 @@ import { inputBus } from '../game/inputBus.js'
 import { isTypingTarget } from '../game/keyboard.js'
 import audio from '../audio/sound.js'
 import { createGovernor, observeWarmupFrame, settleWarmup, nextQualityIdx, msaaRetargetNeeded } from './qualityGovernor.js'
+import { disposeObject3D } from './dispose.js'
 import { buildGarden } from './garden.js'
 import { createSnakeRig } from './snakeRig.js'
 import { buildDecor } from './decor.js'
@@ -173,7 +174,11 @@ export function createEngine(canvas, { reduced } = {}) {
 
   // ---- water reflection environment ------------------------------------
   const pmrem = new THREE.PMREMGenerator(renderer)
-  const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture
+  // Kept around so destroy() can dispose the temporary room scene
+  // (Codex P2 on PR #25: fromScene's input scene is not part of the
+  // main traversal, so its geometries/materials would leak otherwise).
+  const roomEnv = new RoomEnvironment()
+  const envTex = pmrem.fromScene(roomEnv, 0.04).texture
 
   const garden = buildGarden(scene, { envTex, reduced })
   const rig = createSnakeRig(scene)
@@ -190,7 +195,7 @@ export function createEngine(canvas, { reduced } = {}) {
     garden.moonGroup.scale.setScalar(st.moonriseActive ? 2.4 : 1)
   }
   applyGarden()
-  useGame.subscribe((s, prev) => {
+  const unsubGarden = useGame.subscribe((s, prev) => {
     if (s.garden !== prev.garden || s.moonriseActive !== prev.moonriseActive) applyGarden()
   })
 
@@ -884,7 +889,33 @@ export function createEngine(canvas, { reduced } = {}) {
     canvas.removeEventListener('touchcancel', onTouchEnd)
     unsubBus()
     unsubStore()
+    unsubGarden()
     ro.disconnect()
+    // Silence the garden (T08): without this the ambient scheduler's
+    // setInterval and the pad/water voices keep running after unmount,
+    // stacking a new layer of music on every remount.
+    audio.setAmbientOn(false)
+    audio.setPadOn(false)
+    audio.setWaterOn(false)
+    // Release the composer's GPU targets before the scene and renderer
+    // go (dispose is idempotent; the explicit target disposes cover
+    // three versions whose composer lacks its own dispose()).
+    if (composer) {
+      composer.renderTarget1?.dispose()
+      composer.renderTarget2?.dispose()
+      // Every pass, not just bloom: RenderPass and OutputPass hold
+      // their own materials and programs (T08 review).
+      composer.passes?.forEach((p) => p.dispose?.())
+      composer.dispose?.()
+    }
+    // The moon's 2048px shadow map is a WebGLRenderTarget that
+    // disposeObject3D cannot reach (it only gathers geometry,
+    // materials and textures) — release it explicitly (T08 review).
+    moon.dispose()
+    // Every geometry/material/texture the garden, rig, decor and
+    // spirit added to the scene, each disposed exactly once.
+    disposeObject3D(scene)
+    roomEnv.dispose()
     envTex.dispose()
     pmrem.dispose()
     renderer.dispose()
