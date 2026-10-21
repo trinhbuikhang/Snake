@@ -301,6 +301,30 @@ describe('voice toggles (AUDIT L5)', () => {
     expect(resumed).toBeLessThanOrEqual(4) // …not a burst of backed-up phrases
   })
 
+  it('water droplets stop while muted, then resume on unmute', () => {
+    // Pinned randomness: every droplet tick fires (0.5 < 0.75).
+    vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    const fake = boot(0)
+    setWaterOn(true)
+    setMuted(true)
+    // ~13s of droplet ticks (2.6s each), the audio clock tracking real
+    // time. Pre-fix, every tick built a droplet's oscillator even though
+    // the master bus was silent (Codex P2 on the T10d review: 5 new
+    // oscillators over ~14s).
+    for (let i = 0; i < 5; i++) {
+      vi.advanceTimersByTime(2600)
+      fake.currentTime += 2.6
+    }
+    // The water voice itself is one LFO oscillator; no droplets were built.
+    expect(fake.created.oscillators.length).toBe(1)
+    setMuted(false)
+    vi.advanceTimersByTime(2600)
+    fake.currentTime += 2.6
+    vi.advanceTimersByTime(2600)
+    fake.currentTime += 2.6
+    expect(fake.created.oscillators.length).toBe(3) // LFO + 2 droplets
+  })
+
   it('turning a voice off while muted still tears it down', () => {
     const fake = boot(0)
     setPadOn(true)

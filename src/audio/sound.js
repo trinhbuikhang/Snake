@@ -341,6 +341,7 @@ function startWater() {
   lfo.start()
   gain.gain.setTargetAtTime(0.05, c.currentTime, 1.2)
   const droplet = () => {
+    if (muted) return // T10d review: no droplet oscillators while muted
     if (!waterOn || !ctx || !master) return
     const t = c.currentTime + 0.02
     const o = c.createOscillator()
