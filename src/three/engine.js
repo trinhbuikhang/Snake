@@ -63,6 +63,10 @@ export function createEngine(canvas, { reduced } = {}) {
   renderer.toneMappingExposure = 1.15
   renderer.shadowMap.enabled = true
   renderer.shadowMap.type = THREE.PCFSoftShadowMap
+  // P02: shader-error checks are a dev aid. In production, every
+  // program link would otherwise pay synchronous getProgramParameter /
+  // getShaderInfoLog calls, which also block parallel compilation.
+  renderer.debug.checkShaderErrors = import.meta.env.DEV
 
   const scene = new THREE.Scene()
   scene.background = new THREE.Color(0x07110e)
@@ -215,6 +219,79 @@ export function createEngine(canvas, { reduced } = {}) {
     bloomPass = new UnrealBloomPass(new THREE.Vector2(1, 1), BLOOM_BASE, 0.68, 0.84)
     composer.addPass(bloomPass)
     composer.addPass(new OutputPass())
+  }
+
+  // ---- shader precompilation (P02) ---------------------------------------
+  // The first appearance of each planet (and the supernova) used to
+  // stall a frame on shader compilation — worst on the first food of
+  // a run. Compile everything gameplay needs up front instead: the
+  // garden temporarily shows every planet group, compileAsync builds
+  // their programs (in parallel where the driver supports it), then
+  // the garden restores visibility. Fire-and-forget: first paint is
+  // not blocked, and if a run starts before this settles, any program
+  // still missing simply compiles lazily on first use, as before.
+  async function precompileShaders() {
+    const restoreFood = garden.prepareFoodForCompile()
+    try {
+      // Gameplay renders through the composer into a render target
+      // (linear, no tone mapping). Compiling against the default
+      // framebuffer would build the sRGB/ACES variants instead, and
+      // the first food would compile the real ones mid-run (P02
+      // review, round 2). Compile against the composer's read buffer
+      // — the target the scene pass draws into. Program parameters
+      // are captured synchronously inside compile/compileAsync, so
+      // the previous target is restored in the finally BEFORE the
+      // async link is awaited. Reduced mode has no composer: the
+      // null target it plays with is already correct.
+      const prevTarget = composer ? renderer.getRenderTarget() : null
+      if (composer) renderer.setRenderTarget(composer.readBuffer)
+      let pending = null
+      try {
+        if (typeof renderer.compileAsync === 'function') pending = renderer.compileAsync(scene, camera)
+        else renderer.compile(scene, camera)
+      } finally {
+        if (composer) renderer.setRenderTarget(prevTarget)
+      }
+      await pending
+    } catch {
+      // Optimization only — a failed precompile must never break
+      // boot; any missing program compiles lazily on first use.
+    } finally {
+      restoreFood()
+    }
+  }
+  precompileShaders()
+
+  // P02 (round 2): compiling alone did not remove the first-food
+  // hitch — only a real draw does (first render is what uploads
+  // textures and warms the pipeline). One warm-up render with every
+  // planet temporarily shown, executed as a single synchronous block
+  // inside the frame loop just before that frame's normal render:
+  // composer mode draws into readBuffer, which the pass chain
+  // overwrites in the same frame, and reduced mode draws to the
+  // canvas and is painted over by the frame itself before anything
+  // is presented. No await in between, so the visibility race of
+  // round 1 cannot recur. Runs exactly once, on the loop's second
+  // frame — after first paint, never blocking it.
+  function warmupRender() {
+    const restoreFood = garden.prepareFoodForCompile()
+    try {
+      if (composer) {
+        const prevTarget = renderer.getRenderTarget()
+        renderer.setRenderTarget(composer.readBuffer)
+        try {
+          renderer.render(scene, camera)
+        } finally {
+          renderer.setRenderTarget(prevTarget)
+        }
+      } else {
+        renderer.render(scene, camera)
+      }
+    } catch {
+      // Warm-up is an optimization; a failure must not break the frame.
+    } finally {
+      restoreFood()
+    }
   }
 
   // ---- game state ---------------------------------------------------------
@@ -743,6 +820,7 @@ export function createEngine(canvas, { reduced } = {}) {
   let rafId = 0
   let prevTS = performance.now()
   let animT = 0
+  let framesRendered = 0 // drives the one-shot P02 warm-up render (frame 2)
   garden.camera = camera.position
 
   function frame(now) {
@@ -902,6 +980,12 @@ export function createEngine(canvas, { reduced } = {}) {
       pulse = Math.max(0, pulse - dt * 1.8)
       bloomPass.strength = BLOOM_BASE + pulse * 1.1 + (isBoosting ? 0.15 : 0)
     }
+
+    // P02 warm-up: one off-screen render with every planet shown, on
+    // the loop's second frame (after first paint), synchronously
+    // before this frame's own render — see warmupRender().
+    framesRendered += 1
+    if (framesRendered === 2) warmupRender()
 
     if (composer) composer.render()
     else renderer.render(scene, camera)
