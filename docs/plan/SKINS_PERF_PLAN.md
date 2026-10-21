@@ -220,7 +220,7 @@ Prototype đầy đủ đã chạy được (xem `docs/plan/skins/reference/`). 
 
 ## S01 — Rig ống liên tục (`serpentBase`) thay rắn ngọc trai
 
-- [ ] **S01** · Mức: **Cao** · Branch: `feat/s01-serpent-rig`
+- [x] **S01** · Mức: **Cao** · Branch: `feat/s01-serpent-rig`
 
 **Vấn đề**
 - `src/three/snakeRig.js` L86–99: mỗi đốt là một mesh riêng (`MAX_SEGMENTS` mesh + mesh "ridge" con), vật liệu `sharedMat.clone()` mỗi đốt → draw call tăng theo độ dài. Đo (`tooling/length-probe.mjs`): **130 draw call ở độ dài 3, 183 ở 20, 305 ở 60, 486 ở 120**.
