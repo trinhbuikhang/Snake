@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import * as THREE from 'three'
 import { createPlushMoonRig, MUZZLE, muzzleSculpt } from './plushMoon.js'
+import { createMoonJadeRig } from './moonJade.js'
 import { createSnakeRig } from '../snakeRig.js'
 
 // S03 acceptance (headless parts): the muzzle sculpt is a gaussian
@@ -57,6 +58,29 @@ describe('Plush Moon skin (S03)', () => {
     expect(headSpan / (0.44 * 2)).toBeGreaterThan(1.7) // vs body diameter
     rig.dispose()
     expect(scene.children.length).toBe(0)
+  })
+
+  // S03 review fix: the face parts are merged into one mesh per
+  // material, so the whole rig stays within Moon Jade + 2 meshes
+  // (the draw-call budget). Loose face parts were 15 meshes total.
+  it('merges the face into one mesh per material (mesh budget)', () => {
+    const countMeshes = (scene) => {
+      let n = 0
+      scene.traverse((o) => { if (o.isMesh) n += 1 })
+      return n
+    }
+    const plushScene = new THREE.Scene()
+    const plush = createPlushMoonRig(plushScene)
+    const jadeScene = new THREE.Scene()
+    const jade = createMoonJadeRig(jadeScene)
+    const plushCount = countMeshes(plushScene)
+    const jadeCount = countMeshes(jadeScene)
+    expect(plushCount).toBeLessThanOrEqual(jadeCount + 2)
+    // body tube + head + merged felt bumps + merged dark face parts
+    expect(plushCount).toBe(4)
+    plush.dispose()
+    jade.dispose()
+    expect(plushScene.children.length).toBe(0)
   })
 
   it('is reachable through the dispatcher by skin id', () => {

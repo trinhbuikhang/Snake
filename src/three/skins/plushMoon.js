@@ -9,6 +9,7 @@
 // read the single MUZZLE constant set below (the GLSL is generated
 // from it), so the cream region can never drift off the bump.
 import * as THREE from 'three'
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { createSerpent, patchSerpentMaterial } from './serpentBase.js'
 
 const GOLD = 0xe2bd68
@@ -93,7 +94,7 @@ float plushGold() {
   vec2 f2 = (fract(g2) - 0.5 - (vec2(sHash(c2 + 2.3), sHash(c2 + 5.9)) - 0.5) * 0.5) * vec2(1.0, 2.09);
   float dotS = (1.0 - smoothstep(0.1, 0.16, length(f2))) * step(0.72, sHash(c2));
   star = max(star, dotS);
-  // crescent every 4 cells, on alternating flanks
+  // crescent every 3 cells, on alternating flanks
   float k = floor((vBody.y + 1.2) / 3.0);
   float dd = mod(vBody.y + 1.2, 3.0) - 1.5;
   float side = mod(k, 2.0) < 1.0 ? 0.1 : 0.4;
@@ -161,6 +162,13 @@ float plushGold() {
       uniforms.uHeadCy.value = api.HEAD_CY
       uniforms.uHeadR.value.set(api.H.rx, api.H.ry, api.HL)
       uniforms.uHeadC.value.set(api.HEAD_CY, api.ZC)
+      // The face is built part by part and placed on the lathe as
+      // before, then MERGED into one mesh per material (S03 review:
+      // 13 loose face meshes cost +7 draw calls; the plan allows +2).
+      // Each part's head-space matrix is baked into a cloned geometry,
+      // so the merged meshes sit exactly where the parts were — and,
+      // as children of the head mesh, they follow every head motion.
+      const placed = []
       // eyelid bumps (felt) + closed sleepy lash line
       const bumpGeo = new THREE.SphereGeometry(1, 24, 16)
       const arc = new THREE.TorusGeometry(0.08, 0.011, 6, 22, Math.PI)
@@ -183,6 +191,7 @@ float plushGold() {
         }
         g.scale.setScalar(1.3)
         api.place(g, EYE.phi, s > 0 ? EYE.th : Math.PI - EYE.th, -0.026)
+        placed.push(g)
       }
       const p = new THREE.Vector3(), n = new THREE.Vector3()
       api.surf(api.zAt(1.0), -0.12, p, n)
@@ -192,11 +201,58 @@ float plushGold() {
       for (const th of [-0.42, Math.PI + 0.42]) {
         const g = new THREE.Group(); g.add(new THREE.Mesh(dot, lashMat))
         api.place(g, 1.38, th, -0.004)
+        placed.push(g)
       }
       const smile = new THREE.Mesh(new THREE.TorusGeometry(0.04, 0.008, 6, 16, Math.PI), new THREE.MeshBasicMaterial({ color: 0x6a5060 }))
       smile.rotation.z = Math.PI
       const sg = new THREE.Group(); sg.add(smile)
       api.place(sg, 1.33, -Math.PI / 2, -0.001)
+      placed.push(sg)
+
+      // ---- merge the placed parts, one mesh per material ----------
+      const headMesh = api.headMesh
+      headMesh.updateWorldMatrix(true, true)
+      const inv = new THREE.Matrix4().copy(headMesh.matrixWorld).invert()
+      const skinGeos = [] // eyelid bumps (skin material)
+      const lashGeos = [] // lash lines, lashes, nostrils, mouth (basic dark)
+      const srcGeos = new Set()
+      const srcMats = new Set()
+      for (const g of placed) {
+        g.traverse((o) => {
+          if (!o.isMesh) return
+          srcGeos.add(o.geometry)
+          const rel = new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld)
+          const geo = o.geometry.clone().applyMatrix4(rel)
+          if (o.material === material) {
+            skinGeos.push(geo)
+          } else {
+            // one merged basic material for all dark parts; each
+            // part's own tint survives as a vertex colour
+            srcMats.add(o.material)
+            const tint = new THREE.Color(o.material.color)
+            const count = geo.attributes.position.count
+            const colors = new Float32Array(count * 3)
+            for (let i = 0; i < count; i += 1) {
+              colors[i * 3] = tint.r
+              colors[i * 3 + 1] = tint.g
+              colors[i * 3 + 2] = tint.b
+            }
+            geo.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+            lashGeos.push(geo)
+          }
+        })
+      }
+      for (const g of placed) g.removeFromParent()
+      for (const geo of srcGeos) geo.dispose()
+      for (const m of srcMats) m.dispose()
+      if (skinGeos.length) {
+        headMesh.add(new THREE.Mesh(mergeGeometries(skinGeos), material))
+        skinGeos.forEach((g) => g.dispose())
+      }
+      if (lashGeos.length) {
+        headMesh.add(new THREE.Mesh(mergeGeometries(lashGeos), new THREE.MeshBasicMaterial({ vertexColors: true })))
+        lashGeos.forEach((g) => g.dispose())
+      }
     },
     applyInk(ink) {
       uniforms.uGoldC.value.set(GOLD)
