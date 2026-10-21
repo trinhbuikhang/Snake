@@ -6,6 +6,7 @@ import {
   nextQualityIdx,
   msaaRetargetNeeded,
   msaaFor,
+  snapRefresh,
   QUALITY_STEPS,
   DOWN_RATIO,
   UP_RATIO,
@@ -22,9 +23,9 @@ function warmedGovernor(fps) {
   return settleWarmup(s)
 }
 
-function feedWindows(state, avgFps, count) {
+function feedWindows(state, avgFps, count, spikeRatio = 0) {
   let s = state
-  for (let i = 0; i < count; i += 1) s = nextQualityIdx(s, avgFps)
+  for (let i = 0; i < count; i += 1) s = nextQualityIdx(s, avgFps, spikeRatio)
   return s
 }
 
@@ -127,11 +128,17 @@ describe('nextQualityIdx()', () => {
     expect(s.idx).toBe(MAX_IDX)
   })
 
-  it('judges relative to the ceiling, not an absolute number', () => {
-    // 40fps is "bad" on a 60Hz device but perfectly healthy on a 45Hz one.
+  it('judges relative to the snapped target, not an absolute number', () => {
+    // P04 changed this test's premise deliberately: there is no
+    // 45Hz standard refresh rate, so a 45fps warmup median now means
+    // a 60Hz panel whose GPU is struggling — the target snaps to 60
+    // and a steady 40fps IS bad. (Under T06 the target stayed 45 and
+    // 40fps counted as healthy; that is exactly the never-steps-down
+    // failure P04 exists to fix.)
     let s45 = warmedGovernor(45)
-    s45 = feedWindows(s45, 40, 10)
-    expect(s45.idx).toBe(0)
+    expect(s45.targetFps).toBe(60)
+    s45 = feedWindows(s45, 40, BAD_WINDOWS_TO_STEP_DOWN)
+    expect(s45.idx).toBe(1)
   })
 })
 
@@ -235,5 +242,77 @@ describe('QUALITY_STEPS ladder (P03)', () => {
     for (let i = 1; i < QUALITY_STEPS.length; i += 1) {
       expect(QUALITY_STEPS[i]).not.toEqual(QUALITY_STEPS[i - 1])
     }
+  })
+})
+
+describe('snapRefresh() (P04)', () => {
+  it('snaps a struggling median up to the panel rate', () => {
+    // The plan's examples: the median is the achieved rate, the
+    // target must be the display's.
+    expect(snapRefresh(35)).toBe(60)
+    expect(snapRefresh(58)).toBe(60)
+    expect(snapRefresh(118)).toBe(120)
+  })
+
+  it('keeps a genuine low-rate panel at its own standard', () => {
+    expect(snapRefresh(29.7)).toBe(30)
+    expect(snapRefresh(29.8)).toBe(30)
+    expect(snapRefresh(30)).toBe(30)
+  })
+
+  it('passes standard rates through and clamps outside the table', () => {
+    expect(snapRefresh(60)).toBe(60)
+    expect(snapRefresh(144)).toBe(144)
+    expect(snapRefresh(250)).toBe(240) // above the top standard: clamp
+    expect(snapRefresh(20)).toBe(30) // below the lowest: the floor standard
+  })
+
+  it('moves up only once the median clears standard / 0.95', () => {
+    // 63 * 0.95 = 59.85 <= 60, so 60 still qualifies; past
+    // 60 / 0.95 ≈ 63.2 the estimate moves to the next standard.
+    expect(snapRefresh(63)).toBe(60)
+    expect(snapRefresh(64)).toBe(75)
+  })
+})
+
+describe('governor against the snapped target (P04)', () => {
+  it('steps down after 2 windows when a weak GPU renders 35fps on a 60Hz panel', () => {
+    // The P04 headline case: under T06 this governor learned
+    // targetFps ≈ 35 from its own output and never stepped down.
+    let s = warmedGovernor(35)
+    expect(s.targetFps).toBe(60)
+    s = nextQualityIdx(s, 35)
+    expect(s.idx).toBe(0)
+    expect(s.badWindows).toBe(1)
+    s = nextQualityIdx(s, 35)
+    expect(s.idx).toBe(1)
+  })
+
+  it('never steps down on a stable ~30Hz device (warmup median 29.8)', () => {
+    let s = warmedGovernor(29.8)
+    expect(s.targetFps).toBe(30)
+    s = feedWindows(s, 29.8, 12)
+    expect(s.idx).toBe(0)
+    expect(s.badWindows).toBe(0)
+  })
+
+  it('marks a window bad on spikes even when average FPS is fine', () => {
+    let s = warmedGovernor(60)
+    // 58fps average alone would be a "good" window; with 15% of
+    // frames past 2x the target interval it must count as bad.
+    s = nextQualityIdx(s, 58, 0.15)
+    expect(s.badWindows).toBe(1)
+    expect(s.goodWindows).toBe(0)
+    expect(s.idx).toBe(0)
+    s = nextQualityIdx(s, 58, 0.15)
+    expect(s.idx).toBe(1)
+  })
+
+  it('treats the spike threshold as inclusive, and a few spikes as fine', () => {
+    const s = warmedGovernor(60)
+    expect(nextQualityIdx(s, 58, 0.1).badWindows).toBe(1) // exactly 10%: bad
+    const ok = nextQualityIdx(s, 58, 0.09)
+    expect(ok.badWindows).toBe(0)
+    expect(ok.goodWindows).toBe(1) // 58 > 0.92 * 60: a good window
   })
 })
