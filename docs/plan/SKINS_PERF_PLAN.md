@@ -127,7 +127,7 @@ Prototype đầy đủ đã chạy được (xem `docs/plan/skins/reference/`). 
 
 ## P03 — Giảm chi phí GPU (fill-rate)
 
-- [ ] **P03** · Mức: **Cao** · Branch: `perf/p03-gpu-cost`
+- [x] **P03** · Mức: **Cao** · Branch: `perf/p03-gpu-cost`
 
 **Vấn đề**
 - `src/three/engine.js` L58 `antialias: true` dù đã render qua `EffectComposer` (L212–216) → MSAA của framebuffer mặc định gần như vô ích (composer đã có MSAA riêng) nhưng vẫn tốn bộ nhớ/băng thông.

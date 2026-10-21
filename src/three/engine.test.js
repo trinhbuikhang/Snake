@@ -40,7 +40,9 @@ const h = vi.hoisted(() => ({
 vi.mock('three', async () => {
   const actual = await vi.importActual('three')
   class FakeRenderer {
-    constructor() {
+    constructor(params = {}) {
+      this.params = params
+      this.pixelRatios = []
       this.shadowMap = {}
       this.debug = {}
       this.disposeCalls = 0
@@ -52,7 +54,9 @@ vi.mock('three', async () => {
       if (h.noCompileAsync) this.compileAsync = undefined
       h.renderers.push(this)
     }
-    setPixelRatio() {}
+    setPixelRatio(r) {
+      this.pixelRatios.push(r)
+    }
     setSize() {}
     getRenderTarget() {
       return this.currentTarget
@@ -278,14 +282,16 @@ beforeEach(() => {
 })
 
 describe('createEngine lifecycle', () => {
-  it('start() applies the initial quality step: composer targets get 4x MSAA, retargeted exactly once', () => {
+  it('start() applies the initial quality step: composer targets retargeted exactly once', () => {
     const engine = createEngine(freshCanvas(), { reduced: false })
     engine.start()
     const composer = h.composers[0]
-    // The PR #23 guard: without the startup applyQuality() call these
-    // stay at EffectComposer's default of 0 samples.
-    expect(composer.renderTarget1.samples).toBe(4)
-    expect(composer.renderTarget2.samples).toBe(4)
+    // The PR #23 guard: without the startup applyQuality() call the
+    // targets are never retargeted at all (no dispose). Since P03 the
+    // count itself comes from msaaFor(effective dpr): this window
+    // reports DPR 2, step 0 caps at 1.5 → 0 samples.
+    expect(composer.renderTarget1.samples).toBe(0)
+    expect(composer.renderTarget2.samples).toBe(0)
     expect(composer.renderTarget1.dispose).toHaveBeenCalledTimes(1)
     expect(composer.renderTarget2.dispose).toHaveBeenCalledTimes(1)
     engine.destroy()
@@ -297,7 +303,7 @@ describe('createEngine lifecycle', () => {
     const composer = h.composers[0]
     const onResize = h.roCallbacks[0]
     for (let i = 0; i < 5; i += 1) onResize()
-    expect(composer.renderTarget1.samples).toBe(4)
+    expect(composer.renderTarget1.samples).toBe(0)
     expect(composer.renderTarget1.dispose).toHaveBeenCalledTimes(1)
     expect(composer.renderTarget2.dispose).toHaveBeenCalledTimes(1)
     engine.destroy()
@@ -478,6 +484,33 @@ describe('createEngine lifecycle', () => {
     // The warm-up restore ran synchronously (the init compile's
     // restore is still pending a microtask — no await in this test).
     expect(h.foodRestore).toHaveBeenCalledTimes(1)
+    engine.destroy()
+  })
+
+  it('creates the renderer without antialias when the composer renders (P03)', () => {
+    const engine = createEngine(freshCanvas(), { reduced: false })
+    expect(h.composers).toHaveLength(1)
+    expect(h.renderers[0].params.antialias).toBe(false)
+    engine.destroy()
+  })
+
+  it('creates the renderer with antialias in reduced mode, where no composer exists (P03)', () => {
+    const engine = createEngine(freshCanvas(), { reduced: true })
+    expect(h.composers).toHaveLength(0)
+    expect(h.renderers[0].params.antialias).toBe(true)
+    engine.destroy()
+  })
+
+  it('caps the starting step at DPR 1.5 with a 1024px shadow map (P03)', () => {
+    const engine = createEngine(freshCanvas(), { reduced: false })
+    engine.start()
+    const renderer = h.renderers[0]
+    // This window reports devicePixelRatio 2 — step 0 must clamp it
+    // to 1.5 (applySize runs last via start()'s applyQuality).
+    expect(renderer.pixelRatios[renderer.pixelRatios.length - 1]).toBe(1.5)
+    const moon = h.scene.children.find((c) => c.isDirectionalLight)
+    expect(moon.shadow.mapSize.x).toBe(1024)
+    expect(moon.shadow.mapSize.y).toBe(1024)
     engine.destroy()
   })
 
