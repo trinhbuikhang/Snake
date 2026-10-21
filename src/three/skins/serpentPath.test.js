@@ -116,6 +116,26 @@ describe('max-length bound', () => {
   })
 })
 
+describe('tail curl', () => {
+  it('appends visual-only length past the last polyline point', () => {
+    const mk = () => {
+      const st = createPathState()
+      for (let i = 0; i < 4; i += 1) {
+        st.P[i * 3] = i
+        st.P[i * 3 + 1] = 0.4
+        st.P[i * 3 + 2] = 0
+      }
+      return st
+    }
+    const plain = mk()
+    buildPath(plain, 4, null)
+    const curled = mk()
+    buildPath(curled, 4, { len: 0.85, turn: 2.5, side: 1 })
+    expect(curled.nS).toBeGreaterThan(plain.nS)
+    expect(curled.D[curled.nS - 1]).toBeGreaterThan(plain.D[plain.nS - 1] + 0.5)
+  })
+})
+
 describe('radiusAt()', () => {
   it('tapers to tailTip at the tail and swallows the tube at the head', () => {
     const total = 20
