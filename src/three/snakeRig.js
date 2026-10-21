@@ -15,7 +15,6 @@ const HEAD_R = 0.64
 const BODY_R = 0.58
 const TAIL_R = 0.44
 
-const easeOutQuad = (t) => 1 - (1 - t) * (1 - t)
 const easeOutCubic = (t) => {
   const u = 1 - t
   return 1 - u * u * u
@@ -283,9 +282,10 @@ export function createSnakeRig(scene) {
         const p = prev[Math.min(i, prev.length - 1)]
         const px = p ? p.x : c.x
         const pz = p ? p.z : c.z
-        const bt = easeOutQuad(t)
-        let x = px + (c.x - px) * bt
-        let z = pz + (c.z - pz) * bt
+        // P01: linear interpolation — constant velocity along the path.
+        // Per-tick easing made the head surge then stall within each tick.
+        let x = px + (c.x - px) * t
+        let z = pz + (c.z - pz) * t
         let y = (i === 0 ? HEAD_Y : BODY_Y) + liveBob * (i === 0 ? 0.5 : 1)
 
         // Calculate digestion wave bulge on segment i
@@ -348,5 +348,3 @@ export function createSnakeRig(scene) {
 
   return rig
 }
-
-export { easeOutQuad }

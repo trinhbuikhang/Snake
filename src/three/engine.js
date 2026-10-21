@@ -26,6 +26,7 @@ import { isTypingTarget } from '../game/keyboard.js'
 import audio from '../audio/sound.js'
 import { createGovernor, observeWarmupFrame, settleWarmup, nextQualityIdx, msaaRetargetNeeded } from './qualityGovernor.js'
 import { disposeObject3D } from './dispose.js'
+import { rescaleAccum } from './tickClock.js'
 import { buildGarden } from './garden.js'
 import { createSnakeRig } from './snakeRig.js'
 import { buildDecor } from './decor.js'
@@ -479,7 +480,11 @@ export function createEngine(canvas, { reduced } = {}) {
     if (st.status === 'playing' && !dying) {
       isBoosting = boosting
       st.setBoosting(boosting)
+      const oldInterval = interval.v
       interval.v = speedInterval(logic.foodsEaten, isBoosting, moonSpeedMult, modeSpeedMult, eventSpeedMult)
+      // P01: keep the current tick's progress ratio — only the speed
+      // changes, so the snake does not lurch when boost toggles mid-tick.
+      accum = rescaleAccum(accum, oldInterval, interval.v)
     }
   }
 
@@ -804,7 +809,11 @@ export function createEngine(canvas, { reduced } = {}) {
 
     if (st.status === 'playing' && !dying) {
       accum += dt
+      const oldInterval = interval.v
       interval.v = speedInterval(logic.foodsEaten, isBoosting, moonSpeedMult, modeSpeedMult, eventSpeedMult)
+      // P01: a multiplier change (moon phase, night event, …) must not
+      // shift the tick progress ratio either — rescale with the speed.
+      accum = rescaleAccum(accum, oldInterval, interval.v)
       let guard = 0
       while (accum >= interval.v) {
         const tickDt = interval.v // seconds this tick consumes (drives the lantern clock)
@@ -817,11 +826,16 @@ export function createEngine(canvas, { reduced } = {}) {
         if (ev.ate) handleEat(ev)
         // The Jade Carp: caught when the snake's head enters its cell.
         if (spirit && logic.snake[0].x === spirit.x && logic.snake[0].y === spirit.y) catchSpirit()
-        interval.v = speedInterval(logic.foodsEaten, isBoosting, moonSpeedMult, modeSpeedMult, eventSpeedMult)
+        const nextInterval = speedInterval(logic.foodsEaten, isBoosting, moonSpeedMult, modeSpeedMult, eventSpeedMult)
         // Consume THIS tick's span (AUDIT L6): subtracting the freshly
         // recomputed interval.v here would over/under-pay the accumulator
         // whenever the step changed the speed (e.g. right after eating).
         accum -= tickDt
+        // P01: the leftover is progress toward the next tick — rescale it
+        // from the consumed tick's span to the new interval so its ratio
+        // (and the painted position) does not jump when the speed changes.
+        accum = rescaleAccum(accum, tickDt, nextInterval)
+        interval.v = nextInterval
         if (++guard > 6) {
           accum = 0
           break
