@@ -253,7 +253,7 @@ Prototype đầy đủ đã chạy được (xem `docs/plan/skins/reference/`). 
 
 ## S02 — Skin Moon Jade ("Ngọc trăng")
 
-- [ ] **S02** · Mức: **Cao** · Branch: `feat/s02-skin-moon-jade`
+- [x] **S02** · Mức: **Cao** · Branch: `feat/s02-skin-moon-jade`
 
 **Mục tiêu (so với `images/concept-moon-jade.jpg`)**
 - Thân đồ chơi vinyl ngọc trắng ngà bóng (MeshPhysical: clearcoat, sheen bạc hà, iridescence nhẹ), dải bụng bạc hà có rãnh vảy bụng, **giả tán xạ dưới bề mặt** (glow trong: phía khuất sáng + lõi dày, bạc hà ở dưới → tím lilac ở trên), lấp lánh ngọc trai thưa (không có trên mặt). Không cháy trắng dưới bloom.
