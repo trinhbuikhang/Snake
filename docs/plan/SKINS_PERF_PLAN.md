@@ -300,7 +300,7 @@ Prototype đầy đủ đã chạy được (xem `docs/plan/skins/reference/`). 
 
 ## S04 — Registry skin + store + picker trong Garden
 
-- [ ] **S04** · Mức: **Cao** · Branch: `feat/s04-skin-registry-picker`
+- [x] **S04** · Mức: **Cao** · Branch: `feat/s04-skin-registry-picker`
 
 **Hành vi mong muốn**
 - `src/game/skins.js` (thuần, không Three/React): `SKINS` = `[{ id, name, nameVi, desc, unlock, swatch, accent }]`, `SKIN_IDS`, `DEFAULT_SKIN = 'moonJade'`, `skinById(id)`. Trường `unlock` khai báo luật mở khoá (dùng ở S06).

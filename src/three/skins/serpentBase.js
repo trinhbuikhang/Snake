@@ -370,9 +370,17 @@ export function createSerpent(scene, cfg) {
       const r = 0.55 + i * 0.09
       return { x: d.center.x + Math.cos(ang) * r, z: d.center.z + Math.sin(ang) * r }
     },
-    dispose() {
+    // Remove the rig's objects from the scene WITHOUT releasing
+    // GPU resources. Safe at any moment — even while a compileAsync
+    // is still polling this rig's materials (it polls materials,
+    // not scene membership). dispose() below does the GPU teardown
+    // whenever it is safe to run; engine defers that, never this.
+    detach() {
       scene.remove(head, body)
       if (beads) scene.remove(beads.mesh)
+    },
+    dispose() {
+      rig.detach()
       const mats = new Set()
       head.traverse((o) => {
         if (o.geometry) disposables.push(o.geometry)

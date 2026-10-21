@@ -1,5 +1,5 @@
-// Skin rig registry (3D side). Skin data (names, unlock rules) will
-// live in game/skins.js from S04.
+// Skin rig registry (3D side). Skin data (names, unlock rules)
+// lives in game/skins.js.
 import { createMoonJadeRig } from './moonJade.js'
 import { createPlushMoonRig } from './plushMoon.js'
 
