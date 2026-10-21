@@ -35,15 +35,29 @@ function ensureCtx() {
   return ctx
 }
 
+// A voice enabled while there is no AudioContext yet — or while muted —
+// only records its desired state (the *On flags below). Start it as soon as
+// sound becomes possible: when the context is unlocked, or on unmute.
+// Without this, setAmbientOn(true) before the first user gesture wedged the
+// flag forever (AUDIT L5): the voice never started and later calls no-oped.
+function startPendingVoices() {
+  if (!ctx || !master || muted) return
+  if (ambientOn) startAmbient()
+  if (padOn) startPad()
+  if (waterOn) startWater()
+}
+
 export function unlockAudio() {
   const c = ensureCtx()
   if (c && c.state === 'suspended') c.resume().catch(() => {})
   unlocked = true
+  startPendingVoices()
 }
 
 export function setMuted(m) {
   muted = m
   if (master && ctx) master.gain.setTargetAtTime(m ? 0 : 1, ctx.currentTime, 0.02)
+  if (!m) startPendingVoices()
 }
 
 function pluck(freq, at, vol = 0.5) {
@@ -189,87 +203,106 @@ export function playDeath() {
   tickNoise(t + 0.015, 0.12, 400)
 }
 
+function startPad() {
+  if (pad) return
+  const c = ctx
+  padGain = c.createGain()
+  padGain.gain.value = 0
+  padGain.connect(master)
+  const o1 = c.createOscillator()
+  o1.type = 'sine'
+  o1.frequency.value = 55
+  const o2 = c.createOscillator()
+  o2.type = 'sine'
+  o2.frequency.value = 110.4
+  const o3 = c.createOscillator()
+  o3.type = 'triangle'
+  o3.frequency.value = 219.7
+  const o1g = c.createGain()
+  o1g.gain.value = 0.16
+  const o2g = c.createGain()
+  o2g.gain.value = 0.1
+  const o3g = c.createGain()
+  o3g.gain.value = 0.035
+  const filter = c.createBiquadFilter()
+  filter.type = 'lowpass'
+  filter.frequency.value = 520
+  let noise = null
+  if (noiseBuf) {
+    noise = c.createBufferSource()
+    noise.buffer = noiseBuf
+    noise.loop = true
+    const nf = c.createBiquadFilter()
+    nf.type = 'lowpass'
+    nf.frequency.value = 240
+    const ng = c.createGain()
+    ng.gain.value = 0.05
+    noise.connect(nf)
+    nf.connect(ng)
+    ng.connect(padGain)
+    noise.start()
+  }
+  o1.connect(o1g)
+  o2.connect(o2g)
+  o3.connect(o3g)
+  o1g.connect(filter)
+  o2g.connect(filter)
+  o3g.connect(filter)
+  filter.connect(padGain)
+  o1.start()
+  o2.start()
+  o3.start()
+  padLfo = c.createOscillator()
+  padLfo.frequency.value = 0.08
+  const lfoGain = c.createGain()
+  lfoGain.gain.value = 0
+  padLfo.connect(lfoGain)
+  lfoGain.connect(padGain.gain)
+  padLfo.start()
+  padGain.gain.setTargetAtTime(0.055, c.currentTime, 0.6)
+  lfoGain.gain.setTargetAtTime(0.02, c.currentTime, 0.8)
+  pad = { o1, o2, o3, noise }
+}
+
+function stopPad() {
+  const voices = pad
+  if (!voices) return
+  // Detach the live refs NOW, not when the teardown fires (AUDIT L5): a
+  // re-enable inside the 1.2s window must build a fresh voice below, never
+  // inherit these fading ones and stay silent while the flag says "on".
+  pad = null
+  const gain = padGain
+  const lfo = padLfo
+  padGain = null
+  padLfo = null
+  gain.gain.setTargetAtTime(0, ctx.currentTime, 0.25)
+  // This teardown owns exactly the nodes captured above and always runs —
+  // checking the desired-state flag here is what leaked the old graph.
+  setTimeout(() => {
+    try {
+      voices.o1.stop()
+      voices.o2.stop()
+      voices.o3.stop()
+      if (voices.noise) voices.noise.stop()
+      if (lfo) lfo.stop()
+      gain.disconnect()
+    } catch {
+      /* already stopped or disconnected */
+    }
+  }, 1200)
+}
+
 export function setPadOn(on) {
   if (on === padOn) return
   padOn = on
-  if (!ctx || !master) return
-  const c = ctx
-  if (on && !pad) {
-    padGain = c.createGain()
-    padGain.gain.value = 0
-    padGain.connect(master)
-    const o1 = c.createOscillator()
-    o1.type = 'sine'
-    o1.frequency.value = 55
-    const o2 = c.createOscillator()
-    o2.type = 'sine'
-    o2.frequency.value = 110.4
-    const o3 = c.createOscillator()
-    o3.type = 'triangle'
-    o3.frequency.value = 219.7
-    const o1g = c.createGain()
-    o1g.gain.value = 0.16
-    const o2g = c.createGain()
-    o2g.gain.value = 0.1
-    const o3g = c.createGain()
-    o3g.gain.value = 0.035
-    const filter = c.createBiquadFilter()
-    filter.type = 'lowpass'
-    filter.frequency.value = 520
-    if (noiseBuf) {
-      const ns = c.createBufferSource()
-      ns.buffer = noiseBuf
-      ns.loop = true
-      const nf = c.createBiquadFilter()
-      nf.type = 'lowpass'
-      nf.frequency.value = 240
-      const ng = c.createGain()
-      ng.gain.value = 0.05
-      ns.connect(nf)
-      nf.connect(ng)
-      ng.connect(padGain)
-      ns.start()
-    }
-    o1.connect(o1g)
-    o2.connect(o2g)
-    o3.connect(o3g)
-    o1g.connect(filter)
-    o2g.connect(filter)
-    o3g.connect(filter)
-    filter.connect(padGain)
-    o1.start()
-    o2.start()
-    o3.start()
-    padLfo = c.createOscillator()
-    padLfo.frequency.value = 0.08
-    const lfoGain = c.createGain()
-    lfoGain.gain.value = 0
-    padLfo.connect(lfoGain)
-    lfoGain.connect(padGain.gain)
-    padLfo.start()
-    padGain.gain.setTargetAtTime(0.055, c.currentTime, 0.6)
-    lfoGain.gain.setTargetAtTime(0.02, c.currentTime, 0.8)
-    pad = { o1, o2, o3 }
+  if (!on) {
+    if (ctx && master) stopPad()
+    return
   }
-  if (!on && pad) {
-    const c2 = ctx
-    padGain.gain.setTargetAtTime(0, c2.currentTime, 0.25)
-    const voices = pad
-    setTimeout(() => {
-      if (padOn) return
-      try {
-        voices.o1.stop()
-        voices.o2.stop()
-        voices.o3.stop()
-        if (padLfo) padLfo.stop()
-      } catch {
-        /* already stopped */
-      }
-      pad = null
-      padLfo = null
-      padGain = null
-    }, 1200)
-  }
+  // No context yet, or muted: record the intent only — no oscillators are
+  // created (L5). unlockAudio()/setMuted(false) start the voice later.
+  if (!ctx || !master || muted) return
+  startPad()
 }
 
 // P6 "First Light": Silent Night keeps its promise — no music, only water.
@@ -278,79 +311,91 @@ export function setPadOn(on) {
 let waterOn = false
 let waterNodes = null
 
+function startWater() {
+  if (waterNodes || !noiseBuf) return
+  const c = ctx
+  const gain = c.createGain()
+  gain.gain.value = 0
+  gain.connect(master)
+  const src = c.createBufferSource()
+  src.buffer = noiseBuf
+  src.loop = true
+  src.playbackRate.value = 0.5
+  const lp = c.createBiquadFilter()
+  lp.type = 'lowpass'
+  lp.frequency.value = 320
+  lp.Q.value = 0.6
+  const ng = c.createGain()
+  ng.gain.value = 0.5
+  src.connect(lp)
+  lp.connect(ng)
+  ng.connect(gain)
+  src.start()
+  // Slow swell on the filter so the water breathes.
+  const lfo = c.createOscillator()
+  lfo.frequency.value = 0.11
+  const lfoG = c.createGain()
+  lfoG.gain.value = 140
+  lfo.connect(lfoG)
+  lfoG.connect(lp.frequency)
+  lfo.start()
+  gain.gain.setTargetAtTime(0.05, c.currentTime, 1.2)
+  const droplet = () => {
+    if (!waterOn || !ctx || !master) return
+    const t = c.currentTime + 0.02
+    const o = c.createOscillator()
+    o.type = 'sine'
+    o.frequency.setValueAtTime(1500 + Math.random() * 600, t)
+    o.frequency.exponentialRampToValueAtTime(620, t + 0.18)
+    const g = c.createGain()
+    g.gain.setValueAtTime(0.0001, t)
+    g.gain.linearRampToValueAtTime(0.055, t + 0.012)
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.32)
+    o.connect(g)
+    g.connect(master)
+    o.start(t)
+    o.stop(t + 0.36)
+  }
+  const timer = setInterval(() => {
+    if (Math.random() < 0.75) droplet()
+  }, 2600)
+  waterNodes = { src, lfo, gain, timer }
+}
+
+function stopWater() {
+  const nodes = waterNodes
+  if (!nodes) return
+  // Same detach-now rule as the pad (AUDIT L5): a rapid re-enable builds a
+  // fresh voice and droplet timer instead of reviving this fading one.
+  waterNodes = null
+  clearInterval(nodes.timer)
+  nodes.gain.gain.setTargetAtTime(0, ctx.currentTime, 0.4)
+  setTimeout(() => {
+    try {
+      nodes.src.stop()
+      nodes.lfo.stop()
+    } catch {
+      /* already stopped */
+    }
+    try {
+      nodes.gain.disconnect()
+    } catch {
+      /* already disconnected */
+    }
+  }, 1500)
+}
+
 export function setWaterOn(on) {
   if (on === waterOn) return
   waterOn = on
-  if (!ctx || !master || !noiseBuf) return
-  const c = ctx
-  if (on && !waterNodes) {
-    const gain = c.createGain()
-    gain.gain.value = 0
-    gain.connect(master)
-    const src = c.createBufferSource()
-    src.buffer = noiseBuf
-    src.loop = true
-    src.playbackRate.value = 0.5
-    const lp = c.createBiquadFilter()
-    lp.type = 'lowpass'
-    lp.frequency.value = 320
-    lp.Q.value = 0.6
-    const ng = c.createGain()
-    ng.gain.value = 0.5
-    src.connect(lp)
-    lp.connect(ng)
-    ng.connect(gain)
-    src.start()
-    // Slow swell on the filter so the water breathes.
-    const lfo = c.createOscillator()
-    lfo.frequency.value = 0.11
-    const lfoG = c.createGain()
-    lfoG.gain.value = 140
-    lfo.connect(lfoG)
-    lfoG.connect(lp.frequency)
-    lfo.start()
-    gain.gain.setTargetAtTime(0.05, c.currentTime, 1.2)
-    const droplet = () => {
-      if (!waterOn || !ctx || !master) return
-      const t = c.currentTime + 0.02
-      const o = c.createOscillator()
-      o.type = 'sine'
-      o.frequency.setValueAtTime(1500 + Math.random() * 600, t)
-      o.frequency.exponentialRampToValueAtTime(620, t + 0.18)
-      const g = c.createGain()
-      g.gain.setValueAtTime(0.0001, t)
-      g.gain.linearRampToValueAtTime(0.055, t + 0.012)
-      g.gain.exponentialRampToValueAtTime(0.0001, t + 0.32)
-      o.connect(g)
-      g.connect(master)
-      o.start(t)
-      o.stop(t + 0.36)
-    }
-    const timer = setInterval(() => {
-      if (Math.random() < 0.75) droplet()
-    }, 2600)
-    waterNodes = { src, lfo, gain, timer }
+  if (!on) {
+    if (ctx && master) stopWater()
+    return
   }
-  if (!on && waterNodes) {
-    const nodes = waterNodes
-    clearInterval(nodes.timer)
-    nodes.gain.gain.setTargetAtTime(0, c.currentTime, 0.4)
-    setTimeout(() => {
-      if (waterOn) return
-      try {
-        nodes.src.stop()
-        nodes.lfo.stop()
-      } catch {
-        /* already stopped */
-      }
-      try {
-        nodes.gain.disconnect()
-      } catch {
-        /* already disconnected */
-      }
-      waterNodes = null
-    }, 1500)
-  }
+  // No context yet, or muted: record the intent only (L5) — the voice
+  // starts from unlockAudio()/setMuted(false) via startPendingVoices().
+  if (!ctx || !master || muted) return
+  startWater()
 }
 
 // (ambient score section follows; `audio` is exported at the end of the file)
@@ -433,6 +478,12 @@ function maybePlayPhrase(at) {
 
 function planPhrases() {
   if (!ambientOn || !ctx || !ambientGain) return
+  // While muted the master bus is silent, but scheduling anyway would
+  // still build (and throw away) a phrase's oscillators every few
+  // seconds for nothing (AUDIT L5). Skip the pass entirely and leave
+  // nextPhraseAt behind; the clamp below resyncs it on the first live
+  // pass after unmute, so no backed-up phrases burst out.
+  if (muted) return
   // The scheduler interval is throttled while the tab is hidden, but the
   // audio clock keeps running. Without this clamp, a returning tab finds
   // nextPhraseAt far in the past and the loop below schedules every
@@ -447,47 +498,62 @@ function planPhrases() {
   }
 }
 
+function startAmbient() {
+  if (ambientTimer) return
+  const c = ctx
+  ambientGain = c.createGain()
+  ambientGain.gain.value = 0
+  ambientFilter = c.createBiquadFilter()
+  ambientFilter.type = 'lowpass'
+  ambientFilter.frequency.value = ambientPhase.air
+  ambientFilter.connect(ambientGain)
+  ambientGain.connect(master)
+  nextPhraseAt = c.currentTime + 1.4 // first phrase arrives after the fade-in
+  ambientTimer = setInterval(planPhrases, 700)
+  ambientGain.gain.setTargetAtTime(1, c.currentTime, 1.2)
+}
+
+function stopAmbient() {
+  if (!ambientTimer) return
+  clearInterval(ambientTimer)
+  ambientTimer = null
+  const g = ambientGain
+  const f = ambientFilter
+  // Detach the live refs NOW (AUDIT L5): the teardown below owns exactly
+  // these two nodes and always disconnects them. The old code nulled the
+  // refs inside the timeout and skipped it entirely when the voice had
+  // been re-enabled — leaking the faded gain/filter pair into the graph
+  // on every rapid off→on.
+  ambientGain = null
+  ambientFilter = null
+  g.gain.setTargetAtTime(0, ctx.currentTime, 0.5)
+  setTimeout(() => {
+    try {
+      g.disconnect()
+      f.disconnect()
+    } catch {
+      /* already disconnected */
+    }
+  }, 1600)
+}
+
 export function setAmbientOn(on) {
   if (on === ambientOn) return
   ambientOn = on
-  if (!ctx || !master) return
-  const c = ctx
-  if (on && !ambientTimer) {
-    ambientGain = c.createGain()
-    ambientGain.gain.value = 0
-    ambientFilter = c.createBiquadFilter()
-    ambientFilter.type = 'lowpass'
-    ambientFilter.frequency.value = ambientPhase.air
-    ambientFilter.connect(ambientGain)
-    ambientGain.connect(master)
-    nextPhraseAt = c.currentTime + 1.4 // first phrase arrives after the fade-in
-    ambientTimer = setInterval(planPhrases, 700)
-    ambientGain.gain.setTargetAtTime(1, c.currentTime, 1.2)
+  if (!on) {
+    if (ctx && master) stopAmbient()
+    return
   }
-  if (!on && ambientTimer) {
-    clearInterval(ambientTimer)
-    ambientTimer = null
-    const g = ambientGain
-    const f = ambientFilter
-    g.gain.setTargetAtTime(0, c.currentTime, 0.5)
-    setTimeout(() => {
-      if (ambientOn) return
-      try {
-        g.disconnect()
-        f.disconnect()
-      } catch {
-        /* already disconnected */
-      }
-      ambientGain = null
-      ambientFilter = null
-    }, 1600)
-  }
+  // No context yet, or muted: record the intent only (L5) — the voice
+  // starts from unlockAudio()/setMuted(false) via startPendingVoices().
+  if (!ctx || !master || muted) return
+  startAmbient()
 }
 export const audio = { unlockAudio, setMuted, playEat, playBloom, playVerse, playTurn, playDeath, setPadOn, setWaterOn, setAmbientOn, setAmbientPhase }
 
-// Test seam (T05): lets unit tests drive the phrase scheduler against a
-// minimal mock AudioContext and observe what gets scheduled. Not part of
-// the public audio API.
+// Test seam (T05/T10d): lets unit tests drive the phrase scheduler and the
+// voice toggles against a mock AudioContext and observe what gets
+// scheduled, created and torn down. Not part of the public audio API.
 export const __test__ = {
   planPhrases,
   mockAmbient(fakeCtx, { on = true, nextAt = 0 } = {}) {
@@ -498,5 +564,38 @@ export const __test__ = {
     nextPhraseAt = nextAt
   },
   nextPhraseAt: () => nextPhraseAt,
+  // Restore every module-level voice/context field to its load-time value
+  // so toggle tests can start from a pristine module (T10d).
+  reset() {
+    ctx = null
+    master = null
+    muted = false
+    unlocked = false
+    padOn = false
+    pad = null
+    padGain = null
+    padLfo = null
+    noiseBuf = null
+    eatStep = 0
+    waterOn = false
+    waterNodes = null
+    ambientPhase = PHASE_TUNING.half
+    ambientOn = false
+    ambientTimer = null
+    ambientGain = null
+    ambientFilter = null
+    nextPhraseAt = 0
+  },
+  state: () => ({
+    muted,
+    padOn,
+    pad,
+    waterOn,
+    waterNodes,
+    ambientOn,
+    ambientTimer,
+    ambientGain,
+    ambientFilter,
+  }),
 }
 export default audio
