@@ -899,9 +899,15 @@ export function createEngine(canvas, { reduced } = {}) {
     if (composer) {
       composer.renderTarget1?.dispose()
       composer.renderTarget2?.dispose()
-      bloomPass?.dispose?.()
+      // Every pass, not just bloom: RenderPass and OutputPass hold
+      // their own materials and programs (T08 review).
+      composer.passes?.forEach((p) => p.dispose?.())
       composer.dispose?.()
     }
+    // The moon's 2048px shadow map is a WebGLRenderTarget that
+    // disposeObject3D cannot reach (it only gathers geometry,
+    // materials and textures) — release it explicitly (T08 review).
+    moon.dispose()
     // Every geometry/material/texture the garden, rig, decor and
     // spirit added to the scene, each disposed exactly once.
     disposeObject3D(scene)

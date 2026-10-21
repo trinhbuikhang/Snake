@@ -17,6 +17,8 @@ const h = vi.hoisted(() => ({
   composers: [],
   renderers: [],
   bloomPasses: [],
+  renderPasses: [],
+  outputPasses: [],
   roCallbacks: [],
   raf: new Map(),
   nextRafId: 1,
@@ -57,16 +59,26 @@ vi.mock('three/addons/postprocessing/EffectComposer.js', () => ({
     constructor() {
       this.renderTarget1 = { samples: 0, dispose: vi.fn() }
       this.renderTarget2 = { samples: 0, dispose: vi.fn() }
+      this.passes = []
       this.dispose = vi.fn()
       h.composers.push(this)
     }
-    addPass() {}
+    addPass(pass) {
+      this.passes.push(pass)
+    }
     setPixelRatio() {}
     setSize() {}
     render() {}
   },
 }))
-vi.mock('three/addons/postprocessing/RenderPass.js', () => ({ RenderPass: class {} }))
+vi.mock('three/addons/postprocessing/RenderPass.js', () => ({
+  RenderPass: class {
+    constructor() {
+      this.dispose = vi.fn()
+      h.renderPasses.push(this)
+    }
+  },
+}))
 vi.mock('three/addons/postprocessing/UnrealBloomPass.js', () => ({
   UnrealBloomPass: class {
     constructor() {
@@ -76,7 +88,14 @@ vi.mock('three/addons/postprocessing/UnrealBloomPass.js', () => ({
     }
   },
 }))
-vi.mock('three/addons/postprocessing/OutputPass.js', () => ({ OutputPass: class {} }))
+vi.mock('three/addons/postprocessing/OutputPass.js', () => ({
+  OutputPass: class {
+    constructor() {
+      this.dispose = vi.fn()
+      h.outputPasses.push(this)
+    }
+  },
+}))
 vi.mock('three/addons/environments/RoomEnvironment.js', () => ({ RoomEnvironment: class {} }))
 
 vi.mock('./garden.js', () => ({
@@ -155,6 +174,8 @@ beforeEach(() => {
   h.composers = []
   h.renderers = []
   h.bloomPasses = []
+  h.renderPasses = []
+  h.outputPasses = []
   h.roCallbacks = []
   h.raf = new Map()
   h.scene = null
@@ -233,6 +254,37 @@ describe('createEngine lifecycle', () => {
     expect(tex.dispose).toHaveBeenCalledTimes(1)
     expect(h.renderers[0].disposeCalls).toBe(1)
     expect(h.envTex.dispose).toHaveBeenCalled()
+  })
+
+  it("destroy() disposes the moon light's shadow map (T08 review)", () => {
+    const engine = createEngine(freshCanvas(), { reduced: false })
+    engine.start()
+    const moon = h.scene.children.find((c) => c.isDirectionalLight)
+    expect(moon).toBeTruthy()
+    // The real renderer allocates the shadow map on first render; stand
+    // in for that GPU target — it is the largest resource destroy()
+    // used to leak on every remount (2048x2048).
+    const mapDispose = vi.fn()
+    moon.shadow.map = { dispose: mapDispose }
+    const shadowDispose = vi.spyOn(moon.shadow, 'dispose')
+
+    engine.destroy()
+
+    expect(shadowDispose).toHaveBeenCalledTimes(1)
+    expect(mapDispose).toHaveBeenCalledTimes(1)
+  })
+
+  it('destroy() disposes every composer pass exactly once (T08 review)', () => {
+    const engine = createEngine(freshCanvas(), { reduced: false })
+    engine.start()
+    const composer = h.composers[0]
+    expect(composer.passes).toHaveLength(3) // RenderPass, bloom, OutputPass
+
+    engine.destroy()
+
+    expect(h.renderPasses[0].dispose).toHaveBeenCalledTimes(1)
+    expect(h.bloomPasses[0].dispose).toHaveBeenCalledTimes(1)
+    expect(h.outputPasses[0].dispose).toHaveBeenCalledTimes(1)
   })
 
   it('destroy() silences the audio and unsubscribes every store subscription', () => {
