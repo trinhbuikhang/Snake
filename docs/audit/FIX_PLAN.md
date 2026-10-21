@@ -339,7 +339,7 @@ Mỗi mục con là **một PR riêng**, làm theo thứ tự a → f. Tham chi�
     - Ở `playing`, mở 10 unlock → `runUnlocks.length === 10`; màn game over render đủ 10 mục.
     - Thủ công: mua 1 bậc lantern trong Garden (dùng localStorage `ran-xinh-moonlight` để có đủ moonlight) → Start → card đầu tiên của prologue là verse đó. Đính kèm ảnh chụp.
 
-- [ ] **T10c** · Thấp (AUDIT L4) · Branch: `fix/10c-ready-blur`
+- [x] **T10c** · Thấp (AUDIT L4) · Branch: `fix/10c-ready-blur`
   - **Vấn đề:** `src/three/engine.js` L556–560 chỉ pause khi `playing`; mất focus trong beat `ready` (L764–771) thì ván vẫn tự bắt đầu.
   - **Nghiệm thu:** blur/ẩn tab khi `ready` → ván không tự chạy (giữ ở `ready` hoặc chuyển `paused` sau khi vào `playing` — ghi rõ lựa chọn); kiểm tra thủ công có mô tả.
 - [ ] **T10d** · Thấp (AUDIT L5) · Branch: `fix/10d-ambient-edge-cases`
