@@ -370,13 +370,18 @@ Mỗi mục con là **một PR riêng**, làm theo thứ tự a → f. Tham chi�
 
 | Task | PR | Ghi chú |
 |------|----|---------|
-| T01 | | |
-| T02 | | |
-| T03 | | |
-| T04 | | |
-| T05 | | |
-| T06 | | |
-| T07 | | |
-| T08 | | |
-| T09 | | |
-| T10a–f | | |
+| T01 | #17 | Đã merge; kiểm chứng live sau merge: og-image.jpg là JPEG thật (`ff d8 ff`), icon PNG đúng chữ ký, sw.js v3 |
+| T02 | #18 | Đã merge |
+| T03 | #19 | Đã merge; sau merge không còn run "Deploy to GitHub Pages" mới |
+| T04 | #20 | Đã merge; PR #21 sửa tiếp CI Node 20 → 22 theo comment review |
+| T05 | #22 | Đã merge |
+| T06 | #23 | Đã merge; vòng review sửa hồi quy mất MSAA ở bước chất lượng mặc định |
+| T07 | #24 | Đã merge |
+| T08 | #25 | Đã merge; các vòng review bổ sung dispose cho shadow map, mọi composer pass và RoomEnvironment |
+| T09 | #26 | Đã merge |
+| T10a | #27 | Đã merge |
+| T10b | #28 | Đã merge; kiểm tra thủ công Garden → prologue đạt |
+| T10c | #29 | Đã merge; Codex P2 sau merge (ready-veil không phát lại) gập vào T10f |
+| T10d | #30 | Đã merge; vòng review sửa scheduler vẫn tạo oscillator khi đang mute |
+| T10e | #31 | Đã merge; Codex P2 sau merge (coach timer không lên lịch lại sau resume) gập vào T10f |
+| T10f | #32 | Đã merge; gồm hai sửa gập từ review của #29 và #31 |
