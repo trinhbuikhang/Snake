@@ -11,6 +11,7 @@ import {
   BLOOM_MAX_TIER, BLOOM_COSTS, bloomCount,
   earnMoonlight, nextStreak, toDayString, journeyReady, JOURNEY_GOAL,
 } from './garden.js'
+import { SKINS, SKIN_IDS, DEFAULT_SKIN, isDefaultSkin } from './skins.js'
 
 export const BEST_KEY = 'ran-xinh-best' // legacy single best, migrated into BESTS_KEY
 export const BESTS_KEY = 'ran-xinh-bests'
@@ -28,6 +29,7 @@ export const TONIGHT_KEY = 'ran-xinh-tonight'
 // P4 "The Garden Remembers"
 export const MOONLIGHT_KEY = 'ran-xinh-moonlight' // { balance, earned }
 export const GARDEN_KEY = 'ran-xinh-garden' // { lantern, lotus, inks, ink }
+export const SKIN_KEY = 'ran-xinh-skin' // { owned: [skin ids], selected: skin id }
 export const JOURNEY_KEY = 'ran-xinh-journey' // { progress, completed }
 export const KEEPSAKE_KEY = 'ran-xinh-keepsakes' // [{ id, night, date }]
 export const STREAK_KEY = 'ran-xinh-streak' // { count, lastDay }
@@ -195,6 +197,22 @@ export const readGarden = () => {
         if (owned.length) fresh.inks = [...new Set(['jade', ...owned])]
       }
       if (fresh.inks.includes(parsed.ink)) fresh.ink = parsed.ink
+    }
+  } catch { /* corrupted save — start fresh */ }
+  return fresh
+}
+// Serpent skins: owned + selected, validated against the registry.
+// Default-rule skins are always owned; unknown ids are dropped and
+// a selected skin that is not owned falls back to the default.
+export const readSkins = () => {
+  const fresh = { owned: SKINS.filter(isDefaultSkin).map((s) => s.id), selected: DEFAULT_SKIN }
+  try {
+    const parsed = JSON.parse(readItem(SKIN_KEY) || 'null')
+    if (parsed && typeof parsed === 'object') {
+      if (Array.isArray(parsed.owned)) {
+        fresh.owned = [...new Set([...fresh.owned, ...parsed.owned.filter((id) => SKIN_IDS.includes(id))])]
+      }
+      if (fresh.owned.includes(parsed.selected)) fresh.selected = parsed.selected
     }
   } catch { /* corrupted save — start fresh */ }
   return fresh
@@ -427,6 +445,8 @@ export const useGame = create((set, get) => ({
   // P4 "The Garden Remembers"
   moonlight: { balance: 0, earned: 0 },
   garden: { lantern: 0, lotus: 0, inks: ['jade'], ink: 'jade' },
+  // Serpent skins (game/skins.js): owned ids + the one being worn.
+  skins: { owned: [DEFAULT_SKIN], selected: DEFAULT_SKIN },
   journey: { progress: 0, completed: 0 },
   keepsakes: [],
   streak: { count: 0, lastDay: null },
@@ -476,6 +496,7 @@ export const useGame = create((set, get) => ({
       seenPhases: seen.phases,
       moonlight: readMoonlight(),
       garden: readGarden(),
+      skins: readSkins(),
       journey: readJourney(),
       keepsakes: readKeepsakes(),
       streak: readStreak(),
@@ -696,6 +717,18 @@ export const useGame = create((set, get) => ({
     if (!get()._spend(ink.cost)) return
     get()._saveGarden({ ...g, inks: [...g.inks, ink.id], ink: ink.id })
     get().checkVerses('garden')
+  },
+
+  // Wear a skin. Only owned skins can be worn — unlocking (800 ☾ or
+  // a Moonrise Night) arrives in S06; until then an unowned skin is
+  // a no-op here and shows as locked in the picker.
+  chooseSkin(id) {
+    if (!SKIN_IDS.includes(id)) return
+    const cur = get().skins
+    if (!cur.owned.includes(id) || cur.selected === id) return
+    const skins = { owned: cur.owned, selected: id }
+    writeItem(SKIN_KEY, JSON.stringify(skins))
+    set({ skins })
   },
   pause() {
     if (get().status === 'playing') {

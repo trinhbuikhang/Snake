@@ -1674,6 +1674,73 @@ kbd {
   letter-spacing: 0.06em;
 }
 
+.garden__skins {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.6rem;
+}
+
+.garden__skin {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.8rem;
+  background: rgba(22, 44, 35, 0.55);
+  border: 1px solid rgba(78, 237, 184, 0.22);
+  color: #eaf7ef;
+  cursor: pointer;
+  font-size: 0.82rem;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+
+.garden__skin:hover {
+  transform: translateY(-1px);
+}
+
+.garden__skin.is-selected {
+  border-color: #ffd54f;
+  box-shadow: 0 0 14px rgba(255, 213, 79, 0.25);
+}
+
+.garden__skin-preview {
+  position: relative;
+  width: 2.6rem;
+  height: 1.7rem;
+  border-radius: 1rem 1.2rem 1.2rem 1rem;
+  flex-shrink: 0;
+  box-shadow: inset 0 -3px 6px rgba(0, 0, 0, 0.18), 0 0 12px rgba(200, 230, 255, 0.25);
+}
+
+.garden__skin-accent {
+  position: absolute;
+  top: 0.18rem;
+  right: 0.4rem;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+}
+
+.garden__skin-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  line-height: 1.2;
+}
+
+.garden__skin-name {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.garden__skin-sub {
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  color: rgba(234, 247, 239, 0.65);
+}
+
 .garden__inks {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

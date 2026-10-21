@@ -146,3 +146,48 @@ describe('coach marks', () => {
     expect(useGame.getState().coachStep).toBe(0)
   })
 })
+
+describe('serpent skins (S04)', () => {
+  it('hydrates to the default skin on an empty profile', () => {
+    useGame.getState().hydrate()
+    expect(useGame.getState().skins).toEqual({ owned: ['moonJade'], selected: 'moonJade' })
+  })
+
+  it('hydrates through corrupt JSON by falling back to defaults', () => {
+    localStorage.setItem('ran-xinh-skin', '{not json')
+    useGame.getState().hydrate()
+    expect(useGame.getState().skins).toEqual({ owned: ['moonJade'], selected: 'moonJade' })
+  })
+
+  it('filters unknown owned ids and keeps a valid owned selection', () => {
+    localStorage.setItem('ran-xinh-skin', JSON.stringify({ owned: ['plushMoon', 'bogus'], selected: 'plushMoon' }))
+    useGame.getState().hydrate()
+    expect(useGame.getState().skins.owned).toEqual(['moonJade', 'plushMoon'])
+    expect(useGame.getState().skins.selected).toBe('plushMoon')
+  })
+
+  it('falls back when the saved selection is not owned', () => {
+    localStorage.setItem('ran-xinh-skin', JSON.stringify({ owned: ['moonJade'], selected: 'plushMoon' }))
+    useGame.getState().hydrate()
+    expect(useGame.getState().skins.selected).toBe('moonJade')
+  })
+
+  it('chooseSkin refuses unowned and unknown skins without persisting', () => {
+    useGame.getState().chooseSkin('plushMoon') // not owned yet (unlocks land in S06)
+    expect(useGame.getState().skins.selected).toBe('moonJade')
+    useGame.getState().chooseSkin('bogus')
+    expect(useGame.getState().skins.selected).toBe('moonJade')
+    expect(localStorage.getItem('ran-xinh-skin')).toBeNull()
+  })
+
+  it('chooseSkin wears an owned skin and persists under ran-xinh-skin', () => {
+    localStorage.setItem('ran-xinh-skin', JSON.stringify({ owned: ['plushMoon'], selected: 'moonJade' }))
+    useGame.getState().hydrate()
+    useGame.getState().chooseSkin('plushMoon')
+    expect(useGame.getState().skins.selected).toBe('plushMoon')
+    expect(JSON.parse(localStorage.getItem('ran-xinh-skin'))).toEqual({
+      owned: ['moonJade', 'plushMoon'],
+      selected: 'plushMoon',
+    })
+  })
+})

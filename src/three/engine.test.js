@@ -32,6 +32,8 @@ const h = vi.hoisted(() => ({
   audio: null,
   garden: null,
   rig: null,
+  rigCalls: [],
+  nextRigs: [],
   decor: null,
   noCompileAsync: false,
   foodRestore: null,
@@ -150,7 +152,12 @@ vi.mock('./garden.js', () => ({
     return h.garden
   },
 }))
-vi.mock('./snakeRig.js', () => ({ createSnakeRig: () => h.rig }))
+vi.mock('./snakeRig.js', () => ({
+  createSnakeRig: (scene, skinId) => {
+    h.rigCalls.push(skinId)
+    return h.nextRigs.length ? h.nextRigs.shift() : h.rig
+  },
+}))
 vi.mock('./decor.js', () => ({ buildDecor: () => h.decor }))
 
 vi.mock('../audio/sound.js', () => {
@@ -266,6 +273,8 @@ beforeEach(() => {
     addRipple: vi.fn(),
     update: vi.fn(),
   }
+  h.rigCalls = []
+  h.nextRigs = []
   h.rig = {
     death: null,
     group: { position: new THREE.Vector3(0, 0, 0) },
@@ -277,6 +286,7 @@ beforeEach(() => {
     onEat: vi.fn(),
     advanceDeath: vi.fn(),
     startDeath: vi.fn(),
+    dispose: vi.fn(),
   }
   h.decor = { setLanternCount: vi.fn(), setBloomCount: vi.fn(), update: vi.fn() }
 })
@@ -547,5 +557,52 @@ describe('createEngine lifecycle', () => {
     expect(h.audio.setPadOn).not.toHaveBeenCalled()
     expect(h.audio.setAmbientOn).not.toHaveBeenCalled()
     expect(h.decor.setLanternCount).not.toHaveBeenCalled()
+  })
+})
+
+describe('skin swapping (S04)', () => {
+  const makeRig = (skin) => ({
+    skin,
+    death: null,
+    group: { position: new THREE.Vector3(0, 0, 0) },
+    setInk: vi.fn(),
+    reset: vi.fn(),
+    setDir: vi.fn(),
+    paint: vi.fn(),
+    onStep: vi.fn(),
+    onEat: vi.fn(),
+    advanceDeath: vi.fn(),
+    startDeath: vi.fn(),
+    dispose: vi.fn(),
+  })
+
+  it('creates the rig for the selected skin and swaps live on change', () => {
+    const engine = createEngine(freshCanvas(), { reduced: false })
+    // The boot rig is built for the store's selected skin (default).
+    expect(h.rigCalls).toEqual(['moonJade'])
+
+    const plush = makeRig('plushMoon')
+    h.nextRigs.push(plush)
+    useGame.setState({ skins: { owned: ['moonJade', 'plushMoon'], selected: 'plushMoon' } })
+
+    // New rig created with the new id; the old rig disposed exactly
+    // once; ink/pose re-applied to the new rig.
+    expect(h.rigCalls).toEqual(['moonJade', 'plushMoon'])
+    expect(h.rig.dispose).toHaveBeenCalledTimes(1)
+    expect(plush.setInk).toHaveBeenCalled()
+    expect(plush.reset).toHaveBeenCalled()
+    expect(plush.setDir).toHaveBeenCalled()
+
+    engine.destroy()
+    useGame.setState({ skins: { owned: ['moonJade'], selected: 'moonJade' } })
+  })
+
+  it('never swaps a rig without dispose() (the ?rig=old debug rig)', () => {
+    h.rig.dispose = undefined
+    const engine = createEngine(freshCanvas(), { reduced: false })
+    useGame.setState({ skins: { owned: ['moonJade', 'plushMoon'], selected: 'plushMoon' } })
+    expect(h.rigCalls).toEqual(['moonJade'])
+    engine.destroy()
+    useGame.setState({ skins: { owned: ['moonJade'], selected: 'moonJade' } })
   })
 })

@@ -12,6 +12,7 @@ import {
   lanternCount, bloomCount,
   journeyReady, JOURNEY_GOAL, MOONLIGHT_GLYPH,
 } from '../game/garden.js'
+import { SKINS } from '../game/skins.js'
 import { composeMoonCard, composeVerseCard, composeHighlightCard } from '../game/moonCard.js'
 
 const arr = (d) => (
@@ -269,6 +270,8 @@ export function GardenOverlay() {
   const upgradeLanterns = useGame((s) => s.upgradeLanterns)
   const upgradeBlooms = useGame((s) => s.upgradeBlooms)
   const chooseInk = useGame((s) => s.chooseInk)
+  const skins = useGame((s) => s.skins)
+  const chooseSkin = useGame((s) => s.chooseSkin)
   const startMoonrise = useGame((s) => s.startMoonrise)
 
   const moonriseReady = journeyReady(journey.progress)
@@ -325,6 +328,37 @@ export function GardenOverlay() {
               Bloom {bloomCount(garden.lotus + 1)} flowers · {MOONLIGHT_GLYPH} {bloomCost}
             </button>
           )}
+        </div>
+
+        <div className="garden__section">
+          <h3>🐍 Serpent skin</h3>
+          <p className="garden__desc">How the serpent looks tonight. Ink tints its glow.</p>
+          <div className="garden__skins" role="radiogroup" aria-label="Serpent skin">
+            {SKINS.map((skin) => {
+              const owned = skins.owned.includes(skin.id)
+              const selected = skins.selected === skin.id
+              return (
+                <button
+                  key={skin.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  className={`garden__skin${selected ? ' is-selected' : ''}`}
+                  onClick={() => chooseSkin(skin.id)}
+                  title={skin.desc}
+                >
+                  <span className="garden__skin-preview" style={{ background: skin.swatch }}>
+                    <span className="garden__skin-accent" style={{ background: skin.accent }} />
+                  </span>
+                  <span className="garden__skin-text">
+                    <span className="garden__skin-name">{skin.name}</span>
+                    <span className="garden__skin-sub">{skin.nameVi}</span>
+                  </span>
+                  <span className="garden__ink-state">{selected ? 'worn' : owned ? 'wear' : 'Coming soon'}</span>
+                </button>
+              )
+            })}
+          </div>
         </div>
 
         <div className="garden__section">

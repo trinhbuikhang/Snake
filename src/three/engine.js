@@ -34,6 +34,7 @@ import { createSnakeRig } from './snakeRig.js'
 import { buildDecor } from './decor.js'
 import { lanternCount, bloomCount, inkById } from '../game/garden.js'
 import { nightEventById } from '../game/nightEvents.js'
+import { SKIN_IDS } from '../game/skins.js'
 
 const FOV = 42
 const FIT_HALF = 11.8
@@ -198,7 +199,7 @@ export function createEngine(canvas, { reduced } = {}) {
   const envTex = pmrem.fromScene(roomEnv, 0.04).texture
 
   const garden = buildGarden(scene, { envTex, reduced })
-  const rig = createSnakeRig(scene)
+  let rig = createSnakeRig(scene, useGame.getState().skins?.selected)
   const decor = buildDecor(scene)
 
   // P4 "The Garden Remembers": apply purchased decorations, the serpent's
@@ -212,8 +213,48 @@ export function createEngine(canvas, { reduced } = {}) {
     garden.moonGroup.scale.setScalar(st.moonriseActive ? 2.4 : 1)
   }
   applyGarden()
+
+  // S04: skins — swap the serpent rig live when the worn skin
+  // changes (no reload; ink + pose carry over via applyGarden /
+  // reset / setDir). The debug pearl rig (?rig=old) has no dispose()
+  // and never swaps. compiledSkins tracks whose shader programs are
+  // already built (the P02 TODO): the selected skin compiles at
+  // load, the other one in precompileSpareSkin() below — and if a
+  // swap beats that to it, the incoming skin compiles here in one
+  // synchronous block before the old rig goes away, so the swap
+  // never stalls a rendered frame on shader linking.
+  const compiledSkins = new Set([rig.skin])
+  function compileSceneNow() {
+    const prevTarget = composer ? renderer.getRenderTarget() : null
+    if (composer) renderer.setRenderTarget(composer.readBuffer)
+    try {
+      renderer.compile(scene, camera)
+    } finally {
+      if (composer) renderer.setRenderTarget(prevTarget)
+    }
+  }
+  function swapRig(skinId) {
+    const old = rig
+    if (!old.dispose || skinId === old.skin) return
+    rig = createSnakeRig(scene, skinId)
+    if (rig === old) return
+    if (!compiledSkins.has(skinId)) {
+      try {
+        compileSceneNow()
+      } catch {
+        // A failed precompile only means the first frame with the
+        // new skin compiles lazily, as before P02.
+      }
+      compiledSkins.add(skinId)
+    }
+    old.dispose()
+    applyGarden()
+    rig.reset(logic.snake.length)
+    rig.setDir(DIR[logic.dir].x, DIR[logic.dir].y)
+  }
   const unsubGarden = useGame.subscribe((s, prev) => {
     if (s.garden !== prev.garden || s.moonriseActive !== prev.moonriseActive) applyGarden()
+    if (s.skins?.selected !== prev.skins?.selected) swapRig(s.skins.selected)
   })
 
   // ---- postprocessing ----------------------------------------------------
@@ -264,6 +305,28 @@ export function createEngine(canvas, { reduced } = {}) {
       // boot; any missing program compiles lazily on first use.
     } finally {
       restoreFood()
+    }
+    precompileSpareSkin()
+  }
+
+  // S04 (the P02 TODO): precompile the OTHER skin's materials too,
+  // so the first Garden swap doesn't stall on shader linking. The
+  // spare rig is created, compiled and disposed inside one
+  // synchronous block — no frame can render while it exists.
+  function precompileSpareSkin() {
+    if (!rig.dispose) return
+    const other = SKIN_IDS.find((id) => id !== rig.skin)
+    if (!other || compiledSkins.has(other)) return
+    let spare = null
+    try {
+      spare = createSnakeRig(scene, other)
+      if (spare === rig || !spare.dispose) return
+      compileSceneNow()
+      compiledSkins.add(other)
+    } catch {
+      // Optimization only — same contract as precompileShaders.
+    } finally {
+      if (spare && spare !== rig) spare.dispose()
     }
   }
   precompileShaders()
