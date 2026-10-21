@@ -1261,6 +1261,10 @@ kbd {
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
+  /* The list is uncapped since T10b — scroll inside the sheet instead
+     of pushing the rest of the game-over card off screen. */
+  max-height: 38vh;
+  overflow-y: auto;
 }
 
 .run-unlocks__item {
