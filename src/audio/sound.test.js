@@ -276,6 +276,31 @@ describe('voice toggles (AUDIT L5)', () => {
     expect(__test__.state().ambientTimer).not.toBe(null)
   })
 
+  it('schedules no phrases while muted, then resumes without a burst on unmute', () => {
+    // Deterministic phrases: every pass plays, one note (2 oscillators).
+    vi.spyOn(Math, 'random').mockReturnValue(0)
+    const fake = boot(0)
+    setAmbientOn(true)
+    setMuted(true)
+    // ~14s of scheduler ticks, the audio clock tracking real time. The
+    // pre-fix scheduler kept building a phrase's oscillators every
+    // ~2.5s here even though the master bus was silent (AUDIT L5).
+    for (let i = 0; i < 20; i++) {
+      vi.advanceTimersByTime(700)
+      fake.currentTime += 0.7
+    }
+    expect(fake.created.oscillators.length).toBe(0)
+    setMuted(false)
+    const before = fake.created.oscillators.length
+    for (let i = 0; i < 4; i++) {
+      vi.advanceTimersByTime(700)
+      fake.currentTime += 0.7
+    }
+    const resumed = fake.created.oscillators.length - before
+    expect(resumed).toBeGreaterThan(0) // singing again…
+    expect(resumed).toBeLessThanOrEqual(4) // …not a burst of backed-up phrases
+  })
+
   it('turning a voice off while muted still tears it down', () => {
     const fake = boot(0)
     setPadOn(true)

@@ -478,6 +478,12 @@ function maybePlayPhrase(at) {
 
 function planPhrases() {
   if (!ambientOn || !ctx || !ambientGain) return
+  // While muted the master bus is silent, but scheduling anyway would
+  // still build (and throw away) a phrase's oscillators every few
+  // seconds for nothing (AUDIT L5). Skip the pass entirely and leave
+  // nextPhraseAt behind; the clamp below resyncs it on the first live
+  // pass after unmute, so no backed-up phrases burst out.
+  if (muted) return
   // The scheduler interval is throttled while the tab is hidden, but the
   // audio clock keeps running. Without this clamp, a returning tab finds
   // nextPhraseAt far in the past and the loop below schedules every
