@@ -5,6 +5,8 @@ import {
   settleWarmup,
   nextQualityIdx,
   msaaRetargetNeeded,
+  msaaFor,
+  QUALITY_STEPS,
   DOWN_RATIO,
   UP_RATIO,
   BAD_WINDOWS_TO_STEP_DOWN,
@@ -191,5 +193,47 @@ describe('msaaRetargetNeeded()', () => {
   it('is needed when the step changes the sample count', () => {
     expect(msaaRetargetNeeded(4, 0)).toBe(true)
     expect(msaaRetargetNeeded(0, 4)).toBe(true)
+  })
+})
+
+describe('msaaFor()', () => {
+  it('drops MSAA at DPR >= 1.5, where density and bloom hide aliasing (P03)', () => {
+    expect(msaaFor(1.5)).toBe(0)
+    expect(msaaFor(2)).toBe(0)
+    expect(msaaFor(3)).toBe(0)
+  })
+
+  it('keeps 4x MSAA below 1.5, where geometry edges would alias (P03)', () => {
+    expect(msaaFor(1)).toBe(4)
+    expect(msaaFor(1.25)).toBe(4)
+    expect(msaaFor(1.49)).toBe(4)
+  })
+})
+
+describe('QUALITY_STEPS ladder (P03)', () => {
+  it('starts at DPR 1.5', () => {
+    expect(QUALITY_STEPS[0].dpr).toBe(1.5)
+  })
+
+  it('keeps the shadow map at 1024 on every step except possibly the last', () => {
+    // The owner's rule: shadow drops to 512 only at the lowest step.
+    // This is the guard the P03 review asked for — retuning a middle
+    // step to 512 must fail here, not slip through.
+    for (let i = 0; i < QUALITY_STEPS.length - 1; i += 1) {
+      expect(QUALITY_STEPS[i].shadow).toBe(1024)
+    }
+    expect([1024, 512]).toContain(QUALITY_STEPS.at(-1).shadow)
+  })
+
+  it('never raises the pixel ratio on the way down', () => {
+    for (let i = 1; i < QUALITY_STEPS.length; i += 1) {
+      expect(QUALITY_STEPS[i].dpr).toBeLessThanOrEqual(QUALITY_STEPS[i - 1].dpr)
+    }
+  })
+
+  it('has no two identical adjacent steps (a no-op step wastes a governor window)', () => {
+    for (let i = 1; i < QUALITY_STEPS.length; i += 1) {
+      expect(QUALITY_STEPS[i]).not.toEqual(QUALITY_STEPS[i - 1])
+    }
   })
 })

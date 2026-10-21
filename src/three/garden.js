@@ -240,15 +240,17 @@ export function buildGarden(scene, { envTex, reduced }) {
   bed.position.y = -0.45
   scene.add(bed)
 
-  // The water surface
+  // The water surface. P03: MeshStandardMaterial instead of
+  // MeshPhysicalMaterial — the clearcoat layer added a second BRDF
+  // over every pixel of the board for a look the env reflection at
+  // roughness 0.12 already gives; envMap/roughness/metalness/emissive
+  // are unchanged so the moon still reflects on the pond.
   const water = new THREE.Mesh(
     new THREE.PlaneGeometry(20.4, 20.4),
-    new THREE.MeshPhysicalMaterial({
+    new THREE.MeshStandardMaterial({
       color: POND_WATER,
       roughness: 0.12,
       metalness: 0.25,
-      clearcoat: 1.0,
-      clearcoatRoughness: 0.1,
       envMap: envTex,
       envMapIntensity: 0.75,
       emissive: 0x0a1c17,
@@ -365,7 +367,9 @@ export function buildGarden(scene, { envTex, reduced }) {
       cluster.add(tuft)
     }
     cluster.position.set(rx, -0.82, rz)
-    cluster.castShadow = true
+    // No castShadow here (P03): cluster is a Group — it draws nothing
+    // itself, so the flag was a no-op that only misled readers. The
+    // stalks deliberately do not cast either (shadow-caster cost).
     scene.add(cluster)
   }
 

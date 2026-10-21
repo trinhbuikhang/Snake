@@ -37,6 +37,26 @@
 // it numbers. State is a plain object; every function returns a new
 // state instead of mutating.
 
+// The quality ladder the governor walks (P03). The garden is a
+// heavy frame — UnrealBloom over composer targets plus a PCF-soft
+// shadow map, all scaled by the pixel ratio — and fill-rate is the
+// bottleneck, so the ladder starts at DPR 1.5 with a 1024px shadow
+// map and sacrifices in this order: pixel ratio first, then bloom;
+// the shadow map drops to 512 only at the very last step (owner's
+// call: shadow softness is worth more than the fill it saves until
+// every other sacrifice is spent). MSAA is deliberately NOT a
+// ladder field: it follows the effective pixel ratio via msaaFor()
+// below. Exported (rather than private to the engine) so the ladder
+// itself is unit-tested — a middle step silently dropping to 512
+// must fail a test, not just a review.
+export const QUALITY_STEPS = [
+  { dpr: 1.5,  shadow: 1024, bloom: true  },
+  { dpr: 1.25, shadow: 1024, bloom: true  },
+  { dpr: 1,    shadow: 1024, bloom: true  },
+  { dpr: 1,    shadow: 1024, bloom: false },
+  { dpr: 1,    shadow: 512,  bloom: false },
+]
+
 export const DOWN_RATIO = 0.75
 export const UP_RATIO = 0.92
 export const BAD_WINDOWS_TO_STEP_DOWN = 2
@@ -62,6 +82,15 @@ export function createGovernor(maxIdx) {
 // (appliedMsaa still null) that means exactly once.
 export function msaaRetargetNeeded(appliedMsaa, stepMsaa) {
   return appliedMsaa !== stepMsaa
+}
+
+// How many MSAA samples the composer's scene targets get (P03): a
+// pure function of the EFFECTIVE pixel ratio. At DPR >= 1.5 the
+// pixel density — helped by bloom softening edges — makes aliasing
+// invisible, so samples drop to 0 and the fill/bandwidth goes back
+// to the frame; below 1.5 geometry edges need the classic 4x.
+export function msaaFor(dpr) {
+  return dpr >= 1.5 ? 0 : 4
 }
 
 // Feed one frame interval (seconds) during warmup. Intervals from a

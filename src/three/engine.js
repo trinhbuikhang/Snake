@@ -24,7 +24,7 @@ import { useGame, READY_BEAT_S } from '../game/store.js'
 import { inputBus } from '../game/inputBus.js'
 import { isTypingTarget } from '../game/keyboard.js'
 import audio from '../audio/sound.js'
-import { createGovernor, observeWarmupFrame, settleWarmup, nextQualityIdx, msaaRetargetNeeded } from './qualityGovernor.js'
+import { createGovernor, observeWarmupFrame, settleWarmup, nextQualityIdx, msaaRetargetNeeded, msaaFor, QUALITY_STEPS } from './qualityGovernor.js'
 import { disposeObject3D } from './dispose.js'
 import { rescaleAccum } from './tickClock.js'
 import { buildGarden } from './garden.js'
@@ -56,8 +56,19 @@ export function createEngine(canvas, { reduced } = {}) {
   const mq = window.matchMedia?.('(prefers-reduced-motion: reduce)')
   reduced = reduced ?? !!mq?.matches
 
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' })
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+  // P03: gameplay renders through the EffectComposer (created below,
+  // whenever not reduced), which does its own MSAA on its render
+  // targets — a multisampled default framebuffer on top of that costs
+  // memory and bandwidth for nothing. Decide composer use BEFORE the
+  // renderer exists so antialias can follow it: on only when there is
+  // no composer (reduced mode draws straight to the canvas).
+  const useComposer = !reduced
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: !useComposer, powerPreference: 'high-performance' })
+  // Clamp by the starting step's DPR cap right away (P03 review
+  // note): without this the composer would allocate one oversized
+  // target at the device's full DPR before start()'s applyQuality()
+  // brings it down to step 0.
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, QUALITY_STEPS[0].dpr))
   renderer.setSize(canvas.clientWidth, canvas.clientHeight, false)
   renderer.toneMapping = THREE.ACESFilmicToneMapping
   renderer.toneMappingExposure = 1.15
@@ -91,20 +102,11 @@ export function createEngine(canvas, { reduced } = {}) {
   const paintParams = { cur: null, prev: null, t: 0, death: null, animT: 0, dt: 0, isBoosting: false }
 
   // ---- adaptive quality ------------------------------------------------------
-  // The garden is a heavy frame: UnrealBloom + 4x-MSAA composer targets +
-  // a 2048px PCF-soft shadow map at up to DPR 2. On weaker GPUs that stack
-  // tanks the frame rate, so a governor watches a rolling FPS average and
-  // steps the quality down until the frame budget fits. Ordered
-  // cheapest-sacrifice-first: MSAA under bloom is nearly invisible, then
-  // pixel ratio, then shadow resolution — the bloom itself goes last.
-  const QUALITY_STEPS = [
-    { dpr: 2,    msaa: 4, shadow: 2048, bloom: true  },
-    { dpr: 2,    msaa: 0, shadow: 2048, bloom: true  },
-    { dpr: 1.5,  msaa: 0, shadow: 2048, bloom: true  },
-    { dpr: 1.5,  msaa: 0, shadow: 1024, bloom: true  },
-    { dpr: 1.25, msaa: 0, shadow: 1024, bloom: true  },
-    { dpr: 1,    msaa: 0, shadow: 1024, bloom: false },
-  ]
+  // The ladder itself (QUALITY_STEPS) lives in qualityGovernor.js,
+  // exported so its shape is unit-tested (P03 review). In short: start
+  // at DPR 1.5 / shadow 1024, sacrifice pixel ratio, then bloom, and
+  // drop the shadow map to 512 only at the last step; MSAA follows
+  // the effective pixel ratio via msaaFor(), not a ladder field.
   let qualityIdx = 0
   let appliedMsaa = null
   let fpsAccum = 0
@@ -127,26 +129,28 @@ export function createEngine(canvas, { reduced } = {}) {
       composer.setPixelRatio(dpr)
       composer.setSize(w, h)
     }
-    return q
+    return { q, dpr }
   }
 
   function applyQuality() {
-    const q = applySize()
+    const { q, dpr } = applySize()
     if (composer) {
       // Retargeting MSAA samples disposes both composer render targets —
-      // only pay that when the step actually changes msaa (T06: resizes
-      // and DPR/shadow-only steps must not dispose anything). The
-      // decision is the pure msaaRetargetNeeded() so it is unit-tested.
-      if (msaaRetargetNeeded(appliedMsaa, q.msaa)) {
+      // only pay that when the derived count actually changes (T06:
+      // resizes and shadow-only steps must not dispose anything). The
+      // count is msaaFor(effective dpr) (P03); the retarget decision
+      // stays the pure msaaRetargetNeeded() so it is unit-tested.
+      const stepMsaa = msaaFor(dpr)
+      if (msaaRetargetNeeded(appliedMsaa, stepMsaa)) {
         try {
-          composer.renderTarget1.samples = q.msaa
+          composer.renderTarget1.samples = stepMsaa
           composer.renderTarget1.dispose()
-          composer.renderTarget2.samples = q.msaa
+          composer.renderTarget2.samples = stepMsaa
           composer.renderTarget2.dispose()
         } catch {
           /* MSAA optional */
         }
-        appliedMsaa = q.msaa
+        appliedMsaa = stepMsaa
       }
       if (bloomPass) bloomPass.enabled = q.bloom
     }
@@ -163,7 +167,7 @@ export function createEngine(canvas, { reduced } = {}) {
   const moon = new THREE.DirectionalLight(0xf2ede4, 2.1)
   moon.position.set(12, 30, 8)
   moon.castShadow = true
-  moon.shadow.mapSize.set(2048, 2048)
+  moon.shadow.mapSize.set(1024, 1024) // P03: 1024 at the top step; applyQuality owns it per step
   moon.shadow.camera.left = -16
   moon.shadow.camera.right = 16
   moon.shadow.camera.top = 16
@@ -213,7 +217,7 @@ export function createEngine(canvas, { reduced } = {}) {
   // ---- postprocessing ----------------------------------------------------
   let composer = null
   let bloomPass = null
-  if (!reduced) {
+  if (useComposer) {
     composer = new EffectComposer(renderer)
     composer.addPass(new RenderPass(scene, camera))
     bloomPass = new UnrealBloomPass(new THREE.Vector2(1, 1), BLOOM_BASE, 0.68, 0.84)
@@ -1008,7 +1012,8 @@ export function createEngine(canvas, { reduced } = {}) {
     // Apply the starting quality step in full exactly once (T06 review):
     // resize() now only sets sizes, and the governor only re-applies on
     // a step change — without this call the composer's targets would
-    // keep their default 0 samples instead of step 0's 4x MSAA.
+    // keep their default 0 samples instead of the count msaaFor()
+    // derives for step 0's effective DPR (P03).
     // appliedMsaa starts null, so this first call performs the one
     // MSAA retarget; later resizes stay size-only.
     applyQuality()
@@ -1048,7 +1053,7 @@ export function createEngine(canvas, { reduced } = {}) {
       composer.passes?.forEach((p) => p.dispose?.())
       composer.dispose?.()
     }
-    // The moon's 2048px shadow map is a WebGLRenderTarget that
+    // The moon's shadow map is a WebGLRenderTarget that
     // disposeObject3D cannot reach (it only gathers geometry,
     // materials and textures) — release it explicitly (T08 review).
     moon.dispose()
