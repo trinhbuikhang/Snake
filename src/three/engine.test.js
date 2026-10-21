@@ -20,6 +20,9 @@ const h = vi.hoisted(() => ({
   renderPasses: [],
   outputPasses: [],
   roomEnvs: [],
+  winListeners: {},
+  docListeners: {},
+  fakeNow: null,
   roCallbacks: [],
   raf: new Map(),
   nextRafId: 1,
@@ -137,12 +140,20 @@ vi.mock('../audio/sound.js', () => {
 globalThis.window = {
   matchMedia: () => ({ matches: false }),
   devicePixelRatio: 2,
-  addEventListener: vi.fn(),
-  removeEventListener: vi.fn(),
+  addEventListener: vi.fn((type, fn) => {
+    h.winListeners[type] = fn
+  }),
+  removeEventListener: vi.fn((type) => {
+    delete h.winListeners[type]
+  }),
 }
 globalThis.document = {
-  addEventListener: vi.fn(),
-  removeEventListener: vi.fn(),
+  addEventListener: vi.fn((type, fn) => {
+    h.docListeners[type] = fn
+  }),
+  removeEventListener: vi.fn((type) => {
+    delete h.docListeners[type]
+  }),
   hidden: false,
 }
 globalThis.ResizeObserver = class {
@@ -175,6 +186,22 @@ function freshCanvas() {
   }
 }
 
+// Drive the engine's rAF loop forward in 100ms steps (dt clamps at
+// 0.1s per frame, so each step advances engine clocks by exactly 0.1s).
+// The clock is continuous across calls within a test — the engine's own
+// prevTS bookkeeping depends on monotonic timestamps.
+function runFrames(msTotal) {
+  if (h.fakeNow === null) h.fakeNow = performance.now()
+  for (let elapsed = 0; elapsed < msTotal; elapsed += 100) {
+    const entries = [...h.raf.entries()]
+    if (entries.length === 0) return
+    const [id, cb] = entries[entries.length - 1]
+    h.raf.delete(id)
+    h.fakeNow += 100
+    cb(h.fakeNow)
+  }
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   localStorage.clear()
@@ -185,6 +212,9 @@ beforeEach(() => {
   h.renderPasses = []
   h.outputPasses = []
   h.roomEnvs = []
+  h.winListeners = {}
+  h.docListeners = {}
+  h.fakeNow = null
   h.roCallbacks = []
   h.raf = new Map()
   h.scene = null
@@ -200,7 +230,7 @@ beforeEach(() => {
   }
   h.rig = {
     death: null,
-    group: {},
+    group: { position: new THREE.Vector3(0, 0, 0) },
     setInk: vi.fn(),
     reset: vi.fn(),
     setDir: vi.fn(),
@@ -304,6 +334,32 @@ describe('createEngine lifecycle', () => {
     expect(h.renderPasses[0].dispose).toHaveBeenCalledTimes(1)
     expect(h.bloomPasses[0].dispose).toHaveBeenCalledTimes(1)
     expect(h.outputPasses[0].dispose).toHaveBeenCalledTimes(1)
+  })
+
+  it('a blur during the ready beat holds the run at ready until focus returns (T10c)', () => {
+    const engine = createEngine(freshCanvas(), { reduced: false })
+    engine.start()
+    useGame.getState().start()
+    useGame.getState().beginNight()
+    expect(useGame.getState().status).toBe('ready')
+
+    // Halfway through the 1.8s beat, the window loses focus.
+    runFrames(1000)
+    expect(useGame.getState().status).toBe('ready')
+    h.winListeners.blur()
+
+    // However long the player is away, the run must not start itself.
+    runFrames(5000)
+    expect(useGame.getState().status).toBe('ready')
+
+    // On return the beat restarts from zero: a full READY_BEAT_S of
+    // attended frames is required before play begins.
+    h.winListeners.focus()
+    runFrames(1000)
+    expect(useGame.getState().status).toBe('ready')
+    runFrames(1000)
+    expect(useGame.getState().status).toBe('playing')
+    engine.destroy()
   })
 
   it('destroy() silences the audio and unsubscribes every store subscription', () => {

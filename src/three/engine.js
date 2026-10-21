@@ -217,6 +217,7 @@ export function createEngine(canvas, { reduced } = {}) {
   let interval = { v: BASE_INTERVAL }
   let accum = 0
   let readyAccum = 0 // clock for the "night begins" beat before the run starts
+  let readyHeld = false // T10c: beat frozen while the window is blurred/hidden
   let isBoosting = false
   let moonSpeedMult = 1 // moon-phase speed modifier for this run
   let modeSpeedMult = 1 // game-mode speed modifier for this run
@@ -584,12 +585,25 @@ export function createEngine(canvas, { reduced } = {}) {
   const onBlur = () => {
     const st = useGame.getState()
     if (st.status === 'playing') st.pause()
+    else if (st.status === 'ready') {
+      // T10c: hold the ready beat while the player is away — a run must
+      // never start itself in an unattended window. The beat restarts
+      // from zero when focus returns (onFocus), so the player always
+      // gets the full beat with eyes on the garden.
+      readyHeld = true
+      readyAccum = 0
+    }
     setBoost(false)
+  }
+  const onFocus = () => {
+    readyHeld = false
   }
   const onVis = () => {
     if (document.hidden) onBlur()
+    else onFocus()
   }
   window.addEventListener('blur', onBlur)
+  window.addEventListener('focus', onFocus)
   document.addEventListener('visibilitychange', onVis)
 
   // ---- store wiring ----------------------------------------------------------
@@ -812,11 +826,14 @@ export function createEngine(canvas, { reduced } = {}) {
       }
     } else if (st.status === 'ready' && !dying) {
       // The "night begins" beat: the garden breathes, the snake holds still.
-      // Driven by the frame loop so a backgrounded tab can't skip it.
-      readyAccum += dt
-      if (readyAccum >= READY_BEAT_S) {
-        readyAccum = 0
-        st.enterPlaying()
+      // Driven by the frame loop so a backgrounded tab can't skip it —
+      // and held entirely while the window is blurred (T10c, see onBlur).
+      if (!readyHeld) {
+        readyAccum += dt
+        if (readyAccum >= READY_BEAT_S) {
+          readyAccum = 0
+          st.enterPlaying()
+        }
       }
     } else if ((st.status === 'title' || st.status === 'prologue') && !dying) {
       demoAccum += dt
@@ -882,6 +899,7 @@ export function createEngine(canvas, { reduced } = {}) {
     window.removeEventListener('keydown', onKeyDown)
     window.removeEventListener('keyup', onKeyUp)
     window.removeEventListener('blur', onBlur)
+    window.removeEventListener('focus', onFocus)
     document.removeEventListener('visibilitychange', onVis)
     canvas.removeEventListener('touchstart', onTouchStart)
     canvas.removeEventListener('touchmove', onTouchMove)
