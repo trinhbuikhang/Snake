@@ -71,7 +71,7 @@ Prototype đầy đủ đã chạy được (xem `docs/plan/skins/reference/`). 
 
 ## P01 — Chuyển động tuyến tính đều + giật khi bật boost
 
-- [ ] **P01** · Mức: **Cao** · Branch: `perf/p01-linear-motion`
+- [x] **P01** · Mức: **Cao** · Branch: `perf/p01-linear-motion`
 
 **Vấn đề**
 - `src/three/snakeRig.js` L18 `easeOutQuad`, L286 `const bt = easeOutQuad(t)`: mỗi đốt được nội suy từ ô cũ sang ô mới bằng easing **trong từng tick**. Đầu rắn lao nhanh đầu tick rồi gần như dừng cuối tick. Đo bằng `tooling/motion-sim.mjs` (màn 60Hz, interval 0.165s): vận tốc đầu rắn dao động **11.4 → 0.4 ô/s** trong mỗi tick (trung bình 6.06). Với nội suy tuyến tính: **hằng 6.06 ô/s**. Đây là cảm giác "lác lác" chính.
