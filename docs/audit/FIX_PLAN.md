@@ -258,7 +258,7 @@ Commit bằng git thật (`git add` + `git commit`), không qua API dạng text.
 
 ## T08 — Teardown/dispose + unsubscribe
 
-- [ ] **T08** · Mức: **Trung bình** (AUDIT M4) · Branch: `fix/08-teardown`
+- [x] **T08** · Mức: **Trung bình** (AUDIT M4) · Branch: `fix/08-teardown`
 
 **Vấn đề**
 - `src/three/engine.js` L173: `useGame.subscribe(...)` (áp dụng garden) không lưu hàm unsubscribe; `destroy()` không gọi.
