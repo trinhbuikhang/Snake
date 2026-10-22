@@ -27,7 +27,7 @@ import { isTypingTarget } from '../game/keyboard.js'
 import audio from '../audio/sound.js'
 import { createGovernor, observeWarmupFrame, settleWarmup, nextQualityIdx, msaaRetargetNeeded, msaaFor, QUALITY_STEPS, SPIKE_FRAME_MULTIPLE } from './qualityGovernor.js'
 import { disposeObject3D } from './dispose.js'
-import { rescaleAccum } from './tickClock.js'
+import { rescaleAccum, runTicks } from './tickClock.js'
 import { writeCellsInto } from './cellBuffer.js'
 import { alignedCamera } from './cameraFit.js'
 import { readSafeArea } from '../game/hudLayout.js'
@@ -419,8 +419,32 @@ export function createEngine(canvas, { reduced } = {}) {
   let prevCells = snapBufs[0]
   const fillWorldCells = (buf, cells) =>
     writeCellsInto(buf, cells.length, (i, o) => gridToWorldInto(cells[i].x, cells[i].y, o))
-  let interval = { v: BASE_INTERVAL }
-  let accum = 0
+  // The tick clock (C01): runTicks() in tickClock.js advances it; the
+  // object is created once and mutated in place (P06).
+  const tickClock = { accum: 0, interval: BASE_INTERVAL }
+  // The interval currently in force (C01): one closure shared by the
+  // frame loop's pre-tick sync and each tick's next-interval recompute.
+  const currentInterval = () =>
+    speedInterval(logic.foodsEaten, isBoosting, moonSpeedMult, modeSpeedMult, eventSpeedMult)
+  // One tick of the real game (C01): step the simulation, then the
+  // engine-side consequences in their original order. The result object
+  // is reused — the frame loop allocates nothing (P06).
+  const tickResult = { dead: false, nextInterval: 0 }
+  const tickStep = (tickDt) => {
+    const ev = step(logic, tickDt)
+    if (ev.dead) {
+      handleDeath(ev)
+      tickResult.dead = true
+      return tickResult
+    }
+    commitTick()
+    if (ev.ate) handleEat(ev)
+    // The Jade Carp: caught when the snake's head enters its cell.
+    if (spirit && logic.snake[0].x === spirit.x && logic.snake[0].y === spirit.y) catchSpirit()
+    tickResult.dead = false
+    tickResult.nextInterval = currentInterval()
+    return tickResult
+  }
   let readyAccum = 0 // clock for the "night begins" beat before the run starts
   let readyHeld = false // T10c: beat frozen while the window is blurred/hidden
   let isBoosting = false
@@ -511,9 +535,9 @@ export function createEngine(canvas, { reduced } = {}) {
     snapIdx = 0
     curCells = fillWorldCells(snapBufs[0], logic.snake)
     prevCells = curCells
-    accum = 0
+    tickClock.accum = 0
     isBoosting = false
-    interval.v = BASE_INTERVAL
+    tickClock.interval = BASE_INTERVAL
     rig.reset(logic.snake.length)
     rig.setDir(1, 0)
     paintParams.cur = curCells
@@ -624,7 +648,7 @@ export function createEngine(canvas, { reduced } = {}) {
     rig.startDeath(curCells, { x: curCells[0].x, z: curCells[0].z })
     dying = true
     deathT = 0
-    accum = 0
+    tickClock.accum = 0
     clearSpirit() // the spirit leaves when the night ends
     camShake = timeUp ? 0 : 0.38 // a finished feast needs no screen impact
     logic.deathCause = ev.cause || 'unknown'
@@ -689,11 +713,11 @@ export function createEngine(canvas, { reduced } = {}) {
     if (st.status === 'playing' && !dying) {
       isBoosting = boosting
       st.setBoosting(boosting)
-      const oldInterval = interval.v
-      interval.v = speedInterval(logic.foodsEaten, isBoosting, moonSpeedMult, modeSpeedMult, eventSpeedMult)
+      const oldInterval = tickClock.interval
+      tickClock.interval = currentInterval()
       // P01: keep the current tick's progress ratio — only the speed
       // changes, so the snake does not lurch when boost toggles mid-tick.
-      accum = rescaleAccum(accum, oldInterval, interval.v)
+      tickClock.accum = rescaleAccum(tickClock.accum, oldInterval, tickClock.interval)
     }
   }
 
@@ -870,10 +894,10 @@ export function createEngine(canvas, { reduced } = {}) {
         // The ready beat ends: start the simulation from a clean slate.
         // Snap prev onto cur (same buffer, P06): interpolation across
         // the beat would drag the snake from its pre-beat pose.
-        accum = 0
+        tickClock.accum = 0
         prevCells = curCells
       } else if (s.status === 'playing' && prev.status === 'paused') {
-        accum = 0
+        tickClock.accum = 0
         prevCells = curCells
         startRunAudio() // fade the night's sounds back in
       } else if (s.status === 'paused') {
@@ -1053,39 +1077,10 @@ export function createEngine(canvas, { reduced } = {}) {
     }
 
     if (st.status === 'playing' && !dying) {
-      accum += dt
-      const oldInterval = interval.v
-      interval.v = speedInterval(logic.foodsEaten, isBoosting, moonSpeedMult, modeSpeedMult, eventSpeedMult)
-      // P01: a multiplier change (moon phase, night event, …) must not
-      // shift the tick progress ratio either — rescale with the speed.
-      accum = rescaleAccum(accum, oldInterval, interval.v)
-      let guard = 0
-      while (accum >= interval.v) {
-        const tickDt = interval.v // seconds this tick consumes (drives the lantern clock)
-        const ev = step(logic, tickDt)
-        if (ev.dead) {
-          handleDeath(ev)
-          break
-        }
-        commitTick()
-        if (ev.ate) handleEat(ev)
-        // The Jade Carp: caught when the snake's head enters its cell.
-        if (spirit && logic.snake[0].x === spirit.x && logic.snake[0].y === spirit.y) catchSpirit()
-        const nextInterval = speedInterval(logic.foodsEaten, isBoosting, moonSpeedMult, modeSpeedMult, eventSpeedMult)
-        // Consume THIS tick's span (AUDIT L6): subtracting the freshly
-        // recomputed interval.v here would over/under-pay the accumulator
-        // whenever the step changed the speed (e.g. right after eating).
-        accum -= tickDt
-        // P01: the leftover is progress toward the next tick — rescale it
-        // from the consumed tick's span to the new interval so its ratio
-        // (and the painted position) does not jump when the speed changes.
-        accum = rescaleAccum(accum, tickDt, nextInterval)
-        interval.v = nextInterval
-        if (++guard > 6) {
-          accum = 0
-          break
-        }
-      }
+      // The tick block itself lives in tickClock.js (C01) so tests and
+      // the steering simulator drive this exact code; the per-tick work
+      // stays here via the once-created tickStep callback (P06).
+      runTicks(tickClock, dt, tickStep, currentInterval)
       // The carp swims on its own clock, independent of the snake's ticks.
       if (spirit) {
         spirit.accum += dt
@@ -1119,7 +1114,7 @@ export function createEngine(canvas, { reduced } = {}) {
     }
 
     let paintT = 0
-    if (st.status === 'playing' && !dying) paintT = clamp01(accum / interval.v)
+    if (st.status === 'playing' && !dying) paintT = clamp01(tickClock.accum / tickClock.interval)
     else if (st.status === 'ready') paintT = 0 // the snake holds its opening pose
     else if (st.status === 'title' || st.status === 'prologue') paintT = clamp01(demoAccum / DEMO_INTERVAL)
     else if (st.status === 'paused' || dying) paintT = 1 // dying: hold the death pose, don't snap back a tick

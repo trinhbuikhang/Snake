@@ -2,19 +2,20 @@
 // Tooling only — not part of the game build, not part of `npm test`.
 //
 // Drives the REAL pure modules (src/game/logic.js turn/step/speedInterval,
-// src/three/skins/serpentPath.js path builder) through a copy of the
-// engine's frame loop as of master @ f9d1dd6 (engine.js `loop()`:
-// accum += dt; while (accum >= interval) step(); paintT = accum/interval)
-// and the rig's head-yaw smoothing (serpentBase.js paint():
-// yawView += dyaw * min(1, dt * 20), target = atan2 of the spine 0.35
-// cells behind the head). Scripted inputs are delivered as DOM events
-// are: before the next animation frame's tick update.
+// src/three/skins/serpentPath.js path builder) through the engine's real
+// tick loop — runTicks() in src/three/tickClock.js, the exact function
+// engine.js calls since POLISH_PLAN C01 (at a fixed interval per speed,
+// so no syncInterval) — and the rig's head-yaw smoothing (serpentBase.js
+// paint(): yawView += dyaw * min(1, dt * 20), target = atan2 of the spine
+// 0.35 cells behind the head). Scripted inputs are delivered as DOM
+// events are: before the next animation frame's tick update.
 //
 // usage (repo root): node docs/plan/polish/tooling/steer-sim.mjs [--json out.json]
 // Deterministic (seeded RNG) — the same commit always prints the same numbers.
 import fs from 'fs'
 import { createGame, turn, step, speedInterval, gridToWorld, DIR } from '../../../../src/game/logic.js'
 import { createPathState, buildPathPoints, buildPath } from '../../../../src/three/skins/serpentPath.js'
+import { runTicks } from '../../../../src/three/tickClock.js'
 
 const yawArg = process.argv.indexOf('--yaw-tau-k')
 const YAW_K = yawArg > 0 ? +process.argv[yawArg + 1] : 0
@@ -42,7 +43,8 @@ function freshGame() {
 function run({ interval, fps, inputs, duration, yaw = false }) {
   const g = freshGame()
   const dt = 1 / fps
-  let accum = 0
+  const clock = { accum: 0, interval }
+  let deadEv = null
   let now = 0
   let k = 0
   const steps = [] // { t, dir }
@@ -60,20 +62,21 @@ function run({ interval, fps, inputs, duration, yaw = false }) {
       if (turn(g, inputs[k].key)) accepted.push({ ...inputs[k], stepIdx: steps.length })
       k++
     }
-    accum += dt
-    let guard = 0
-    while (accum >= interval) {
-      const ev = step(g, interval)
-      if (ev.dead) return { steps, accepted, frames, dead: true, cause: ev.cause }
+    runTicks(clock, dt, (tickDt, clk) => {
+      const ev = step(g, tickDt)
+      if (ev.dead) {
+        deadEv = ev
+        return { dead: true, nextInterval: interval }
+      }
       // a step happens at the tick boundary inside this frame
-      steps.push({ t: now - (accum - interval), frameT: now, dir: g.dir })
+      steps.push({ t: now - (clk.accum - tickDt), frameT: now, dir: g.dir })
       prev = cur
       cur = toCells()
-      accum -= interval
-      if (++guard > 6) { accum = 0; break }
-    }
+      return { dead: false, nextInterval: interval }
+    })
+    if (deadEv) return { steps, accepted, frames, dead: true, cause: deadEv.cause }
     if (yaw) {
-      const t = Math.min(1, accum / interval)
+      const t = Math.min(1, clock.accum / interval)
       const m = buildPathPoints(path, cur, prev, t, 0.5)
       buildPath(path, m, null)
       const { S, D, nS } = path

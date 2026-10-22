@@ -141,7 +141,7 @@ Phát hiện:
 
 ## C01 — Vòng lặp tick thuần + test lái tốc độ cao
 
-- [ ] **C01** · Mức: **Cao** · Branch: `feat/c01-steering-tests`
+- [x] **C01** · Mức: **Cao** · Branch: `feat/c01-steering-tests`
 
 **Mục tiêu**
 Khoá bằng test cái đang đúng (hàng đợi rẽ, độ trễ ≤ 1 tick) **trên đúng vòng lặp engine dùng**, để C02–C04 và mọi thay đổi sau không làm hỏng. Task này **không đổi hành vi**.
