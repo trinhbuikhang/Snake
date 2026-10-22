@@ -552,6 +552,9 @@ export function PauseOverlay() {
             </button>
           )}
         </div>
+        <div className="pause-settings">
+          <SettingsToggles labelled />
+        </div>
         <p className="hint">
           Press <kbd>P</kbd> or <kbd>Esc</kbd> to resume
         </p>
@@ -1265,48 +1268,68 @@ function PlayingHud() {
   )
 }
 
-function Corners() {
+// Camera / touch pad / sound toggles (H02). Two shapes, one logic:
+// unlabelled = the round .icon-btn trio used by Corners (icons show
+// the ACTION, as before); labelled = .pill-toggle rows for the
+// pause sheet, where icon + text show the CURRENT STATE (the
+// camera's name, "Touch pad", "Sound on/off") so the sheet works
+// on narrow screens where the bar keeps only Pause (H03).
+function SettingsToggles({ labelled = false }) {
   const muted = useGame((s) => s.muted)
   const setMuted = useGame((s) => s.setMuted)
-  const status = useGame((s) => s.status)
-  const togglePause = useGame((s) => s.togglePause)
   const cameraMode = useGame((s) => s.cameraMode)
   const toggleCameraMode = useGame((s) => s.toggleCameraMode)
   const showControls = useGame((s) => s.showControls)
   const toggleControls = useGame((s) => s.toggleControls)
+  const cls = labelled ? 'pill-toggle' : 'icon-btn'
 
   return (
-    <div className="chrome-actions">
+    <>
       <button
         type="button"
-        className="icon-btn"
+        className={cls}
         aria-label="Change camera angle (C key)"
         title={`Camera: ${CAM_LABELS[cameraMode] || 'Classic 3D'} (C key)`}
         onClick={toggleCameraMode}
       >
         {icons.camera}
+        {labelled && <span>{CAM_LABELS[cameraMode] || 'Classic 3D'}</span>}
       </button>
 
       <button
         type="button"
-        className={`icon-btn ${showControls ? 'icon-btn--active' : ''}`}
+        className={`${cls}${showControls ? ` ${cls}--active` : ''}`}
         aria-label="Toggle virtual controls"
         title="Toggle virtual controls"
+        aria-pressed={showControls}
         onClick={toggleControls}
       >
         {icons.gamepad}
+        {labelled && <span>Touch pad</span>}
       </button>
 
       <button
         type="button"
-        className="icon-btn"
+        className={cls}
         aria-label={muted ? 'Unmute' : 'Mute'}
         title={muted ? 'Unmute (M key)' : 'Mute (M key)'}
         aria-pressed={muted}
         onClick={() => setMuted(!muted)}
       >
-        {muted ? icons.unmute : icons.mute}
+        {labelled ? (muted ? icons.mute : icons.unmute) : muted ? icons.unmute : icons.mute}
+        {labelled && <span>{muted ? 'Sound off' : 'Sound on'}</span>}
       </button>
+    </>
+  )
+}
+
+function Corners() {
+  const status = useGame((s) => s.status)
+  const togglePause = useGame((s) => s.togglePause)
+
+  return (
+    <div className="chrome-actions">
+      <SettingsToggles />
 
       {(status === 'playing' || status === 'paused') && (
         <button
