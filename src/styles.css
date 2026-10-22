@@ -628,6 +628,19 @@ kbd {
   color: #ffffff;
 }
 
+/* C03: the pad owns hit-testing (the whole square steers); the buttons
+   are display + labels only. --active mirrors :active for pad steering. */
+.dbtn {
+  pointer-events: none;
+}
+
+.dbtn--active {
+  background: rgba(78, 237, 184, 0.35);
+  border-color: var(--jade);
+  transform: scale(0.92);
+  color: #ffffff;
+}
+
 .dbtn svg {
   width: 22px;
   height: 22px;

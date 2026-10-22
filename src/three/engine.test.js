@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import * as THREE from 'three'
 import { createEngine } from './engine.js'
 import { useGame } from '../game/store.js'
+import { inputBus } from '../game/inputBus.js'
 
 // Engine lifecycle tests (T08, plus the PR #23 review note: the
 // startup applyQuality() call had no automated guard).
@@ -687,6 +688,33 @@ describe('createEngine camera follows the HUD (H04)', () => {
     useGame.getState().toggleControls()
     runFrames(2000)
     expect(camera.position.x).toBeGreaterThan(1)
+    engine.destroy()
+  })
+})
+
+describe('Dash held through the ready beat (C03)', () => {
+  it('boost pressed during ready applies on entering playing; releasing it turns boost off', () => {
+    const engine = createEngine(freshCanvas(), { reduced: false })
+    engine.start()
+    useGame.setState({ status: 'ready' })
+    inputBus.emit({ type: 'boost', boosting: true })
+    // Still in the ready beat: setBoost gates on 'playing', nothing yet.
+    expect(useGame.getState().isBoosting).toBe(false)
+    useGame.getState().enterPlaying()
+    expect(useGame.getState().isBoosting).toBe(true)
+    inputBus.emit({ type: 'boost', boosting: false })
+    expect(useGame.getState().isBoosting).toBe(false)
+    engine.destroy()
+  })
+
+  it('boost released again before playing does not leak into the run', () => {
+    const engine = createEngine(freshCanvas(), { reduced: false })
+    engine.start()
+    useGame.setState({ status: 'ready' })
+    inputBus.emit({ type: 'boost', boosting: true })
+    inputBus.emit({ type: 'boost', boosting: false })
+    useGame.getState().enterPlaying()
+    expect(useGame.getState().isBoosting).toBe(false)
     engine.destroy()
   })
 })

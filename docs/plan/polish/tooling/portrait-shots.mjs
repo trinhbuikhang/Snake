@@ -7,7 +7,9 @@
 // For each portrait viewport: <label>-<id>-title.png, -play.png (coach skipped),
 // -coach.png (first coach step), -paused.png, and <label>-portrait.json with:
 //   stat value font size/family + numeral style, d-pad/Dash rects,
-//   padHit = share of the d-pad's square that lands on a direction button,
+//   padHit = share of the d-pad's live surface (outside the 16px centre
+//   dead zone, C03) where a tap actually steers — elementFromPoint inside
+//   .dpad. Before C03 it counted points landing on a .dbtn (0.281).
 //   pause-sheet + title tap sizes.
 import fs from 'fs'
 import path from 'path'
@@ -70,8 +72,15 @@ for (const vp of PORTRAIT) {
     let padHit = null
     if (pad) {
       const r = pad.getBoundingClientRect(); let n = 0, hit = 0
-      for (let y = r.top + 2; y < r.bottom; y += 4) for (let x = r.left + 2; x < r.right; x += 4) { n++; const el = document.elementFromPoint(x, y); if (el && el.closest('.dbtn')) hit++ }
-      padHit = +(hit / n).toFixed(3)
+      const cx = r.left + r.width / 2, cy = r.top + r.height / 2
+      for (let y = r.top + 2; y < r.bottom; y += 4) for (let x = r.left + 2; x < r.right; x += 4) {
+        // Dead zone (padDirection in src/game/padInput.js): points whose
+        // Chebyshev distance from the centre is < 16px steer nothing and
+        // are excluded from the share.
+        if (Math.max(Math.abs(x - cx), Math.abs(y - cy)) < 16) continue
+        n++; const el = document.elementFromPoint(x, y); if (el && el.closest('.dpad')) hit++
+      }
+      padHit = n ? +(hit / n).toFixed(3) : null
     }
     return {
       status: document.querySelector('.hud-top') ? 'playing' : 'other',

@@ -449,6 +449,7 @@ export function createEngine(canvas, { reduced } = {}) {
   let readyAccum = 0 // clock for the "night begins" beat before the run starts
   let readyHeld = false // T10c: beat frozen while the window is blurred/hidden
   let isBoosting = false
+  let boostHeld = false // C03: Dash physically held (inputBus), even before 'playing'
   let moonSpeedMult = 1 // moon-phase speed modifier for this run
   let modeSpeedMult = 1 // game-mode speed modifier for this run
   let eventSpeedMult = 1 // night-event speed modifier for this run
@@ -538,6 +539,7 @@ export function createEngine(canvas, { reduced } = {}) {
     prevCells = curCells
     tickClock.accum = 0
     isBoosting = false
+    boostHeld = false
     tickClock.interval = BASE_INTERVAL
     rig.reset(logic.snake.length)
     rig.setDir(1, 0)
@@ -796,7 +798,12 @@ export function createEngine(canvas, { reduced } = {}) {
   const unsubBus = inputBus.on((ev) => {
     if (!ev) return
     if (ev.type === 'turn') requestTurn(ev.key)
-    if (ev.type === 'boost') setBoost(ev.boosting)
+    if (ev.type === 'boost') {
+      // C03: remember the physical hold even outside 'playing' — Dash
+      // pressed during the ready beat applies the moment the run starts.
+      boostHeld = ev.boosting
+      setBoost(ev.boosting)
+    }
     if (ev.type === 'camera') useGame.getState().toggleCameraMode()
   })
 
@@ -914,6 +921,10 @@ export function createEngine(canvas, { reduced } = {}) {
         audio.setWaterOn(false)
         audio.setAmbientOn(false)
       }
+      // C03: Dash already held through the ready beat — boost from the
+      // first tick instead of dropping the press (setBoost gates on
+      // 'playing', so the ready-time press only set the flag).
+      if (s.status === 'playing' && prev.status === 'ready' && boostHeld) setBoost(true)
     }
     if (s.muted !== prev.muted) audio.setMuted(s.muted)
     if (s.cameraMode !== prev.cameraMode || s.showControls !== prev.showControls) updateCameraTarget()
