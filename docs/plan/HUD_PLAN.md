@@ -146,7 +146,7 @@ Một module thuần (không React/Three) chứa mọi con số layout HUD mà C
 
 ## H03 — Thanh trên duy nhất (viên nang pastel + Pause), compact, safe-area
 
-- [ ] **H03** · Mức: **Cao** · Branch: `feat/h03-hud-top-bar`
+- [x] **H03** · Mức: **Cao** · Branch: `feat/h03-hud-top-bar`
 
 **Vấn đề**
 - `PlayingHud` (L1232) + `Corners` (L1268) định vị độc lập → 5 cặp chồng nhau ở 375–414px, 3 ở 600px, 1 ở tablet/landscape safe-area (xem bảng). Ảnh: `hud/images/before-after-portrait.jpg`.
