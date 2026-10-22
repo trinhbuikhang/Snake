@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useGame } from '../game/store.js'
 import { inputBus } from '../game/inputBus.js'
+import { isCompact } from '../game/hudLayout.js'
 import { MOON_PHASES, moonPhaseById, GAME_MODES, gameModeById } from '../game/logic.js'
 import { WHISPERS, WHISPER_COUNT } from '../game/whispers.js'
 import { VERSES, VERSE_COUNT } from '../game/verses.js'
@@ -70,6 +71,21 @@ const DIR_ARROW = {
   down: '↓',
   left: '←',
   right: '→',
+}
+
+// HUD plan: viewport size drives the compact bar (and, from H04/H05,
+// the touch cluster and the coach placement) — the same rules the
+// camera fit reads, from hudLayout.js. Resize listener only; no
+// per-frame layout reads.
+function useViewport() {
+  const read = () => ({ w: window.innerWidth, h: window.innerHeight })
+  const [vp, setVp] = useState(read)
+  useEffect(() => {
+    const on = () => setVp(read())
+    window.addEventListener('resize', on)
+    return () => window.removeEventListener('resize', on)
+  }, [])
+  return vp
 }
 
 const CAM_LABELS = {
@@ -1203,35 +1219,40 @@ export function JournalOverlay() {
   )
 }
 
-function Chip({ label, value, highlight }) {
+// One cell of the stat capsule (H03): tiny uppercase label over a
+// display-font value; kind picks the pastel accent (hudLayout palette).
+function Stat({ kind, label, children, title }) {
   return (
-    <div className={`chip${highlight ? ' chip--highlight' : ''}`}>
-      <span>{label}</span>
-      <b>{value}</b>
+    <div className={`hud-stat hud-stat--${kind}`} title={title}>
+      <span className="hud-stat__label">{label}</span>
+      <b className="hud-stat__value">{children}</b>
     </div>
   )
 }
 
 /**
- * Direction-queue indicator chip.
- * Displays current active direction and queued next turn arrow.
+ * Direction cell: current direction + queued next turn. While
+ * dashing it reads ⚡ under a "Dash" label and the capsule glows
+ * (hud-stats--boost) — the bar never changes size.
  */
-function QueueChip({ currentDir, queuedDir }) {
+function DirStat({ currentDir, queuedDir, boosting }) {
   const hasQueue = !!queuedDir
   return (
-    <div
-      className={`chip queue-chip ${hasQueue ? 'queue-chip--buffered' : ''}`}
+    <Stat
+      kind={`dir${hasQueue ? ' hud-stat--buffered' : ''}`}
+      label={boosting ? 'Dash' : 'Dir'}
       title={hasQueue ? `Turning: ${queuedDir}` : `Current direction: ${currentDir}`}
     >
-      <span>Dir</span>
-      <div className="queue-arrows">
-        <b className="dir-main">{DIR_ARROW[currentDir] || '→'}</b>
-        {hasQueue && <b className="dir-next">{DIR_ARROW[queuedDir]}</b>}
-      </div>
-    </div>
+      {boosting ? '⚡' : DIR_ARROW[currentDir] || '→'}
+      {hasQueue && <i className="dir-next">{DIR_ARROW[queuedDir]}</i>}
+    </Stat>
   )
 }
 
+// The single top bar (H03): one 44px grid row — stat capsule in the
+// middle, actions on the right — so the capsule and the buttons can
+// never overlap again. Compact (< 560px): the capsule takes the left
+// and only Pause stays; the other toggles live in the pause sheet.
 function PlayingHud() {
   const score = useGame((s) => s.score)
   const length = useGame((s) => s.length)
@@ -1241,28 +1262,45 @@ function PlayingHud() {
   const queuedDir = useGame((s) => s.queuedDir)
   const gameMode = useGame((s) => s.gameMode)
   const timeLeft = useGame((s) => s.timeLeft)
+  const togglePause = useGame((s) => s.togglePause)
+  const { w } = useViewport()
+  const compact = isCompact(w)
 
   const showTimer = gameMode === 'lantern' && timeLeft != null
   const timerText = showTimer ? `0:${String(Math.max(0, timeLeft)).padStart(2, '0')}` : ''
 
   return (
-    <div className="hud-top">
-      <div className="chips">
-        <Chip label="Score" value={score} highlight />
-        <Chip label="Length" value={length} />
-        <Chip label="Best" value={best} />
+    <div className={`hud-top${compact ? ' hud-top--compact' : ''}`}>
+      <div
+        className={`hud-stats${isBoosting ? ' hud-stats--boost' : ''}`}
+        role="group"
+        aria-label="Run stats"
+      >
+        <Stat kind="score" label="Score">{score}</Stat>
+        <Stat kind="length" label="Length">{length}</Stat>
+        <Stat kind="best" label="Best">{best}</Stat>
         {showTimer && (
-          <div
-            className={`chip chip--timer${timeLeft <= 10 ? ' chip--timer-low' : ''}`}
+          <Stat
+            kind={`timer${timeLeft <= 10 ? ' hud-stat--timer-low' : ''}`}
+            label="🏮"
             title="Time remaining in this Lantern Rush"
-            aria-live="off"
           >
-            <span>🏮</span>
-            <b>{timerText}</b>
-          </div>
+            {timerText}
+          </Stat>
         )}
-        <QueueChip currentDir={currentDir} queuedDir={queuedDir} />
-        {isBoosting && <div className="chip chip--boost">⚡ DASH</div>}
+        <DirStat currentDir={currentDir} queuedDir={queuedDir} boosting={isBoosting} />
+      </div>
+      <div className="hud-actions">
+        {!compact && <SettingsToggles />}
+        <button
+          type="button"
+          className="icon-btn icon-btn--pause"
+          aria-label="Pause"
+          title="Pause / Resume (P key)"
+          onClick={togglePause}
+        >
+          {icons.pause}
+        </button>
       </div>
     </div>
   )
@@ -1323,25 +1361,13 @@ function SettingsToggles({ labelled = false }) {
   )
 }
 
+// Title / game-over corner buttons. While playing or paused the
+// top bar and the pause sheet own these toggles instead (H03), so
+// Hud() does not render Corners in those states.
 function Corners() {
-  const status = useGame((s) => s.status)
-  const togglePause = useGame((s) => s.togglePause)
-
   return (
     <div className="chrome-actions">
       <SettingsToggles />
-
-      {(status === 'playing' || status === 'paused') && (
-        <button
-          type="button"
-          className="icon-btn"
-          aria-label={status === 'paused' ? 'Resume' : 'Pause'}
-          title="Pause / Resume (P key)"
-          onClick={togglePause}
-        >
-          {icons.pause}
-        </button>
-      )}
     </div>
   )
 }
@@ -1410,7 +1436,7 @@ export default function Hud() {
   return (
     <>
       <div className="vignette" />
-      <Corners />
+      {status !== 'playing' && status !== 'paused' && <Corners />}
       {status === 'title' && !showHowTo && !showJournal && !showGarden && <TitleOverlay />}
       {status === 'title' && showHowTo && <HowToOverlay />}
       {status === 'title' && showJournal && !showHowTo && <JournalOverlay />}

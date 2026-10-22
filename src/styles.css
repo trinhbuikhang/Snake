@@ -51,6 +51,14 @@
   --hud-bar-h: 44px;
   --hud-btn: 44px;
   --hud-gap: 8px;
+  /* HUD plan pastel accents + capsule surface (H03) */
+  --pastel-mint: #b8f3dc;
+  --pastel-lilac: #d9cbff;
+  --pastel-peach: #ffd8b5;
+  --pastel-moon: #fff0c4;
+  --pastel-rose: #ffc4d2;
+  --hud-glass: rgba(14, 20, 30, 0.8);
+  --hud-line: rgba(217, 203, 255, 0.28);
 }
 
 /* Invisible probe whose padding mirrors env(safe-area-inset-*) so
@@ -352,103 +360,129 @@ body {
   pointer-events: none;
 }
 
+/* The single top bar (H03): one 44px grid row inset by the larger
+   of --hud-edge and the safe-area inset. Capsule centred (column 2),
+   actions right (column 3) — one grid, so they can never overlap. */
 .hud-top {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
+  top: max(var(--hud-edge), env(safe-area-inset-top, 0px));
+  left: max(var(--hud-edge), env(safe-area-inset-left, 0px));
+  right: max(var(--hud-edge), env(safe-area-inset-right, 0px));
+  height: var(--hud-bar-h);
   z-index: var(--z-chrome);
-  display: flex;
-  justify-content: center;
-  padding-top: max(14px, env(safe-area-inset-top, 0px));
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: var(--hud-gap);
   pointer-events: none;
 }
 
-.chips {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+.hud-top > * {
+  pointer-events: auto;
 }
 
-.chip {
-  min-width: 74px;
+.hud-stats {
+  grid-column: 2;
+  display: flex;
+  align-items: stretch;
+  height: var(--hud-bar-h);
+  padding: 0 6px;
+  border-radius: 22px;
+  background: var(--hud-glass);
+  border: 1.5px solid var(--hud-line);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  pointer-events: none;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+/* Dashing glows the capsule — the bar itself never changes size. */
+.hud-stats--boost {
+  border-color: rgba(255, 216, 181, 0.8);
+  box-shadow: 0 0 18px rgba(255, 216, 181, 0.45);
+}
+
+.hud-actions {
+  grid-column: 3;
+  justify-self: end;
+  display: flex;
+  gap: var(--hud-gap);
+}
+
+.hud-stat {
+  min-width: 64px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 2px;
-  padding: 8px 16px;
-  background: var(--panel);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-md);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  justify-content: center;
+  gap: 1px;
+  padding: 0 8px;
+  position: relative;
 }
 
-.chip span {
-  font-size: 0.76rem;
-  letter-spacing: 0.18em;
+.hud-stat + .hud-stat::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 12px;
+  bottom: 12px;
+  width: 1px;
+  background: rgba(217, 203, 255, 0.18);
+}
+
+.hud-stat__label {
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: rgba(244, 240, 230, 0.65);
-}
-
-.chip b {
-  font-family: var(--font-display);
-  font-size: var(--fs-stat);
-  font-weight: 700;
-  line-height: 1.05;
-  color: #ffffff;
-}
-
-.chip--highlight b {
-  color: var(--gold-glow);
-  text-shadow: 0 0 14px rgba(255, 193, 7, 0.5);
-}
-
-.chip--boost {
-  background: linear-gradient(135deg, rgba(255, 193, 7, 0.3), rgba(255, 87, 34, 0.35));
-  border-color: var(--gold-glow);
-  color: #fff;
-  font-size: 0.82rem;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  padding: 12px 16px;
-  box-shadow: 0 0 20px rgba(255, 193, 7, 0.45);
-  animation: boost-pulse 0.8s ease-in-out infinite alternate;
-}
-
-@keyframes boost-pulse {
-  from { transform: scale(1); filter: brightness(1); }
-  to { transform: scale(1.05); filter: brightness(1.25); }
-}
-
-/* Queue Indicator Chip */
-.queue-chip {
-  min-width: 68px;
-}
-
-.queue-arrows {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 1.25rem;
+  color: rgba(255, 240, 196, 0.62);
   line-height: 1;
 }
 
-.dir-main {
+.hud-stat__value {
+  font-family: var(--font-display);
+  font-size: 1.22rem;
+  font-weight: 700;
+  line-height: 1.05;
   color: var(--cream);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
+.hud-stat--score .hud-stat__value { color: var(--pastel-moon); text-shadow: 0 0 10px rgba(255, 240, 196, 0.45); }
+.hud-stat--length .hud-stat__value { color: var(--pastel-mint); }
+.hud-stat--best .hud-stat__value { color: var(--pastel-lilac); }
+.hud-stat--dir .hud-stat__value { color: var(--pastel-peach); font-family: var(--font-ui); font-size: 1.05rem; }
+.hud-stat--timer .hud-stat__value { color: var(--pastel-peach); }
+.hud-stat--timer-low .hud-stat__value { color: var(--pastel-rose); animation: timer-pulse 1s ease-in-out infinite; }
+.hud-stat--dir { min-width: 52px; }
+
 .dir-next {
-  color: var(--jade);
-  font-weight: 800;
-  font-size: 1.35rem;
-  text-shadow: 0 0 12px rgba(78, 237, 184, 0.8);
+  font-style: normal;
+  margin-left: 4px;
+  color: var(--pastel-mint);
+  text-shadow: 0 0 10px rgba(184, 243, 220, 0.8);
   animation: next-turn-pulse 0.4s ease-out;
 }
 
-.queue-chip--buffered {
-  border-color: var(--jade);
-  box-shadow: 0 0 18px rgba(78, 237, 184, 0.35);
+/* Compact (< 560px): stats on the left, only Pause on the right. */
+.hud-top--compact {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.hud-top--compact .hud-stats {
+  grid-column: 1;
+  justify-self: stretch;
+  min-width: 0;
+}
+
+.hud-top--compact .hud-actions {
+  grid-column: 2;
+}
+
+.hud-top--compact .hud-stat {
+  min-width: 0;
+  flex: 1 1 0;
+  padding: 0 7px;
 }
 
 @keyframes next-turn-pulse {
@@ -760,7 +794,6 @@ kbd {
 /* ---------------- mobile adjustments ---------------- */
 
 @media (max-width: 480px) {
-  .chip { min-width: 60px; padding: 6px 10px; }
   .sheet { padding: 16px; }
   .sheet-card { padding: 1.8rem 1.3rem; }
   .actions .btn { width: 100%; max-width: 320px; }
@@ -776,7 +809,7 @@ kbd {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
   }
-  .best-badge, .chip--boost {
+  .best-badge, .hud-stat--timer-low .hud-stat__value {
     animation: none;
   }
   * {
@@ -915,18 +948,7 @@ kbd {
   min-height: 1.3em;
 }
 
-/* Lantern Rush countdown chip */
-.chip--timer {
-  border-color: rgba(255, 180, 84, 0.55);
-  color: #ffd9a0;
-}
-
-.chip--timer-low {
-  border-color: rgba(255, 122, 110, 0.8);
-  color: #ff9d92;
-  animation: timer-pulse 1s ease-in-out infinite;
-}
-
+/* Lantern Rush low-time pulse (the timer cell itself is .hud-stat--timer) */
 @keyframes timer-pulse {
   0%,
   100% {
@@ -1071,8 +1093,8 @@ kbd {
 /* ---- Mid-run unlock note: a quiet corner count, never over the garden ---- */
 .journal-ping {
   position: fixed;
-  top: max(14px, env(safe-area-inset-top, 0px));
-  left: max(14px, env(safe-area-inset-left, 0px));
+  top: calc(max(var(--hud-edge), env(safe-area-inset-top, 0px)) + var(--hud-bar-h) + 6px);
+  left: max(var(--hud-edge), env(safe-area-inset-left, 0px));
   z-index: 40;
   pointer-events: none;
   display: inline-flex;
