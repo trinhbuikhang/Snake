@@ -1,0 +1,1030 @@
+# REFERENCE PROTOTYPE — HUD plan (docs/plan/HUD_PLAN.md). NOT game code; do not apply/commit as a whole.
+# Base: master @ aabe5b7. Try locally: git worktree add /tmp/hud-proto aabe5b7 && cd /tmp/hud-proto && git apply <this file>
+# Port task by task (H01..H05) with tests; see docs/plan/hud/README.md.
+
+diff --git a/src/components/Hud.jsx b/src/components/Hud.jsx
+index c4e424d..4e1d9dc 100644
+--- a/src/components/Hud.jsx
++++ b/src/components/Hud.jsx
+@@ -1,6 +1,7 @@
+ import { useEffect, useState } from 'react'
+ import { useGame } from '../game/store.js'
+ import { inputBus } from '../game/inputBus.js'
++import { isCompact, controlsVisible, coachPlacement } from '../game/hudLayout.js'
+ import { MOON_PHASES, moonPhaseById, GAME_MODES, gameModeById } from '../game/logic.js'
+ import { WHISPERS, WHISPER_COUNT } from '../game/whispers.js'
+ import { VERSES, VERSE_COUNT } from '../game/verses.js'
+@@ -72,6 +73,19 @@ const DIR_ARROW = {
+   right: '→',
+ }
+ 
++// HUD plan: viewport size drives the compact bar, the touch cluster and
++// the coach placement — same rules the camera fit reads (hudLayout.js).
++function useViewport() {
++  const read = () => ({ w: window.innerWidth, h: window.innerHeight })
++  const [vp, setVp] = useState(read)
++  useEffect(() => {
++    const on = () => setVp(read())
++    window.addEventListener('resize', on)
++    return () => window.removeEventListener('resize', on)
++  }, [])
++  return vp
++}
++
+ const CAM_LABELS = {
+   aligned: 'Classic 3D',
+   topdown: 'Top-Down 2D',
+@@ -552,6 +566,7 @@ export function PauseOverlay() {
+             </button>
+           )}
+         </div>
++        <SettingsToggles labelled />
+         <p className="hint">
+           Press <kbd>P</kbd> or <kbd>Esc</kbd> to resume
+         </p>
+@@ -884,19 +899,24 @@ function CoachMarks() {
+     return () => clearTimeout(t)
+   }, [coachStep, advanceCoach])
+ 
++  const vp = useViewport()
++  const showControls = useGame((s) => s.showControls)
+   if (coachStep < 0 || coachStep >= COACH_COPY.length) return null
+   const step = COACH_COPY[coachStep]
++  const place = coachPlacement({ ...vp, showControls })
+   return (
+-    <div className="coach-marks" role="status" aria-live="polite">
++    <div className={`coach-marks coach-marks--${place}`} role="status" aria-live="polite">
+       <button type="button" className="coach-card" onClick={dismissCoach} aria-label="Skip the guide">
+         <p className="coach-card__title">{step.title}</p>
+         <p className="coach-card__text">{step.text}</p>
+-        <p className="coach-card__dots" aria-hidden="true">
+-          {COACH_COPY.map((_, i) => (
+-            <span key={i} className={i === coachStep ? 'on' : ''} />
+-          ))}
++        <p className="coach-card__foot">
++          <span className="coach-card__dots" aria-hidden="true">
++            {COACH_COPY.map((_, i) => (
++              <span key={i} className={i === coachStep ? 'on' : ''} />
++            ))}
++          </span>
++          <span className="coach-card__skip">tap to skip</span>
+         </p>
+-        <p className="coach-card__skip">tap to skip</p>
+       </button>
+     </div>
+   )
+@@ -1200,125 +1220,132 @@ export function JournalOverlay() {
+   )
+ }
+ 
+-function Chip({ label, value, highlight }) {
++function Stat({ kind, label, children, title }) {
+   return (
+-    <div className={`chip${highlight ? ' chip--highlight' : ''}`}>
+-      <span>{label}</span>
+-      <b>{value}</b>
++    <div className={`hud-stat hud-stat--${kind}`} title={title}>
++      <span className="hud-stat__label">{label}</span>
++      <b className="hud-stat__value">{children}</b>
+     </div>
+   )
+ }
+ 
+ /**
+- * Direction-queue indicator chip.
+- * Displays current active direction and queued next turn arrow.
++ * Direction-queue indicator: current direction + queued next turn.
+  */
+-function QueueChip({ currentDir, queuedDir }) {
++function DirStat({ currentDir, queuedDir, boosting }) {
+   const hasQueue = !!queuedDir
+   return (
+-    <div
+-      className={`chip queue-chip ${hasQueue ? 'queue-chip--buffered' : ''}`}
++    <Stat
++      kind={`dir${hasQueue ? ' hud-stat--buffered' : ''}`}
++      label={boosting ? 'Dash' : 'Dir'}
+       title={hasQueue ? `Turning: ${queuedDir}` : `Current direction: ${currentDir}`}
+     >
+-      <span>Dir</span>
+-      <div className="queue-arrows">
+-        <b className="dir-main">{DIR_ARROW[currentDir] || '→'}</b>
+-        {hasQueue && <b className="dir-next">{DIR_ARROW[queuedDir]}</b>}
+-      </div>
+-    </div>
+-  )
+-}
+-
+-function PlayingHud() {
+-  const score = useGame((s) => s.score)
+-  const length = useGame((s) => s.length)
+-  const best = useGame((s) => s.best)
+-  const isBoosting = useGame((s) => s.isBoosting)
+-  const currentDir = useGame((s) => s.currentDir)
+-  const queuedDir = useGame((s) => s.queuedDir)
+-  const gameMode = useGame((s) => s.gameMode)
+-  const timeLeft = useGame((s) => s.timeLeft)
+-
+-  const showTimer = gameMode === 'lantern' && timeLeft != null
+-  const timerText = showTimer ? `0:${String(Math.max(0, timeLeft)).padStart(2, '0')}` : ''
+-
+-  return (
+-    <div className="hud-top">
+-      <div className="chips">
+-        <Chip label="Score" value={score} highlight />
+-        <Chip label="Length" value={length} />
+-        <Chip label="Best" value={best} />
+-        {showTimer && (
+-          <div
+-            className={`chip chip--timer${timeLeft <= 10 ? ' chip--timer-low' : ''}`}
+-            title="Time remaining in this Lantern Rush"
+-            aria-live="off"
+-          >
+-            <span>🏮</span>
+-            <b>{timerText}</b>
+-          </div>
+-        )}
+-        <QueueChip currentDir={currentDir} queuedDir={queuedDir} />
+-        {isBoosting && <div className="chip chip--boost">⚡ DASH</div>}
+-      </div>
+-    </div>
++      {boosting ? '⚡' : DIR_ARROW[currentDir] || '→'}
++      {hasQueue && <i className="dir-next">{DIR_ARROW[queuedDir]}</i>}
++    </Stat>
+   )
+ }
+ 
+-function Corners() {
++// HUD plan: camera / touch pad / sound toggles. Inline in the bar on
++// wide screens, inside the pause sheet everywhere (labelled).
++function SettingsToggles({ labelled = false }) {
+   const muted = useGame((s) => s.muted)
+   const setMuted = useGame((s) => s.setMuted)
+-  const status = useGame((s) => s.status)
+-  const togglePause = useGame((s) => s.togglePause)
+   const cameraMode = useGame((s) => s.cameraMode)
+   const toggleCameraMode = useGame((s) => s.toggleCameraMode)
+   const showControls = useGame((s) => s.showControls)
+   const toggleControls = useGame((s) => s.toggleControls)
+-
++  const cls = labelled ? 'pill-toggle' : 'icon-btn'
+   return (
+-    <div className="chrome-actions">
++    <div className={labelled ? 'pause-settings' : 'hud-toggles'}>
+       <button
+         type="button"
+-        className="icon-btn"
++        className={cls}
+         aria-label="Change camera angle (C key)"
+         title={`Camera: ${CAM_LABELS[cameraMode] || 'Classic 3D'} (C key)`}
+         onClick={toggleCameraMode}
+       >
+         {icons.camera}
++        {labelled && <span>{CAM_LABELS[cameraMode] || 'Classic 3D'}</span>}
+       </button>
+-
+       <button
+         type="button"
+-        className={`icon-btn ${showControls ? 'icon-btn--active' : ''}`}
++        className={`${cls} ${showControls ? `${cls}--active` : ''}`}
+         aria-label="Toggle virtual controls"
++        aria-pressed={showControls}
+         title="Toggle virtual controls"
+         onClick={toggleControls}
+       >
+         {icons.gamepad}
++        {labelled && <span>Touch pad</span>}
+       </button>
+-
+       <button
+         type="button"
+-        className="icon-btn"
++        className={cls}
+         aria-label={muted ? 'Unmute' : 'Mute'}
+         title={muted ? 'Unmute (M key)' : 'Mute (M key)'}
+         aria-pressed={muted}
+         onClick={() => setMuted(!muted)}
+       >
+-        {muted ? icons.unmute : icons.mute}
++        {/* bar icon = action (as before); labelled pill = current state */}
++        {labelled ? (muted ? icons.mute : icons.unmute) : muted ? icons.unmute : icons.mute}
++        {labelled && <span>{muted ? 'Sound off' : 'Sound on'}</span>}
+       </button>
++    </div>
++  )
++}
++
++function PlayingHud() {
++  const score = useGame((s) => s.score)
++  const length = useGame((s) => s.length)
++  const best = useGame((s) => s.best)
++  const isBoosting = useGame((s) => s.isBoosting)
++  const currentDir = useGame((s) => s.currentDir)
++  const queuedDir = useGame((s) => s.queuedDir)
++  const gameMode = useGame((s) => s.gameMode)
++  const timeLeft = useGame((s) => s.timeLeft)
++  const togglePause = useGame((s) => s.togglePause)
++  const { w } = useViewport()
++  const compact = isCompact(w)
+ 
+-      {(status === 'playing' || status === 'paused') && (
++  const showTimer = gameMode === 'lantern' && timeLeft != null
++  const timerText = showTimer ? `0:${String(Math.max(0, timeLeft)).padStart(2, '0')}` : ''
++
++  return (
++    <div className={`hud-top${compact ? ' hud-top--compact' : ''}`}>
++      <div className={`hud-stats${isBoosting ? ' hud-stats--boost' : ''}`} role="group" aria-label="Run stats">
++        <Stat kind="score" label="Score">{score}</Stat>
++        <Stat kind="length" label="Length">{length}</Stat>
++        <Stat kind="best" label="Best">{best}</Stat>
++        {showTimer && (
++          <Stat kind={`timer${timeLeft <= 10 ? ' hud-stat--timer-low' : ''}`} label="🏮" title="Time remaining in this Lantern Rush">
++            {timerText}
++          </Stat>
++        )}
++        <DirStat currentDir={currentDir} queuedDir={queuedDir} boosting={isBoosting} />
++      </div>
++      <div className="hud-actions">
++        {!compact && <SettingsToggles />}
+         <button
+           type="button"
+-          className="icon-btn"
+-          aria-label={status === 'paused' ? 'Resume' : 'Pause'}
++          className="icon-btn icon-btn--pause"
++          aria-label="Pause"
+           title="Pause / Resume (P key)"
+           onClick={togglePause}
+         >
+           {icons.pause}
+         </button>
+-      )}
++      </div>
++    </div>
++  )
++}
++
++// Title / game-over corner buttons. While playing or paused the bar and
++// the pause sheet own these toggles instead (HUD plan).
++function Corners() {
++  return (
++    <div className="chrome-actions">
++      <SettingsToggles />
+     </div>
+   )
+ }
+@@ -1383,11 +1410,12 @@ export default function Hud() {
+   const showGarden = useGame((s) => s.showGarden)
+   const showControls = useGame((s) => s.showControls)
+   const moonriseCoda = useGame((s) => s.moonriseCoda)
++  const vp = useViewport()
+ 
+   return (
+     <>
+       <div className="vignette" />
+-      <Corners />
++      {status !== 'playing' && status !== 'paused' && <Corners />}
+       {status === 'title' && !showHowTo && !showJournal && !showGarden && <TitleOverlay />}
+       {status === 'title' && showHowTo && <HowToOverlay />}
+       {status === 'title' && showJournal && !showHowTo && <JournalOverlay />}
+@@ -1404,9 +1432,7 @@ export default function Hud() {
+           <PlayingHud />
+           <CoachMarks />
+           <JournalPing />
+-          <div className={showControls ? 'force-show-controls' : 'responsive-controls'}>
+-            <OnScreenControls />
+-          </div>
++          {controlsVisible(vp.w, showControls) && <OnScreenControls />}
+         </>
+       )}
+       {status === 'paused' && <PauseOverlay />}
+diff --git a/src/game/hudLayout.js b/src/game/hudLayout.js
+new file mode 100644
+index 0000000..fec7df3
+--- /dev/null
++++ b/src/game/hudLayout.js
+@@ -0,0 +1,95 @@
++// HUD layout tokens + pure layout rules (REFERENCE PROTOTYPE, HUD plan).
++//
++// One source of truth for the numbers the CSS lays out and the camera
++// fit must keep clear of. styles.css reads the same values through the
++// --hud-* custom properties in :root (hudLayout.test.js keeps them
++// equal to HUD below); engine.js asks
++// hudReserve() which screen bands the board has to avoid.
++
++export const HUD = {
++  edge: 10, // bar inset from the screen edge (before safe-area)
++  barH: 44, // stat capsule + round buttons share one 44px row
++  btn: 44, // round icon/pause button (tap target >= 44)
++  gap: 8, // gap between bar items
++  fitGap: 8, // breathing room between board and any HUD band
++  padInset: 16, // touch cluster inset from bottom/right (before safe-area)
++  padGap: 8, // gap between d-pad buttons
++  dashGap: 16, // gap Dash <-> d-pad
++  coachH: 92, // max height of the compact coach card (portrait strip above the pad)
++  coachGap: 12, // coach card <-> d-pad
++}
++
++// Below this width the bar keeps only stats + Pause; camera / touch pad /
++// sound live in the pause sheet. At or above it every toggle sits inline.
++export const COMPACT_MAX_W = 560
++// Same breakpoint the old CSS media query used for the touch cluster.
++export const CONTROLS_MAX_W = 900
++
++export const isCompact = (w) => w < COMPACT_MAX_W
++
++export const controlsVisible = (w, showControls) => !!showControls || w <= CONTROLS_MAX_W
++
++// .dpad grid tracks are 58px at every width (only the buttons shrink to
++// 52px under 480px), so the pad is always 190px; Dash shrinks 66 -> 56.
++export function clusterSize(w) {
++  const small = w <= 480
++  const btn = small ? 52 : 58
++  const dash = small ? 56 : 66
++  const pad = 3 * 58 + 2 * HUD.padGap
++  return { btn, dash, pad, w: dash + HUD.dashGap + pad, h: pad }
++}
++
++const ZERO = { top: 0, right: 0, bottom: 0, left: 0 }
++
++// Screen bands (CSS px) the board must stay out of.
++export function hudReserve({ w, h, safe = ZERO, showControls = false }) {
++  const s = { ...ZERO, ...safe }
++  const barTop = Math.max(HUD.edge, s.top)
++  const out = {
++    w,
++    h,
++    top: barTop + HUD.barH,
++    left: s.left,
++    right: s.right,
++    bottom: s.bottom,
++    cluster: null,
++  }
++  if (controlsVisible(w, showControls)) {
++    const c = clusterSize(w)
++    out.cluster = {
++      w: c.w + Math.max(HUD.padInset, s.right),
++      h: c.h + Math.max(HUD.padInset, s.bottom),
++    }
++    // Portrait: the strip just above the pad is kept for the coach card
++    // when the board can spare it (soft reserve, see fitMargins).
++    if (w / h <= 1) out.coachStrip = HUD.coachGap + HUD.coachH
++  }
++  return out
++}
++
++// Where the first-night coach card goes so it never sits on the pad,
++// the bar, or (at the listed viewports) the board.
++//  'above-pad'  portrait with touch cluster: full-width card just above the pad
++//  'pad-column' landscape with touch cluster: in the column above the pad
++//  'top-left'   no cluster (desktop): small card under the bar, left side
++export function coachPlacement({ w, h, showControls }) {
++  if (!controlsVisible(w, showControls)) return 'top-left'
++  return w / h > 1 ? 'pad-column' : 'above-pad'
++}
++
++// Reads env(safe-area-inset-*) through a CSS probe (.safe-probe in
++// styles.css) so JS sees exactly what the CSS sees.
++let probe = null
++export function readSafeArea() {
++  if (typeof document === 'undefined' || typeof document.createElement !== 'function' || typeof getComputedStyle !== 'function') return { ...ZERO }
++  if (!probe) {
++    probe = document.createElement('div')
++    probe.className = 'safe-probe'
++    probe.setAttribute('aria-hidden', 'true')
++    const host = document.body || document.documentElement
++    host.appendChild(probe)
++  }
++  const cs = getComputedStyle(probe)
++  const px = (v) => parseFloat(v) || 0
++  return { top: px(cs.paddingTop), right: px(cs.paddingRight), bottom: px(cs.paddingBottom), left: px(cs.paddingLeft) }
++}
+diff --git a/src/styles.css b/src/styles.css
+index e18e20d..25786ab 100644
+--- a/src/styles.css
++++ b/src/styles.css
+@@ -37,6 +37,21 @@
+   --font-display: 'Cormorant Garamond', Georgia, serif;
+   --font-ui: 'Inter', system-ui, -apple-system, sans-serif;
+ 
++  /* HUD plan layout tokens — keep equal to HUD in src/game/hudLayout.js */
++  --hud-edge: 10px;
++  --hud-bar-h: 44px;
++  --hud-btn: 44px;
++  --hud-gap: 8px;
++
++  /* HUD plan pastel accents */
++  --pastel-mint: #b8f3dc;
++  --pastel-lilac: #d9cbff;
++  --pastel-peach: #ffd8b5;
++  --pastel-moon: #fff0c4;
++  --pastel-rose: #ffc4d2;
++  --hud-glass: rgba(14, 20, 30, 0.8);
++  --hud-line: rgba(217, 203, 255, 0.28);
++
+   /* Z-Index Ladder */
+   --z-canvas: 1;
+   --z-vignette: 5;
+@@ -287,42 +302,57 @@ body {
+ 
+ .chrome-actions {
+   position: absolute;
+-  top: max(14px, env(safe-area-inset-top, 0px));
+-  right: max(14px, env(safe-area-inset-right, 0px));
+-  display: flex;
+-  gap: 10px;
++  top: max(var(--hud-edge), env(safe-area-inset-top, 0px));
++  right: max(var(--hud-edge), env(safe-area-inset-right, 0px));
+   z-index: var(--z-chrome);
+ }
+ 
++.hud-toggles {
++  display: flex;
++  gap: var(--hud-gap);
++}
++
++/* JS reads env(safe-area-inset-*) through this probe (hudLayout.readSafeArea). */
++.safe-probe {
++  position: fixed;
++  top: 0;
++  left: 0;
++  width: 0;
++  height: 0;
++  visibility: hidden;
++  pointer-events: none;
++  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
++}
++
+ .icon-btn {
+   display: grid;
+   place-items: center;
+-  width: 44px;
+-  height: 44px;
++  width: var(--hud-btn);
++  height: var(--hud-btn);
++  flex: none;
+   border-radius: 50%;
+-  background: var(--panel-solid);
+-  border: 1px solid var(--hairline);
+-  color: var(--cream);
++  background: var(--hud-glass);
++  border: 1.5px solid var(--hud-line);
++  color: var(--pastel-moon);
+   cursor: pointer;
+-  transition: all 0.16s ease;
++  transition: transform 0.16s ease, border-color 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
+ }
+ 
+ .icon-btn:hover {
+-  border-color: var(--jade);
+-  color: var(--jade);
+-  transform: translateY(-2px);
+-  box-shadow: 0 6px 20px rgba(78, 237, 184, 0.25);
++  border-color: var(--pastel-mint);
++  color: var(--pastel-mint);
++  transform: translateY(-1px);
++  box-shadow: 0 6px 18px rgba(184, 243, 220, 0.22);
+ }
+ 
+ .icon-btn:active {
+-  transform: scale(0.95);
++  transform: scale(0.94);
+ }
+ 
+ .icon-btn--active {
+-  border-color: var(--jade);
+-  color: var(--jade);
+-  background: rgba(30, 60, 48, 0.95);
+-  box-shadow: 0 0 16px rgba(78, 237, 184, 0.4);
++  border-color: var(--pastel-mint);
++  color: var(--pastel-mint);
++  box-shadow: 0 0 14px rgba(184, 243, 220, 0.35);
+ }
+ 
+ .icon-btn svg {
+@@ -331,108 +361,170 @@ body {
+   pointer-events: none;
+ }
+ 
++.icon-btn--pause {
++  color: var(--pastel-lilac);
++  border-color: rgba(217, 203, 255, 0.5);
++}
++
++/* HUD plan: one tidy bar — stat capsule + actions in a single flex row,
++   so nothing can stack on top of anything else at any width. */
+ .hud-top {
+   position: absolute;
+-  top: 0;
+-  left: 0;
+-  right: 0;
++  top: max(var(--hud-edge), env(safe-area-inset-top, 0px));
++  left: max(var(--hud-edge), env(safe-area-inset-left, 0px));
++  right: max(var(--hud-edge), env(safe-area-inset-right, 0px));
++  height: var(--hud-bar-h);
+   z-index: var(--z-chrome);
++  display: grid;
++  grid-template-columns: 1fr auto 1fr;
++  align-items: center;
++  gap: var(--hud-gap);
++  pointer-events: none;
++}
++
++.hud-top > * {
++  pointer-events: auto;
++}
++
++.hud-stats {
++  grid-column: 2;
+   display: flex;
+-  justify-content: center;
+-  padding-top: max(14px, env(safe-area-inset-top, 0px));
++  align-items: stretch;
++  height: var(--hud-bar-h);
++  padding: 0 6px;
++  border-radius: 22px;
++  background: var(--hud-glass);
++  border: 1.5px solid var(--hud-line);
++  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+   pointer-events: none;
++  transition: box-shadow 0.2s ease, border-color 0.2s ease;
++}
++
++.hud-stats--boost {
++  border-color: rgba(255, 216, 181, 0.8);
++  box-shadow: 0 0 18px rgba(255, 216, 181, 0.45);
+ }
+ 
+-.chips {
++.hud-actions {
++  grid-column: 3;
++  justify-self: end;
+   display: flex;
+-  align-items: center;
+-  gap: 10px;
++  gap: var(--hud-gap);
+ }
+ 
+-.chip {
+-  min-width: 74px;
++.hud-stat {
++  min-width: 64px;
+   display: flex;
+   flex-direction: column;
+   align-items: center;
+-  gap: 2px;
+-  padding: 8px 16px;
+-  background: var(--panel);
+-  border: 1px solid var(--hairline);
+-  border-radius: var(--radius-md);
+-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
++  justify-content: center;
++  gap: 1px;
++  padding: 0 8px;
++  position: relative;
+ }
+ 
+-.chip span {
+-  font-size: 0.76rem;
+-  letter-spacing: 0.18em;
++.hud-stat + .hud-stat::before {
++  content: '';
++  position: absolute;
++  left: 0;
++  top: 12px;
++  bottom: 12px;
++  width: 1px;
++  background: rgba(217, 203, 255, 0.18);
++}
++
++.hud-stat__label {
++  font-size: 0.6rem;
++  font-weight: 600;
++  letter-spacing: 0.14em;
+   text-transform: uppercase;
+-  color: rgba(244, 240, 230, 0.65);
++  color: rgba(255, 240, 196, 0.62);
++  line-height: 1;
+ }
+ 
+-.chip b {
++.hud-stat__value {
+   font-family: var(--font-display);
+-  font-size: var(--fs-stat);
++  font-size: 1.22rem;
+   font-weight: 700;
+   line-height: 1.05;
+-  color: #ffffff;
++  color: var(--cream);
++  font-variant-numeric: tabular-nums;
++  white-space: nowrap;
+ }
+ 
+-.chip--highlight b {
+-  color: var(--gold-glow);
+-  text-shadow: 0 0 14px rgba(255, 193, 7, 0.5);
++.hud-stat--score .hud-stat__value { color: var(--pastel-moon); text-shadow: 0 0 10px rgba(255, 240, 196, 0.45); }
++.hud-stat--length .hud-stat__value { color: var(--pastel-mint); }
++.hud-stat--best .hud-stat__value { color: var(--pastel-lilac); }
++.hud-stat--dir .hud-stat__value { color: var(--pastel-peach); font-family: var(--font-ui); font-size: 1.05rem; }
++.hud-stat--timer .hud-stat__value { color: var(--pastel-peach); }
++.hud-stat--timer-low .hud-stat__value { color: var(--pastel-rose); animation: timer-pulse 1s ease-in-out infinite; }
++.hud-stat--dir { min-width: 52px; }
++
++.dir-next {
++  font-style: normal;
++  margin-left: 4px;
++  color: var(--pastel-mint);
++  text-shadow: 0 0 10px rgba(184, 243, 220, 0.8);
++  animation: next-turn-pulse 0.4s ease-out;
+ }
+ 
+-.chip--boost {
+-  background: linear-gradient(135deg, rgba(255, 193, 7, 0.3), rgba(255, 87, 34, 0.35));
+-  border-color: var(--gold-glow);
+-  color: #fff;
+-  font-size: 0.82rem;
+-  font-weight: 700;
+-  letter-spacing: 0.12em;
+-  padding: 12px 16px;
+-  box-shadow: 0 0 20px rgba(255, 193, 7, 0.45);
+-  animation: boost-pulse 0.8s ease-in-out infinite alternate;
++/* Compact (< 560px): stats on the left, only Pause on the right. */
++.hud-top--compact {
++  grid-template-columns: minmax(0, 1fr) auto;
+ }
+ 
+-@keyframes boost-pulse {
+-  from { transform: scale(1); filter: brightness(1); }
+-  to { transform: scale(1.05); filter: brightness(1.25); }
++.hud-top--compact .hud-stats {
++  grid-column: 1;
++  justify-self: stretch;
++  min-width: 0;
+ }
+ 
+-/* Queue Indicator Chip */
+-.queue-chip {
+-  min-width: 68px;
++.hud-top--compact .hud-actions {
++  grid-column: 2;
+ }
+ 
+-.queue-arrows {
+-  display: flex;
+-  align-items: center;
+-  gap: 6px;
+-  font-size: 1.25rem;
+-  line-height: 1;
++.hud-top--compact .hud-stat {
++  min-width: 0;
++  flex: 1 1 0;
++  padding: 0 7px;
+ }
+ 
+-.dir-main {
+-  color: var(--cream);
++@keyframes next-turn-pulse {
++  from { transform: scale(1.3); opacity: 0.6; }
++  to { transform: scale(1); opacity: 1; }
+ }
+ 
+-.dir-next {
+-  color: var(--jade);
+-  font-weight: 800;
+-  font-size: 1.35rem;
+-  text-shadow: 0 0 12px rgba(78, 237, 184, 0.8);
+-  animation: next-turn-pulse 0.4s ease-out;
++/* Pause sheet settings (camera / touch pad / sound) */
++.pause-settings {
++  display: flex;
++  flex-wrap: wrap;
++  justify-content: center;
++  gap: 8px;
++  margin: 1.1rem 0 0.4rem;
+ }
+ 
+-.queue-chip--buffered {
+-  border-color: var(--jade);
+-  box-shadow: 0 0 18px rgba(78, 237, 184, 0.35);
++.pill-toggle {
++  display: inline-flex;
++  align-items: center;
++  gap: 8px;
++  min-height: 44px;
++  padding: 0 16px;
++  border-radius: 999px;
++  background: rgba(217, 203, 255, 0.08);
++  border: 1.5px solid var(--hud-line);
++  color: var(--pastel-moon);
++  font: 600 0.85rem var(--font-ui);
++  cursor: pointer;
+ }
+ 
+-@keyframes next-turn-pulse {
+-  from { transform: scale(1.3); opacity: 0.6; }
+-  to { transform: scale(1); opacity: 1; }
++.pill-toggle svg {
++  width: 18px;
++  height: 18px;
++}
++
++.pill-toggle--active {
++  border-color: var(--pastel-mint);
++  color: var(--pastel-mint);
+ }
+ 
+ /* ---------------- legend & controls ---------------- */
+@@ -705,7 +797,6 @@ kbd {
+ /* ---------------- mobile adjustments ---------------- */
+ 
+ @media (max-width: 480px) {
+-  .chip { min-width: 60px; padding: 6px 10px; }
+   .sheet { padding: 16px; }
+   .sheet-card { padding: 1.8rem 1.3rem; }
+   .actions .btn { width: 100%; max-width: 320px; }
+@@ -934,50 +1025,73 @@ kbd {
+    auto-advance; tapping the card skips the guide entirely. */
+ .coach-marks {
+   position: fixed;
+-  left: 50%;
+-  bottom: calc(110px + env(safe-area-inset-bottom));
+-  transform: translateX(-50%);
+-  width: min(430px, calc(100vw - 48px));
+   z-index: 40;
+   pointer-events: none;
+ }
+ 
++/* HUD plan placements (hudLayout.coachPlacement) */
++.coach-marks--above-pad {
++  left: max(16px, env(safe-area-inset-left, 0px));
++  right: max(16px, env(safe-area-inset-right, 0px));
++  bottom: calc(max(16px, env(safe-area-inset-bottom, 0px)) + 190px + 12px);
++  margin: 0 auto;
++  max-width: 430px;
++}
++
++.coach-marks--pad-column {
++  right: max(16px, env(safe-area-inset-right, 0px));
++  bottom: calc(max(16px, env(safe-area-inset-bottom, 0px)) + 190px + 10px);
++  width: 272px;
++}
++
++.coach-marks--top-left {
++  left: max(16px, env(safe-area-inset-left, 0px));
++  top: calc(max(var(--hud-edge), env(safe-area-inset-top, 0px)) + var(--hud-bar-h) + 14px);
++  width: 250px;
++}
++
+ .coach-card {
+   pointer-events: auto;
+   width: 100%;
+   text-align: center;
+   font-family: inherit;
+   color: var(--cream);
+-  background: rgba(10, 17, 14, 0.85);
+-  border: 1px solid rgba(212, 175, 105, 0.4);
+-  border-radius: var(--radius-md);
+-  box-shadow: var(--shadow-soft);
+-  padding: 12px 18px 10px;
++  background: rgba(14, 20, 30, 0.88);
++  border: 1.5px solid rgba(255, 240, 196, 0.35);
++  border-radius: 18px;
++  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
++  padding: 9px 14px 8px;
+   cursor: pointer;
+   animation: coachIn 0.45s ease;
+ }
+ 
+ .coach-card__title {
+   font-family: Georgia, 'Times New Roman', serif;
+-  letter-spacing: 0.22em;
++  letter-spacing: 0.18em;
+   text-transform: uppercase;
+-  font-size: 0.8rem;
+-  color: var(--gold-glow);
+-  margin: 0 0 6px;
++  font-size: 0.7rem;
++  color: var(--pastel-moon);
++  margin: 0 0 4px;
+ }
+ 
+ .coach-card__text {
+-  font-size: 0.95rem;
+-  line-height: 1.45;
++  font-size: 0.84rem;
++  line-height: 1.35;
+   color: rgba(244, 240, 230, 0.92);
+-  margin: 0 0 8px;
++  margin: 0 0 5px;
+ }
+ 
+-.coach-card__dots {
++.coach-card__foot {
+   display: flex;
+-  gap: 6px;
++  align-items: center;
+   justify-content: center;
+-  margin: 0 0 4px;
++  gap: 10px;
++  margin: 0;
++}
++
++.coach-card__dots {
++  display: inline-flex;
++  gap: 5px;
+ }
+ 
+ .coach-card__dots span {
+@@ -988,16 +1102,15 @@ kbd {
+ }
+ 
+ .coach-card__dots span.on {
+-  background: var(--gold-glow);
+-  box-shadow: 0 0 8px rgba(255, 213, 79, 0.8);
++  background: var(--pastel-moon);
++  box-shadow: 0 0 8px rgba(255, 240, 196, 0.8);
+ }
+ 
+ .coach-card__skip {
+-  font-size: 0.7rem;
++  font-size: 0.62rem;
+   letter-spacing: 0.14em;
+   text-transform: uppercase;
+   color: rgba(244, 240, 230, 0.45);
+-  margin: 0;
+ }
+ 
+ @keyframes coachIn {
+@@ -1016,8 +1129,8 @@ kbd {
+ /* ---- Mid-run unlock note: a quiet corner count, never over the garden ---- */
+ .journal-ping {
+   position: fixed;
+-  top: max(14px, env(safe-area-inset-top, 0px));
+-  left: max(14px, env(safe-area-inset-left, 0px));
++  top: calc(max(var(--hud-edge), env(safe-area-inset-top, 0px)) + var(--hud-bar-h) + 6px);
++  left: max(var(--hud-edge), env(safe-area-inset-left, 0px));
+   z-index: 40;
+   pointer-events: none;
+   display: inline-flex;
+diff --git a/src/three/cameraFit.js b/src/three/cameraFit.js
+index bf39e38..97e1901 100644
+--- a/src/three/cameraFit.js
++++ b/src/three/cameraFit.js
+@@ -28,6 +28,31 @@
+ // re-projects the corners with a real THREE.PerspectiveCamera so
+ // this convention is verified end to end.
+ 
++// HUD plan (REFERENCE PROTOTYPE): margins derived from the HUD bands
++// hudReserve() reports, so the board never sits under the bar, the
++// touch cluster or a safe-area inset. base = preset caps (tall screens).
++export function fitMargins(res, base, gap = 8) {
++  const { w, h } = res
++  const ndcX = (px) => 1 - (2 * px) / w
++  const ndcY = (px) => 1 - (2 * px) / h
++  const m = {
++    x: Math.min(base.x, ndcX(res.left + (res.left ? gap : 0))),
++    right: Math.min(base.x, ndcX(res.right + (res.right ? gap : 0))),
++    top: Math.min(base.top, ndcY(res.top + gap)),
++    bottom: Math.min(base.bottom, ndcY(res.bottom + (res.bottom ? gap : 0))),
++    anchor: w / h > 1 ? 'min' : 'middle',
++  }
++  if (res.cluster) {
++    // Landscape: keep the board left of the cluster (board slides
++    // sideways). Portrait: keep it above the cluster.
++    if (w / h > 1) m.right = Math.min(m.right, ndcX(res.cluster.w + gap))
++    else m.bottom = Math.min(m.bottom, ndcY(res.cluster.h + gap))
++    // Soft reserve: centre the board above the coach strip when it fits.
++    if (res.coachStrip) m.softBottom = Math.min(m.bottom, ndcY(res.cluster.h + res.coachStrip + gap))
++  }
++  return m
++}
++
+ export function fitAligned({ el, fov, aspect, boardHalf, margins }) {
+   const sinEl = Math.sin(el)
+   const cosEl = Math.cos(el)
+@@ -61,6 +86,7 @@ export function fitAligned({ el, fov, aspect, boardHalf, margins }) {
+   let best = Infinity
+   let bestZ = 0
+   let bestX = 0
++  let bestDist = Infinity
+   for (let lz = -1; lz <= 4; lz += 0.25) {
+     for (const lx of lookXs) {
+       let lo = 4
+@@ -77,5 +103,38 @@ export function fitAligned({ el, fov, aspect, boardHalf, margins }) {
+       }
+     }
+   }
++  // anchor 'middle' (portrait): the fit is width-limited, so the
++  // board can slide vertically at (almost) the same distance. Centre it
++  // in the free band between the HUD bar and the touch cluster instead
++  // of wherever the coarse search stopped.
++  if (margins.anchor === 'middle') {
++    const edgeY = (d, lz, sz) => {
++      const py = -sinEl * d
++      const pz = sz * boardHalf - lz - cosEl * d
++      const depth = -(py * sinEl + pz * cosEl)
++      return (py * cosEl - pz * sinEl) / (depth * tanHalf)
++    }
++    const softBottom = margins.softBottom ?? margins.bottom
++    let bestErr = Infinity
++    for (let lz = -2; lz <= 14; lz += 0.1) {
++      let lo = 4
++      let hi = 120
++      for (let i = 0; i < 26; i += 1) {
++        const mid = (lo + hi) / 2
++        if (fitsAt(mid, lz, bestX)) hi = mid
++        else lo = mid
++      }
++      if (!fitsAt(hi, lz, bestX)) continue
++      // only slide while the board keeps (about) its on-screen width
++      if (hi > best * 1.02) continue
++      const err = Math.abs((margins.top - edgeY(hi, lz, -1)) - (softBottom + edgeY(hi, lz, 1)))
++      if (err < bestErr) {
++        bestErr = err
++        bestZ = lz
++        bestDist = hi
++      }
++    }
++    if (bestErr < Infinity) best = bestDist
++  }
+   return { dist: best, lookZ: bestZ, lookX: bestX }
+ }
+diff --git a/src/three/engine.js b/src/three/engine.js
+index 75016d5..4921379 100644
+--- a/src/three/engine.js
++++ b/src/three/engine.js
+@@ -29,7 +29,8 @@ import { createGovernor, observeWarmupFrame, settleWarmup, nextQualityIdx, msaaR
+ import { disposeObject3D } from './dispose.js'
+ import { rescaleAccum } from './tickClock.js'
+ import { writeCellsInto } from './cellBuffer.js'
+-import { fitAligned } from './cameraFit.js'
++import { fitAligned, fitMargins } from './cameraFit.js'
++import { hudReserve, readSafeArea, HUD } from '../game/hudLayout.js'
+ import { buildGarden } from './garden.js'
+ import { createSnakeRig } from './snakeRig.js'
+ import { buildDecor } from './decor.js'
+@@ -40,13 +41,6 @@ import { SKIN_IDS } from '../game/skins.js'
+ const FOV = 42
+ const FIT_HALF = 11.8
+ const BOARD_HALF = 10.25 // board edge (±10) + rim, for the perspective fit
+-// S05 review: HUD geometry the aligned fit must respect. The pill
+-// row's bottom edge sits ~74px from the top; the touch cluster
+-// (Dash + d-pad, anchored bottom-right: 16px inset + 66px Dash +
+-// 16px gap + 190px pad) starts 288px from the right edge.
+-const HUD_BOTTOM_PX = 74
+-const TOUCH_CLUSTER_W_PX = 288
+-const FIT_GAP_PX = 8 // breathing room between board and HUD/cluster
+ const DEMO_INTERVAL = 0.15
+ const DEATH_DURATION = 1.6
+ const BLOOM_BASE = 0.42
+@@ -902,7 +896,7 @@ export function createEngine(canvas, { reduced } = {}) {
+       }
+     }
+     if (s.muted !== prev.muted) audio.setMuted(s.muted)
+-    if (s.cameraMode !== prev.cameraMode) updateCameraTarget()
++    if (s.cameraMode !== prev.cameraMode || s.showControls !== prev.showControls) updateCameraTarget()
+     if (s.moonPhase !== prev.moonPhase || s.gameMode !== prev.gameMode) applyRunModifiers() // title-screen pickers: update ambience & speed live
+   })
+ 
+@@ -936,31 +930,20 @@ export function createEngine(canvas, { reduced } = {}) {
+       // with the look point slid toward the near edge so the board
+       // centres vertically instead of wasting the far half-screen.
+       //
+-      // The preset margins are the tall-screen values. Two runtime
+-      // adjustments (S05 review, measured once per resize — this
+-      // function never runs per frame):
+-      // - Short screens: the fixed top margin reserves 10% of the
+-      //   height, but the HUD pill row is ~74px tall regardless —
+-      //   at 390px high that is 39px of room for 74px of pills and
+-      //   the far rows hid underneath. Reserve the pill row's real
+-      //   height + gap instead whenever that asks for more room.
+-      let top = preset.perspFit.top
+-      const hudReserve = HUD_BOTTOM_PX + FIT_GAP_PX
+-      if (h > hudReserve * 2) top = Math.min(top, 1 - (2 * hudReserve) / h)
+-      // - Touch landscape: keep the board's right edge left of the
+-      //   Dash/d-pad cluster via an asymmetric right margin;
+-      //   fitAligned slides the look point sideways (lookX) to
+-      //   satisfy it, so the board shifts instead of shrinking.
+-      let right = preset.perspFit.x
+-      if (camera.aspect > 1 && window.matchMedia?.('(pointer: coarse)')?.matches) {
+-        right = Math.min(right, 1 - (2 * (TOUCH_CLUSTER_W_PX + FIT_GAP_PX)) / w)
+-      }
++      // HUD plan: margins follow the HUD bands that are actually
++      // on screen (bar + safe-area + touch cluster whenever it is
++      // visible — by width or by the toggle, not by pointer type).
++      const margins = fitMargins(
++        hudReserve({ w, h, safe: readSafeArea(), showControls: st.showControls }),
++        preset.perspFit,
++        HUD.fitGap,
++      )
+       const { dist, lookZ, lookX } = fitAligned({
+         el: preset.el,
+         fov: preset.fov,
+         aspect: camera.aspect,
+         boardHalf: BOARD_HALF,
+-        margins: { x: preset.perspFit.x, right, top, bottom: preset.perspFit.bottom },
++        margins,
+       })
+       camLookTarget.set(lookX, 0, lookZ)
+       camPosTarget.copy(viewDir).multiplyScalar(dist * preset.distMult).add(camLookTarget)
