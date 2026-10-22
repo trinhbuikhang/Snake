@@ -40,6 +40,7 @@ src/
     logic.js            # pure grid Snake: step, turn, food, demo orbit
     store.js            # Zustand UI/game status + localStorage prefs
     skins.js            # serpent skin registry (data + unlock rules, pure)
+    hudLayout.js        # HUD layout tokens + pure layout rules shared by CSS and the camera fit
     inputBus.js         # keyboard / touch / swipe → direction + boost
   three/
     engine.js           # render loop, camera modes, couples logic ↔ scene
@@ -66,6 +67,7 @@ src/
 | `game/logic.js` | Pure simulation | No React, no Three, no DOM. Safe to unit-test in Node. |
 | `game/store.js` | UI + session state | Status (`title` \| `prologue` \| `ready` \| `playing` \| `paused` \| `dead`), score, camera, mute, floating texts. Persists prefs via localStorage keys `ran-xinh-*`. |
 | `game/inputBus.js` | Input fan-in | Decouples DOM events from the engine tick. |
+| `game/hudLayout.js` | HUD layout source | Pure tokens + layout rules (bar/cluster sizes, reserves, coach placement). CSS reads the same numbers via `--hud-*` variables (sync-tested); the camera fit reads them via `hudReserve()`. |
 | `three/engine.js` | Runtime glue | Owns WebGL, composer/bloom, camera presets, the quality governor, the tick that calls `step` / `turn`, and full teardown in `destroy()`. |
 | `components/*` | Thin React shell | Canvas mount + HUD only — do not put game rules in JSX. |
 
@@ -87,9 +89,19 @@ src/
 
 ### Camera modes (`store` + `engine`)
 
-- `aligned` — axes match screen (default “Classic 3D”). Framing is a true perspective fit (S05): `fitAligned({el, fov, aspect, boardHalf, margins})` in `src/three/cameraFit.js` finds the closest distance keeping all four board corners (±10.25, rim included) inside NDC margins (x 0.97 / top 0.80 / bottom 0.93), sliding the look point (`lookZ`, and `lookX` when asymmetric) instead of the old ortho-style `FIT_HALF` sizing. Two runtime margin adjustments in `updateCameraTarget()` (resize-time only, never per frame): on short screens the top margin derives from the real HUD pill height (`HUD_BOTTOM_PX`), and on touch landscape a right margin (`TOUCH_CLUSTER_W_PX`) keeps the board clear of the Dash/d-pad cluster. The fit runs only in `updateCameraTarget()`.
+- `aligned` — axes match screen (default “Classic 3D”). Framing is a true perspective fit (S05, HUD-following since H04): `updateCameraTarget()` calls the one pure entry `alignedCamera({w, h, safe, showControls, preset, boardHalf})` in `src/three/cameraFit.js`, which wraps `hudReserve()` → `fitMargins()` → `fitAligned()`. `fitAligned` finds the closest distance keeping all four board corners (±10.25, rim included) inside NDC margins, sliding the look point (`lookZ`, and `lookX` when asymmetric) instead of the old ortho-style `FIT_HALF` sizing. The margins are no longer constants: `fitMargins` derives them from the HUD bands `hudReserve()` reports (top bar + safe-area insets, read via `readSafeArea()` at fit time only) capped by the preset's base margins (x 0.97 / top 0.80 / bottom 0.93). Landscape with the touch cluster visible → a right margin slides the board left of the cluster; portrait → `anchor: 'middle'` centres the board in the free band between the bar and the coach strip (`softBottom`). The engine refits on resize, on `cameraMode` change, and on `showControls` change — never per frame. (The S05-era constants `HUD_BOTTOM_PX` / `TOUCH_CLUSTER_W_PX` and the `pointer: coarse` condition are gone; do not reintroduce them.)
 - `topdown` — near-overhead 2.5D (legacy `FIT_HALF` framing)
 - `cinematic` — gentle isometric tilt (legacy `FIT_HALF` framing)
+
+### HUD layout (H01–H05)
+
+Settled by `docs/plan/HUD_PLAN.md`; the numbers live in exactly one place:
+
+- **Single source**: `src/game/hudLayout.js` (pure, no React/Three/DOM writes) exports the `HUD` tokens (`edge 10, barH 44, btn 44, gap 8, fitGap 8, padInset 16, padGap 8, dashGap 16, coachH 92, coachGap 12`), `COMPACT_MAX_W = 560`, `CONTROLS_MAX_W = 900`, and the rules `isCompact`, `controlsVisible`, `clusterSize`, `hudReserve`, `coachPlacement`, `readSafeArea`. `styles.css` mirrors the tokens as `:root` `--hud-*` variables (plus the pastel accents `--pastel-*`, `--hud-glass`, `--hud-line`); `hudLayout.test.js` asserts the CSS equals the JS (including the `.dpad` 58px tracks and `.btn-boost` sizes), so a one-sided change fails tests. Adding or resizing any fixed HUD element means updating `hudReserve()` and re-running the harness (below).
+- **Top bar**: one 44px grid row (`.hud-top`, inset by `max(--hud-edge, env(safe-area-inset-*))`) holding the stat capsule (`.hud-stats` with `Stat` cells; the Lantern Rush timer is an extra cell; dashing only glows the capsule) and `.hud-actions`. Compact (`isCompact(w)`, w < 560): the capsule stretches across the left and only Pause stays — Camera / Touch pad / Sound move into the Pause sheet. `SettingsToggles({labelled})` in `Hud.jsx` renders both shapes of those toggles (round icon buttons in the bar and on title/game-over via `Corners`; labelled `.pill-toggle` pills in the Pause sheet). `Corners` is not rendered while `playing`/`paused`. `Hud.jsx` tracks size with the `useViewport()` hook (resize listener only).
+- **One cluster rule**: the touch cluster (Dash + d-pad) is visible ⇔ `controlsVisible(w, showControls) = showControls || w ≤ 900`. `Hud.jsx` renders it by that function and `alignedCamera` reserves space by the same function — never gate either side on `pointer: coarse` or on a CSS media query again (that divergence is what H04 removed).
+- **Coach card**: placed by `coachPlacement()` — `above-pad` (portrait + cluster: above the pad, inside the strip the camera reserves), `pad-column` (landscape + cluster: the 272px column above the pad), `top-left` (no cluster: under the bar, 272px wide — the prototype's 250px measured 106px tall, over the `HUD.coachH` 92 budget; 272px measures 88px). Dots + "tap to skip" share one `.coach-card__foot` row; copy is unchanged since before the plan.
+- **Measuring**: `docs/plan/hud/tooling/harness.mjs` (headless Chrome, 11 viewports: p390, p375, p414, teams375, p390safe, t768, w600, l844t, l844safe, l844m, d1280) renders the game with the coach visible and reports `hudOverlaps` (intersecting HUD element pairs) and `cellsCovered` (board cells under any HUD rect) — the target is 0/0 at all 11. It takes a camera model module: `fit-baseline-aabe5b7.mjs` reproduces the pre-plan fit for before/after comparisons; `fit-prototype.mjs` now just calls the engine's own `alignedCamera`, so measurements can never drift from the shipping fit.
 
 ### Serpent skins (S01–S06)
 
@@ -131,7 +143,7 @@ Settled by `docs/plan/SKINS_PERF_PLAN.md`; do not regress them:
 6. Avoid drive-by refactors and unrelated file edits.
 7. **Never claim "tests pass" without committed tests runnable via `npm test`.** Sandbox-only checks are fine, but they must be labeled as manual. (Audit rule, from T04.)
 8. **Binary files (icons, images, fonts) must be committed through real git.** Never push them through a UTF-8-text-only API — base64 text masquerading as binaries was exactly how production ended up serving "PNGs" that were text files. (Audit rule, from T01.)
-9. Check `docs/audit/FIX_PLAN.md` before touching anything the audit covers — settled decisions there are final. Same for `docs/plan/SKINS_PERF_PLAN.md` (skins + performance): its settled decisions (skin prices, storage key, camera scope, perf budgets) are final. Ambiguity → stop and ask.
+9. Check `docs/audit/FIX_PLAN.md` before touching anything the audit covers — settled decisions there are final. Same for `docs/plan/SKINS_PERF_PLAN.md` (skins + performance): its settled decisions (skin prices, storage key, camera scope, perf budgets) are final. Same for `docs/plan/HUD_PLAN.md` (HUD layout + camera fit): its settled decisions (single top bar, compact breakpoint, `controlsVisible`, coach placement, the harness 0/0 target) are final. Ambiguity → stop and ask.
 
 ## Out of scope unless asked
 

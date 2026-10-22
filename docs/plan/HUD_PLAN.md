@@ -216,7 +216,7 @@ Một module thuần (không React/Three) chứa mọi con số layout HUD mà C
 
 ## H06 — Cập nhật `AGENT.md`
 
-- [ ] **H06** · Mức: **Trung bình** · Branch: `docs/h06-agent-md-hud`
+- [x] **H06** · Mức: **Trung bình** · Branch: `docs/h06-agent-md-hud`
 
 **Tiêu chí nghiệm thu**
 - `AGENT.md` mô tả đúng code trên `master` lúc làm task:
