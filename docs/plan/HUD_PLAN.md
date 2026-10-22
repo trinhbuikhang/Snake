@@ -74,7 +74,7 @@ Nguyên nhân (tại `aabe5b7`):
 | H02/H03 | Trong lúc `playing`/`paused`, **không** render `Corners` (`.chrome-actions`); toggle nằm trong thanh (rộng) và luôn có trong sheet Pause (có nhãn: "Classic 3D"/tên camera, "Touch pad", "Sound on/off" — pill hiện **trạng thái**). Màn title/game over giữ `Corners` như cũ. Phím tắt C / M / P giữ nguyên. | Mobile vẫn đổi được camera/âm thanh, chỉ cần một chạm Pause. |
 | H04 | Cụm điều khiển hiện ⇔ `controlsVisible(w, showControls) = showControls \|\| w ≤ 900` — **một hàm JS** dùng cho cả render (`Hud.jsx`) lẫn camera. Bỏ media query `.responsive-controls`/`.force-show-controls` và điều kiện `pointer: coarse`. | Hết lệch "d-pad hiện theo bề rộng, camera chừa chỗ theo pointer". |
 | H04 | Ngang (`aspect > 1`): chừa cụm bằng lề phải (bàn trượt trái, như S05). Dọc: chừa cụm bằng lề dưới; bàn **canh giữa** dải từ đáy thanh trên tới đỉnh "dải coach" (`HUD.coachH = 92` + 12px) phía trên d-pad nếu đủ chỗ (`anchor: 'middle'`, `softBottom`). Lề trên vẫn ≤ 0.80 NDC trên màn cao (desktop gần như không đổi: chiều cao bàn ở `d1280` lệch ≤ 2%). Không đổi `el`, `fov` của preset. | Hết dải trống lớn phía trên; giữ chỗ cho coach mà không thu nhỏ bàn theo bề ngang. |
-| H05 | Coach: dọc có cụm → **ngay trên d-pad**, rộng full (tối đa 430px); ngang có cụm → **cột trên d-pad** (rộng 272px, bằng cụm); không có cụm (desktop) → **góc trên trái dưới thanh**, rộng 250px. Card gọn: cao ≤ 92px, chấm + "tap to skip" chung một dòng. Nội dung (copy) giữ nguyên. | Đo được 0 ô bị che ở mọi viewport bắt buộc trong prototype. |
+| H05 | Coach: dọc có cụm → **ngay trên d-pad**, rộng full (tối đa 430px); ngang có cụm → **cột trên d-pad** (rộng 272px, bằng cụm); không có cụm (desktop) → **góc trên trái dưới thanh**, rộng 272px (đổi từ 250px của prototype sau khi đo ở vòng review PR #53: ở 250px cả 3 bước coach xuống 3 dòng, thẻ cao 106px > `HUD.coachH` 92; ở 272px thẻ 88px và vẫn 0 ô bị che). Card gọn: cao ≤ 92px, chấm + "tap to skip" chung một dòng. Nội dung (copy) giữ nguyên. | Đo được 0 ô bị che ở mọi viewport bắt buộc trong prototype. |
 | Chung | `topdown` / `cinematic` giữ nguyên cách fit cũ. Không đổi gameplay, store, âm thanh. | Giảm rủi ro. |
 
 ## Thứ tự task (tóm tắt)
@@ -197,7 +197,7 @@ Một module thuần (không React/Three) chứa mọi con số layout HUD mà C
 
 ## H05 — Coach card gọn, đặt theo layout
 
-- [ ] **H05** · Mức: **Trung bình** · Branch: `feat/h05-coach-placement`
+- [x] **H05** · Mức: **Trung bình** · Branch: `feat/h05-coach-placement`
 
 **Vấn đề**
 - `.coach-marks` (styles.css L935) cố định `bottom: 110px`, rộng 430px, căn giữa: dọc đè nút Up/Left/Right của d-pad (3 cặp), `teams375` che 20 ô; ngang che ~196–200 ô; desktop che 30 ô.
