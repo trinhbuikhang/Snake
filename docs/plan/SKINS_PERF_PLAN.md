@@ -343,7 +343,7 @@ Prototype đầy đủ đã chạy được (xem `docs/plan/skins/reference/`). 
 
 ## S06 — Mở khoá skin (moonlight / cột mốc), sẵn sàng cho bộ sưu tập
 
-- [ ] **S06** · Mức: **Trung bình** · Branch: `feat/s06-skin-unlocks`
+- [x] **S06** · Mức: **Trung bình** · Branch: `feat/s06-skin-unlocks`
 
 **Hành vi mong muốn**
 - Luật mở khoá khai báo dữ liệu trong `SKINS[*].unlock`, dạng danh sách "điều kiện nào đến trước":

@@ -12,7 +12,7 @@ import {
   lanternCount, bloomCount,
   journeyReady, JOURNEY_GOAL, MOONLIGHT_GLYPH,
 } from '../game/garden.js'
-import { SKINS } from '../game/skins.js'
+import { SKINS, skinUnlockState } from '../game/skins.js'
 import { composeMoonCard, composeVerseCard, composeHighlightCard } from '../game/moonCard.js'
 
 const arr = (d) => (
@@ -272,6 +272,7 @@ export function GardenOverlay() {
   const chooseInk = useGame((s) => s.chooseInk)
   const skins = useGame((s) => s.skins)
   const chooseSkin = useGame((s) => s.chooseSkin)
+  const buySkin = useGame((s) => s.buySkin)
   const startMoonrise = useGame((s) => s.startMoonrise)
 
   const moonriseReady = journeyReady(journey.progress)
@@ -335,17 +336,31 @@ export function GardenOverlay() {
           <p className="garden__desc">How the serpent looks tonight. Ink tints its glow.</p>
           <div className="garden__skins" role="radiogroup" aria-label="Serpent skin">
             {SKINS.map((skin) => {
-              const owned = skins.owned.includes(skin.id)
+              // S06: card state comes from the unlock rules — worn /
+              // wear when owned, the moonlight price when buyable,
+              // locked (disabled, with the reason) when not.
+              const st = skinUnlockState(skin, {
+                owned: skins.owned,
+                balance: moonlight.balance,
+                journeyCompleted: journey.completed,
+              })
               const selected = skins.selected === skin.id
+              const locked = !st.owned && !st.buyable
+              const milestoneHint = skin.unlock.some(
+                (r) => r.type === 'milestone' && r.id === 'first-moonrise',
+              )
+                ? 'or complete a Moonrise Night'
+                : null
               return (
                 <button
                   key={skin.id}
                   type="button"
                   role="radio"
                   aria-checked={selected}
-                  className={`garden__skin${selected ? ' is-selected' : ''}${owned ? '' : ' is-locked'}`}
-                  aria-disabled={!owned}
-                  onClick={() => chooseSkin(skin.id)}
+                  className={`garden__skin${selected ? ' is-selected' : ''}${locked ? ' is-locked' : ''}`}
+                  aria-disabled={locked}
+                  disabled={locked}
+                  onClick={() => (st.owned ? chooseSkin(skin.id) : buySkin(skin.id))}
                   title={skin.desc}
                 >
                   <span className="garden__skin-preview" style={{ background: skin.swatch }}>
@@ -354,7 +369,14 @@ export function GardenOverlay() {
                   <span className="garden__skin-text">
                     <span className="garden__skin-name">{skin.name}</span>
                     <span className="garden__skin-sub">{skin.nameVi}</span>
-                    <span className="garden__skin-state">{selected ? 'worn' : owned ? 'wear' : '🔒 Coming soon'}</span>
+                    <span className="garden__skin-state">
+                      {selected
+                        ? 'worn'
+                        : st.owned
+                          ? 'wear'
+                          : `${locked ? '🔒 ' : ''}${MOONLIGHT_GLYPH} ${st.cost}`}
+                    </span>
+                    <span className="garden__skin-hint">{!st.owned && milestoneHint ? milestoneHint : ''}</span>
                   </span>
                 </button>
               )
@@ -691,7 +713,10 @@ export function GameOverOverlay() {
                       <span className="run-unlocks__lines">“{u.lines[1]}”</span>
                     </>
                   ) : (
-                    <span className="run-unlocks__lines">“{u.text}”</span>
+                    <>
+                      {u.kind === 'skin' && <span className="run-unlocks__kind">a new serpent skin</span>}
+                      <span className="run-unlocks__lines">“{u.text}”</span>
+                    </>
                   )}
                 </li>
               ))}

@@ -191,3 +191,62 @@ describe('serpent skins (S04)', () => {
     })
   })
 })
+
+describe('buySkin and milestone grants (S06)', () => {
+  it('buySkin with 800 moonlight buys plushMoon, wears it and persists both', () => {
+    useGame.setState({ moonlight: { balance: 800, earned: 800 } })
+    useGame.getState().buySkin('plushMoon')
+    const s = useGame.getState()
+    expect(s.moonlight.balance).toBe(0)
+    expect(s.skins.owned).toContain('plushMoon')
+    expect(s.skins.selected).toBe('plushMoon')
+    expect(JSON.parse(localStorage.getItem('ran-xinh-skin')).selected).toBe('plushMoon')
+    expect(JSON.parse(localStorage.getItem('ran-xinh-moonlight')).balance).toBe(0)
+  })
+
+  it('buySkin refuses at 799 and for unknown ids, without touching the balance', () => {
+    useGame.setState({ moonlight: { balance: 799, earned: 799 } })
+    useGame.getState().buySkin('plushMoon')
+    expect(useGame.getState().skins.owned).not.toContain('plushMoon')
+    expect(useGame.getState().moonlight.balance).toBe(799)
+    useGame.setState({ moonlight: { balance: 5000, earned: 5000 } })
+    useGame.getState().buySkin('bogus')
+    expect(useGame.getState().moonlight.balance).toBe(5000)
+    expect(useGame.getState().skins.selected).toBe('moonJade')
+  })
+
+  it('buySkin on an owned skin wears it without charging', () => {
+    localStorage.setItem('ran-xinh-skin', JSON.stringify({ owned: ['plushMoon'], selected: 'moonJade' }))
+    useGame.getState().hydrate()
+    useGame.setState({ moonlight: { balance: 300, earned: 300 } })
+    useGame.getState().buySkin('plushMoon')
+    expect(useGame.getState().moonlight.balance).toBe(300)
+    expect(useGame.getState().skins.selected).toBe('plushMoon')
+  })
+
+  it('completing a Moonrise Night grants plushMoon free and announces it in runUnlocks', () => {
+    useGame.setState({ status: 'playing', moonriseActive: true, gameMode: 'classic' })
+    useGame.getState().gameOver({ score: 12, length: 9, cause: 'wall' })
+    const s = useGame.getState()
+    expect(s.journey.completed).toBe(1)
+    expect(s.skins.owned).toContain('plushMoon')
+    expect(s.skins.selected).toBe('moonJade') // granted, not auto-worn
+    expect(s.runUnlocks.some((u) => u.kind === 'skin' && u.id === 'plushMoon')).toBe(true)
+    expect(JSON.parse(localStorage.getItem('ran-xinh-skin')).owned).toContain('plushMoon')
+  })
+
+  it('a normal night grants nothing', () => {
+    useGame.setState({ status: 'playing', moonriseActive: false, gameMode: 'classic' })
+    useGame.getState().gameOver({ score: 12, length: 9, cause: 'wall' })
+    const s = useGame.getState()
+    expect(s.skins.owned).not.toContain('plushMoon')
+    expect(s.runUnlocks.some((u) => u.kind === 'skin')).toBe(false)
+  })
+
+  it('hydrate grants the milestone skin to a player who finished a Moonrise before S06', () => {
+    localStorage.setItem('ran-xinh-journey', JSON.stringify({ progress: 0, completed: 2 }))
+    useGame.getState().hydrate()
+    expect(useGame.getState().skins.owned).toContain('plushMoon')
+    expect(JSON.parse(localStorage.getItem('ran-xinh-skin')).owned).toContain('plushMoon')
+  })
+})

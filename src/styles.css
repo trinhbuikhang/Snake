@@ -1771,6 +1771,17 @@ kbd {
   color: rgba(234, 247, 239, 0.65);
 }
 
+/* Fourth line (S06): the free path for a locked skin ("or complete
+   a Moonrise Night"). Rendered on every card — empty when owned —
+   with a reserved min-height so all cards stay the same height;
+   unlike the lock state line it wraps instead of truncating. */
+.garden__skin-hint {
+  min-height: 0.85rem;
+  font-size: 0.66rem;
+  line-height: 1.25;
+  color: rgba(234, 247, 239, 0.5);
+}
+
 /* Locked skin (not owned yet): clearly not tappable — dimmed art,
    name and subtitle, no hover lift; the lock state line itself
    stays fully legible. */

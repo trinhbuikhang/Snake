@@ -11,7 +11,10 @@ import {
   BLOOM_MAX_TIER, BLOOM_COSTS, bloomCount,
   earnMoonlight, nextStreak, toDayString, journeyReady, JOURNEY_GOAL,
 } from './garden.js'
-import { SKINS, SKIN_IDS, DEFAULT_SKIN, isDefaultSkin } from './skins.js'
+import {
+  SKINS, SKIN_IDS, DEFAULT_SKIN, isDefaultSkin, skinById,
+  skinUnlockState, checkSkinMilestones,
+} from './skins.js'
 
 export const BEST_KEY = 'ran-xinh-best' // legacy single best, migrated into BESTS_KEY
 export const BESTS_KEY = 'ran-xinh-bests'
@@ -321,6 +324,29 @@ function completeRun(get, set, cause) {
   }
   writeItem(JOURNEY_KEY, JSON.stringify(journey))
 
+  // S06: completing a Moonrise Night grants the milestone skins
+  // (Plush Moon) for free. The grant is recorded like any other
+  // unlock — an entry in runUnlocks, so the player sees it in the
+  // game-over summary (T10b routing: a live run's unlocks rest
+  // there). The skin is owned, not auto-worn.
+  let skins = get().skins
+  let skinUnlockEntries = []
+  if (wasMoonrise && skins) {
+    const granted = checkSkinMilestones({
+      owned: skins.owned,
+      journeyCompleted: journey.completed,
+    })
+    if (granted.length > 0) {
+      skins = { owned: [...skins.owned, ...granted], selected: skins.selected }
+      writeItem(SKIN_KEY, JSON.stringify(skins))
+      skinUnlockEntries = granted.map((id) => ({
+        kind: 'skin',
+        id,
+        text: `${skinById(id).name} is yours — a gift of the Moonrise Night.`,
+      }))
+    }
+  }
+
   // P5 "Shared Skies" — Tonight's Highlights: the run's most beautiful
   // moments, finalized here. Candidates were noted during play; keep the top
   // 3 by priority, in the order they happened, for the game-over reel.
@@ -361,6 +387,8 @@ function completeRun(get, set, cause) {
     moonriseCoda,
     lastMoonlight: ml,
     highlights,
+    skins,
+    runUnlocks: [...(get().runUnlocks || []), ...skinUnlockEntries],
   })
 }
 
@@ -479,6 +507,16 @@ export const useGame = create((set, get) => ({
     const bests = readBests()
     const gameMode = readMode()
     const seen = readSeen()
+    const journey = readJourney()
+    let skins = readSkins()
+    // S06: a player who completed a Moonrise Night before skin
+    // grants existed has still earned the milestone skins — record
+    // the grant now so it is never lost.
+    const grants = checkSkinMilestones({ owned: skins.owned, journeyCompleted: journey.completed })
+    if (grants.length > 0) {
+      skins = { owned: [...skins.owned, ...grants], selected: skins.selected }
+      writeItem(SKIN_KEY, JSON.stringify(skins))
+    }
     set({
       bests,
       best: bests[gameMode] || 0,
@@ -496,8 +534,8 @@ export const useGame = create((set, get) => ({
       seenPhases: seen.phases,
       moonlight: readMoonlight(),
       garden: readGarden(),
-      skins: readSkins(),
-      journey: readJourney(),
+      skins,
+      journey,
       keepsakes: readKeepsakes(),
       streak: readStreak(),
       gardenerName: readName(),
@@ -727,6 +765,38 @@ export const useGame = create((set, get) => ({
     const cur = get().skins
     if (!cur.owned.includes(id) || cur.selected === id) return
     const skins = { owned: cur.owned, selected: id }
+    writeItem(SKIN_KEY, JSON.stringify(skins))
+    set({ skins })
+  },
+
+  buySkin(id) {
+    // S06: buy an unowned skin with moonlight, like chooseInk —
+    // the price comes from the skin's unlock data, the balance is
+    // spent through _spend, and a bought skin is worn at once.
+    // Re-buying an owned skin never charges: it just wears it.
+    if (!SKIN_IDS.includes(id)) return
+    const cur = get().skins
+    if (!cur) return
+    if (cur.owned.includes(id)) {
+      get().chooseSkin(id)
+      return
+    }
+    const st = skinUnlockState(skinById(id), {
+      owned: cur.owned,
+      balance: get().moonlight?.balance || 0,
+      journeyCompleted: get().journey?.completed || 0,
+    })
+    if (st.owned) {
+      // A milestone already grants it (defensive; completeRun and
+      // hydrate normally record grants before this can happen).
+      const skins = { owned: [...cur.owned, id], selected: cur.selected }
+      writeItem(SKIN_KEY, JSON.stringify(skins))
+      set({ skins })
+      return
+    }
+    if (!st.buyable) return
+    if (!get()._spend(st.cost)) return
+    const skins = { owned: [...cur.owned, id], selected: id }
     writeItem(SKIN_KEY, JSON.stringify(skins))
     set({ skins })
   },
