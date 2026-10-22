@@ -1504,6 +1504,13 @@ export default function Hud() {
         <>
           <NightBanner />
           <ReadyVeil />
+          {/* C03 (review fix): the touch controls render during the ready
+              beat too, so a player can pre-hold Dash (and pre-steer on the
+              pad) before the run starts — without this the button is not
+              in the DOM during 'ready' and the held-Dash boost can never
+              trigger. Both veils are pointer-events: none, so nothing
+              covers the controls. */}
+          {controlsVisible(vp.w, showControls) && <OnScreenControls />}
         </>
       )}
       {status === 'playing' && (

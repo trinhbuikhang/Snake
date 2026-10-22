@@ -848,6 +848,7 @@ export function createEngine(canvas, { reduced } = {}) {
       readyAccum = 0
     }
     setBoost(false)
+    boostHeld = false // C03 (review fix): a blurred window must not carry a stale Dash hold into the run
   }
   const onFocus = () => {
     readyHeld = false

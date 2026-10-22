@@ -717,4 +717,15 @@ describe('Dash held through the ready beat (C03)', () => {
     expect(useGame.getState().isBoosting).toBe(false)
     engine.destroy()
   })
+
+  it('window blur during ready clears the hold, so the run does not start boosted (review fix)', () => {
+    const engine = createEngine(freshCanvas(), { reduced: false })
+    engine.start()
+    useGame.setState({ status: 'ready' })
+    inputBus.emit({ type: 'boost', boosting: true })
+    h.winListeners.blur()
+    useGame.getState().enterPlaying()
+    expect(useGame.getState().isBoosting).toBe(false)
+    engine.destroy()
+  })
 })

@@ -27,7 +27,7 @@ describe('padDirection (C03)', () => {
     // Offsets along a slide: up the middle, across to the right, down.
     const pts = [
       [0, -20], [0, -40], // up
-      [18, -38], [40, -30], [44, -4], // swinging right (one tie at 18,-38 stays up)
+      [18, -38], [40, -30], [44, -4], // swinging right ((18,-38) is still vertical-dominant, so it stays up)
       [38, 20], [10, 42], [0, 44], // down
     ]
     const seq = []
