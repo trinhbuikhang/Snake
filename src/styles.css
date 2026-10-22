@@ -1772,11 +1772,12 @@ kbd {
 }
 
 /* Fourth line (S06): the free path for a locked skin ("or complete
-   a Moonrise Night"). Rendered on every card — empty when owned —
-   with a reserved min-height so all cards stay the same height;
-   unlike the lock state line it wraps instead of truncating. */
+   a Moonrise Night"). Rendered on every card — empty when owned.
+   At card width the hint wraps to two lines, so the min-height
+   reserves exactly two lines (2 × 0.66rem × 1.25): buying the skin
+   empties the hint but must not shrink the card. */
 .garden__skin-hint {
-  min-height: 0.85rem;
+  min-height: 1.65rem;
   font-size: 0.66rem;
   line-height: 1.25;
   color: rgba(234, 247, 239, 0.5);

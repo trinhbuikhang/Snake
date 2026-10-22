@@ -701,8 +701,13 @@ export function GameOverOverlay() {
           </div>
         )}
         {runUnlocks.length > 0 && (
-          <div className="run-unlocks" aria-label="New journal entries tonight">
-            <p className="run-unlocks__title">New in your journal tonight</p>
+          <div
+            className="run-unlocks"
+            aria-label={runUnlocks.some((u) => u.kind === 'skin') ? 'New tonight' : 'New journal entries tonight'}
+          >
+            <p className="run-unlocks__title">
+              {runUnlocks.some((u) => u.kind === 'skin') ? 'New tonight' : 'New in your journal tonight'}
+            </p>
             <ul>
               {runUnlocks.map((u) => (
                 <li key={`${u.kind}-${u.id}`} className="run-unlocks__item">
