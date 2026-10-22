@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useGame } from '../game/store.js'
 import { inputBus } from '../game/inputBus.js'
-import { isCompact } from '../game/hudLayout.js'
+import { isCompact, controlsVisible } from '../game/hudLayout.js'
 import { MOON_PHASES, moonPhaseById, GAME_MODES, gameModeById } from '../game/logic.js'
 import { WHISPERS, WHISPER_COUNT } from '../game/whispers.js'
 import { VERSES, VERSE_COUNT } from '../game/verses.js'
@@ -1432,6 +1432,7 @@ export default function Hud() {
   const showGarden = useGame((s) => s.showGarden)
   const showControls = useGame((s) => s.showControls)
   const moonriseCoda = useGame((s) => s.moonriseCoda)
+  const vp = useViewport()
 
   return (
     <>
@@ -1453,9 +1454,7 @@ export default function Hud() {
           <PlayingHud />
           <CoachMarks />
           <JournalPing />
-          <div className={showControls ? 'force-show-controls' : 'responsive-controls'}>
-            <OnScreenControls />
-          </div>
+          {controlsVisible(vp.w, showControls) && <OnScreenControls />}
         </>
       )}
       {status === 'paused' && <PauseOverlay />}

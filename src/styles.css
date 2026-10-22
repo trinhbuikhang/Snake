@@ -639,20 +639,9 @@ kbd {
 .dbtn--right { grid-area: 2 / 3; }
 .dbtn--down { grid-area: 3 / 2; }
 
-/* Responsive controls visibility */
-@media (min-width: 901px) {
-  .responsive-controls { display: none; }
-  .legend { display: block; }
-}
-
-@media (max-width: 900px) {
-  .responsive-controls { display: block; }
-  .legend { display: none; }
-}
-
-.force-show-controls {
-  display: block !important;
-}
+/* Touch-cluster visibility is NOT CSS-driven anymore (H04):
+   Hud.jsx renders the cluster when hudLayout's controlsVisible()
+   says so — the same rule the camera fit reserves space by. */
 
 /* ---------------- informational cards (how to / pause / over) ---------------- */
 

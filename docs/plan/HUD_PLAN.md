@@ -170,7 +170,7 @@ Một module thuần (không React/Three) chứa mọi con số layout HUD mà C
 
 ## H04 — Camera lấy lề từ HUD thật (thanh, safe-area, cụm điều khiển khi hiện)
 
-- [ ] **H04** · Mức: **Cao** · Branch: `feat/h04-camera-follows-hud`
+- [x] **H04** · Mức: **Cao** · Branch: `feat/h04-camera-follows-hud`
 
 **Vấn đề**
 - `engine.js` L47–48 hằng số rời (`HUD_BOTTOM_PX = 74`, `TOUCH_CLUSTER_W_PX = 288`), L955 chỉ chừa cụm khi `pointer: coarse` → `l844m` Dash che 13 ô (`hud/images/before-after-landscape.jpg`, hàng 2); không đọc safe-area (`l844safe` Dash che 4 ô); không fit lại khi bật/tắt `showControls`.

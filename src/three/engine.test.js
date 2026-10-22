@@ -667,3 +667,26 @@ describe('skin swapping (S04)', () => {
     useGame.setState({ skins: { owned: ['moonJade'], selected: 'moonJade' } })
   })
 })
+
+describe('createEngine camera follows the HUD (H04)', () => {
+  it('refits when showControls changes: the board slides left at 1280x800, no resize needed', () => {
+    const canvas = { ...freshCanvas(), clientWidth: 1280, clientHeight: 800 }
+    const engine = createEngine(canvas, { reduced: false })
+    engine.start()
+    // The camera the engine precompiled with is the live one.
+    const camera = h.renderers[0].compileAsyncCalls[0][1]
+    runFrames(2000)
+    // No cluster at 1280 wide with the toggle off: the board is
+    // centred, so the camera sits on the z axis (lookX = 0).
+    expect(Math.abs(camera.position.x)).toBeLessThan(0.05)
+
+    // Toggling the touch pad on must refit immediately (the store
+    // subscription, not a resize): the cluster appears on the right
+    // and alignedCamera slides the board left of it (lookX > 0, and
+    // for the aligned preset position.x tracks lookX exactly).
+    useGame.getState().toggleControls()
+    runFrames(2000)
+    expect(camera.position.x).toBeGreaterThan(1)
+    engine.destroy()
+  })
+})
