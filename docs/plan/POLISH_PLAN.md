@@ -168,7 +168,7 @@ Khoá bằng test cái đang đúng (hàng đợi rẽ, độ trễ ≤ 1 tick) 
 
 ## C02 — Vuốt theo một ngón (chạy khi giữ Dash) + khoá trục
 
-- [ ] **C02** · Mức: **Cao** · Branch: `fix/c02-swipe-multitouch`
+- [x] **C02** · Mức: **Cao** · Branch: `fix/c02-swipe-multitouch`
 
 **Vấn đề**
 - `engine.js` L779–804 đọc `e.touches[0]` (mọi ngón trên màn hình) → giữ Dash + vuốt: **0 lượt rẽ** (S6, S7); nhả Dash giữa chừng → rẽ **sai hướng** (S8). Ngưỡng 18px không khoá trục → vuốt cong thêm lượt rẽ ngoài ý muốn (S3). `swipe-sim.mjs`: master **5/9**.

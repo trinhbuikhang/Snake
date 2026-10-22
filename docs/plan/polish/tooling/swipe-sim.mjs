@@ -11,8 +11,21 @@
 // Events for a finger that went down on the Dash button are delivered to the
 // button, never to the canvas.
 //
-// usage (repo root): node docs/plan/polish/tooling/swipe-sim.mjs [--reference] [--json out.json]
+// usage (repo root): node docs/plan/polish/tooling/swipe-sim.mjs [--master | --reference] [--json out.json]
+// Default: the real src/game/swipe.js tracker (C02). --master replays the
+// verbatim pre-C02 handler copy above ("before"); --reference the plan's
+// prototype in docs/plan/polish/reference/swipeTracker.js.
 import fs from 'fs'
+import { createSwipeTracker } from '../../../../src/game/swipe.js'
+
+export function srcSwipe(requestTurn) {
+  const tr = createSwipeTracker()
+  return {
+    onTouchStart: (e) => tr.start(e),
+    onTouchMove: (e) => { const k = tr.move(e); if (k) requestTurn(k) },
+    onTouchEnd: (e) => tr.end(e),
+  }
+}
 
 export function engineSwipe(requestTurn) {
   const pointer = { active: false, sx: 0, sy: 0 }
@@ -105,11 +118,10 @@ export function runScenarios(factory) {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  // --reference: replay the same traces through the C02 reference tracker
-  // (docs/plan/polish/reference/swipeTracker.js) instead of master's handlers.
+  const master = process.argv.includes('--master')
   const ref = process.argv.includes('--reference')
-  const factory = ref ? (await import('../reference/swipeTracker.js')).referenceSwipe : engineSwipe
-  console.log(ref ? 'handlers: REFERENCE swipeTracker (C02)' : 'handlers: master engine.js @ f9d1dd6 (copy)')
+  const factory = master ? engineSwipe : ref ? (await import('../reference/swipeTracker.js')).referenceSwipe : srcSwipe
+  console.log(master ? 'handlers: master engine.js @ f9d1dd6 (copy)' : ref ? 'handlers: REFERENCE swipeTracker (C02)' : 'handlers: src/game/swipe.js (C02)')
   const res = runScenarios(factory)
   for (const r of res) console.log(`${r.id} ${r.ok ? 'OK  ' : 'FAIL'} expect [${r.expect}] got [${r.got}]  ${r.name}`)
   console.log(`swipe scenarios ok: ${res.filter((r) => r.ok).length}/${res.length}`)
