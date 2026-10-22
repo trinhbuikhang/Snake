@@ -93,7 +93,7 @@ Nguyên nhân (tại `aabe5b7`):
 
 ## H01 — Token + luật layout thuần (`src/game/hudLayout.js`)
 
-- [ ] **H01** · Mức: **Cao** · Branch: `feat/h01-hud-layout-tokens`
+- [x] **H01** · Mức: **Cao** · Branch: `feat/h01-hud-layout-tokens`
 
 **Mục tiêu**
 Một module thuần (không React/Three) chứa mọi con số layout HUD mà CSS và camera cùng dùng. Task này **không đổi giao diện**.

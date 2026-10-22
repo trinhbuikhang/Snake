@@ -43,6 +43,27 @@
   --z-chrome: 10;
   --z-dpad: 15;
   --z-sheet: 30;
+
+  /* HUD layout tokens (H01) — MUST equal HUD in src/game/hudLayout.js
+     (hudLayout.test.js asserts this); the camera fit reads the same
+     numbers from the JS side. */
+  --hud-edge: 10px;
+  --hud-bar-h: 44px;
+  --hud-btn: 44px;
+  --hud-gap: 8px;
+}
+
+/* Invisible probe whose padding mirrors env(safe-area-inset-*) so
+   readSafeArea() in hudLayout.js can read the values from JS. */
+.safe-probe {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  visibility: hidden;
+  pointer-events: none;
+  padding: env(safe-area-inset-top, 0px) env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
 }
 
 * {
