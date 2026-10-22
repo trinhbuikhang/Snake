@@ -1,0 +1,1014 @@
+{
+ "p390": {
+  "id": "p390",
+  "w": 390,
+  "h": 844,
+  "dpr": 3,
+  "play": {
+   "status": "playing",
+   "bar": {
+    "l": 10,
+    "t": 10,
+    "r": 380,
+    "b": 54,
+    "w": 370,
+    "h": 44
+   },
+   "stats": {
+    "l": 10,
+    "t": 10,
+    "r": 328,
+    "b": 54,
+    "w": 318,
+    "h": 44
+   },
+   "statValue": {
+    "fontSize": "19.52px",
+    "fontFamily": "\"Cormorant Garamond\"",
+    "numeric": "tabular-nums",
+    "color": "rgb(255, 240, 196)"
+   },
+   "statLabel": {
+    "fontSize": "9.6px",
+    "letterSpacing": "1.344px"
+   },
+   "dpad": {
+    "l": 184,
+    "t": 638,
+    "r": 374,
+    "b": 828,
+    "w": 190,
+    "h": 190
+   },
+   "dbtn": [
+    {
+     "l": 250,
+     "t": 638,
+     "r": 302,
+     "b": 690,
+     "w": 52,
+     "h": 52
+    },
+    {
+     "l": 184,
+     "t": 704,
+     "r": 236,
+     "b": 756,
+     "w": 52,
+     "h": 52
+    },
+    {
+     "l": 316,
+     "t": 704,
+     "r": 368,
+     "b": 756,
+     "w": 52,
+     "h": 52
+    },
+    {
+     "l": 250,
+     "t": 770,
+     "r": 302,
+     "b": 822,
+     "w": 52,
+     "h": 52
+    }
+   ],
+   "dash": {
+    "l": 112,
+    "t": 772,
+    "r": 168,
+    "b": 828,
+    "w": 56,
+    "h": 56
+   },
+   "padHit": 0.281
+  },
+  "titleTaps": [
+   {
+    "name": "Change camera angle (C k",
+    "w": 44,
+    "h": 44
+   },
+   {
+    "name": "Toggle virtual controls",
+    "w": 44,
+    "h": 44
+   },
+   {
+    "name": "Mute",
+    "w": 44,
+    "h": 44
+   },
+   {
+    "name": "Start playing",
+    "w": 320,
+    "h": 48
+   },
+   {
+    "name": "\ud83c\udfee Garden",
+    "w": 320,
+    "h": 48
+   },
+   {
+    "name": "How to play",
+    "w": 320,
+    "h": 48
+   },
+   {
+    "name": "Camera: Classic 3D",
+    "w": 320,
+    "h": 48
+   },
+   {
+    "name": "\ud83d\udc0dClassic",
+    "w": 83,
+    "h": 57
+   },
+   {
+    "name": "\ud83c\udfeeLantern Rush",
+    "w": 125,
+    "h": 57
+   },
+   {
+    "name": "\ud83c\udf43Zen Garden",
+    "w": 110,
+    "h": 57
+   },
+   {
+    "name": "\ud83c\udf11New",
+    "w": 54,
+    "h": 57
+   },
+   {
+    "name": "\ud83c\udf12Crescent",
+    "w": 84,
+    "h": 57
+   },
+   {
+    "name": "\ud83c\udf13Half",
+    "w": 54,
+    "h": 57
+   },
+   {
+    "name": "\ud83c\udf14Gibbous",
+    "w": 73,
+    "h": 57
+   },
+   {
+    "name": "\ud83c\udf15Full",
+    "w": 54,
+    "h": 57
+   },
+   {
+    "name": "\ud83d\udcd6 Journal \u00b7 0/40 whispe",
+    "w": 348,
+    "h": 59
+   }
+  ],
+  "pauseTaps": [
+   {
+    "name": "Resume",
+    "w": 150,
+    "h": 64
+   },
+   {
+    "name": "Back to title",
+    "w": 150,
+    "h": 64
+   },
+   {
+    "name": "\ud83c\udf43 End session",
+    "w": 314,
+    "h": 48
+   },
+   {
+    "name": "Change camera angle (C k",
+    "w": 130,
+    "h": 44
+   },
+   {
+    "name": "Toggle virtual controls",
+    "w": 129,
+    "h": 44
+   },
+   {
+    "name": "Mute",
+    "w": 122,
+    "h": 44
+   }
+  ],
+  "errs": []
+ },
+ "p375": {
+  "id": "p375",
+  "w": 375,
+  "h": 667,
+  "dpr": 3,
+  "play": {
+   "status": "playing",
+   "bar": {
+    "l": 10,
+    "t": 10,
+    "r": 365,
+    "b": 54,
+    "w": 355,
+    "h": 44
+   },
+   "stats": {
+    "l": 10,
+    "t": 10,
+    "r": 313,
+    "b": 54,
+    "w": 303,
+    "h": 44
+   },
+   "statValue": {
+    "fontSize": "19.52px",
+    "fontFamily": "\"Cormorant Garamond\"",
+    "numeric": "tabular-nums",
+    "color": "rgb(255, 240, 196)"
+   },
+   "statLabel": {
+    "fontSize": "9.6px",
+    "letterSpacing": "1.344px"
+   },
+   "dpad": {
+    "l": 169,
+    "t": 461,
+    "r": 359,
+    "b": 651,
+    "w": 190,
+    "h": 190
+   },
+   "dbtn": [
+    {
+     "l": 235,
+     "t": 461,
+     "r": 287,
+     "b": 513,
+     "w": 52,
+     "h": 52
+    },
+    {
+     "l": 169,
+     "t": 527,
+     "r": 221,
+     "b": 579,
+     "w": 52,
+     "h": 52
+    },
+    {
+     "l": 301,
+     "t": 527,
+     "r": 353,
+     "b": 579,
+     "w": 52,
+     "h": 52
+    },
+    {
+     "l": 235,
+     "t": 593,
+     "r": 287,
+     "b": 645,
+     "w": 52,
+     "h": 52
+    }
+   ],
+   "dash": {
+    "l": 97,
+    "t": 595,
+    "r": 153,
+    "b": 651,
+    "w": 56,
+    "h": 56
+   },
+   "padHit": 0.281
+  },
+  "titleTaps": [
+   {
+    "name": "Change camera angle (C k",
+    "w": 44,
+    "h": 44
+   },
+   {
+    "name": "Toggle virtual controls",
+    "w": 44,
+    "h": 44
+   },
+   {
+    "name": "Mute",
+    "w": 44,
+    "h": 44
+   },
+   {
+    "name": "Start playing",
+    "w": 320,
+    "h": 48
+   },
+   {
+    "name": "\ud83c\udfee Garden",
+    "w": 320,
+    "h": 48
+   },
+   {
+    "name": "How to play",
+    "w": 320,
+    "h": 48
+   },
+   {
+    "name": "Camera: Classic 3D",
+    "w": 320,
+    "h": 48
+   },
+   {
+    "name": "\ud83d\udc0dClassic",
+    "w": 83,
+    "h": 57
+   },
+   {
+    "name": "\ud83c\udfeeLantern Rush",
+    "w": 125,
+    "h": 57
+   },
+   {
+    "name": "\ud83c\udf43Zen Garden",
+    "w": 110,
+    "h": 57
+   },
+   {
+    "name": "\ud83c\udf11New",
+    "w": 54,
+    "h": 57
+   },
+   {
+    "name": "\ud83c\udf12Crescent",
+    "w": 84,
+    "h": 57
+   },
+   {
+    "name": "\ud83c\udf13Half",
+    "w": 54,
+    "h": 57
+   },
+   {
+    "name": "\ud83c\udf14Gibbous",
+    "w": 73,
+    "h": 57
+   },
+   {
+    "name": "\ud83c\udf15Full",
+    "w": 54,
+    "h": 57
+   },
+   {
+    "name": "\ud83d\udcd6 Journal \u00b7 0/40 whispe",
+    "w": 348,
+    "h": 59
+   }
+  ],
+  "pauseTaps": [
+   {
+    "name": "Resume",
+    "w": 143,
+    "h": 64
+   },
+   {
+    "name": "Back to title",
+    "w": 143,
+    "h": 64
+   },
+   {
+    "name": "\ud83c\udf43 End session",
+    "w": 299,
+    "h": 48
+   },
+   {
+    "name": "Change camera angle (C k",
+    "w": 130,
+    "h": 44
+   },
+   {
+    "name": "Toggle virtual controls",
+    "w": 129,
+    "h": 44
+   },
+   {
+    "name": "Mute",
+    "w": 122,
+    "h": 44
+   }
+  ],
+  "errs": []
+ },
+ "p414": {
+  "id": "p414",
+  "w": 414,
+  "h": 896,
+  "dpr": 3,
+  "play": {
+   "status": "playing",
+   "bar": {
+    "l": 10,
+    "t": 10,
+    "r": 404,
+    "b": 54,
+    "w": 394,
+    "h": 44
+   },
+   "stats": {
+    "l": 10,
+    "t": 10,
+    "r": 352,
+    "b": 54,
+    "w": 342,
+    "h": 44
+   },
+   "statValue": {
+    "fontSize": "19.52px",
+    "fontFamily": "\"Cormorant Garamond\"",
+    "numeric": "tabular-nums",
+    "color": "rgb(255, 240, 196)"
+   },
+   "statLabel": {
+    "fontSize": "9.6px",
+    "letterSpacing": "1.344px"
+   },
+   "dpad": {
+    "l": 208,
+    "t": 690,
+    "r": 398,
+    "b": 880,
+    "w": 190,
+    "h": 190
+   },
+   "dbtn": [
+    {
+     "l": 274,
+     "t": 690,
+     "r": 326,
+     "b": 742,
+     "w": 52,
+     "h": 52
+    },
+    {
+     "l": 208,
+     "t": 756,
+     "r": 260,
+     "b": 808,
+     "w": 52,
+     "h": 52
+    },
+    {
+     "l": 340,
+     "t": 756,
+     "r": 392,
+     "b": 808,
+     "w": 52,
+     "h": 52
+    },
+    {
+     "l": 274,
+     "t": 822,
+     "r": 326,
+     "b": 874,
+     "w": 52,
+     "h": 52
+    }
+   ],
+   "dash": {
+    "l": 136,
+    "t": 824,
+    "r": 192,
+    "b": 880,
+    "w": 56,
+    "h": 56
+   },
+   "padHit": 0.281
+  },
+  "titleTaps": [
+   {
+    "name": "Change camera angle (C k",
+    "w": 44,
+    "h": 44
+   },
+   {
+    "name": "Toggle virtual controls",
+    "w": 44,
+    "h": 44
+   },
+   {
+    "name": "Mute",
+    "w": 44,
+    "h": 44
+   },
+   {
+    "name": "Start playing",
+    "w": 320,
+    "h": 48
+   },
+   {
+    "name": "\ud83c\udfee Garden",
+    "w": 320,
+    "h": 48
+   },
+   {
+    "name": "How to play",
+    "w": 320,
+    "h": 48
+   },
+   {
+    "name": "Camera: Classic 3D",
+    "w": 320,
+    "h": 48
+   },
+   {
+    "name": "\ud83d\udc0dClassic",
+    "w": 83,
+    "h": 57
+   },
+   {
+    "name": "\ud83c\udfeeLantern Rush",
+    "w": 125,
+    "h": 57
+   },
+   {
+    "name": "\ud83c\udf43Zen Garden",
+    "w": 110,
+    "h": 57
+   },
+   {
+    "name": "\ud83c\udf11New",
+    "w": 54,
+    "h": 57
+   },
+   {
+    "name": "\ud83c\udf12Crescent",
+    "w": 84,
+    "h": 57
+   },
+   {
+    "name": "\ud83c\udf13Half",
+    "w": 54,
+    "h": 57
+   },
+   {
+    "name": "\ud83c\udf14Gibbous",
+    "w": 73,
+    "h": 57
+   },
+   {
+    "name": "\ud83c\udf15Full",
+    "w": 54,
+    "h": 57
+   },
+   {
+    "name": "\ud83d\udcd6 Journal \u00b7 0/40 whispe",
+    "w": 362,
+    "h": 59
+   }
+  ],
+  "pauseTaps": [
+   {
+    "name": "Resume",
+    "w": 162,
+    "h": 64
+   },
+   {
+    "name": "Back to title",
+    "w": 162,
+    "h": 64
+   },
+   {
+    "name": "\ud83c\udf43 End session",
+    "w": 338,
+    "h": 48
+   },
+   {
+    "name": "Change camera angle (C k",
+    "w": 130,
+    "h": 44
+   },
+   {
+    "name": "Toggle virtual controls",
+    "w": 129,
+    "h": 44
+   },
+   {
+    "name": "Mute",
+    "w": 122,
+    "h": 44
+   }
+  ],
+  "errs": []
+ },
+ "teams375": {
+  "id": "teams375",
+  "w": 375,
+  "h": 640,
+  "dpr": 3,
+  "note": "Teams in-app visible area (HUD_PLAN)",
+  "play": {
+   "status": "playing",
+   "bar": {
+    "l": 10,
+    "t": 10,
+    "r": 365,
+    "b": 54,
+    "w": 355,
+    "h": 44
+   },
+   "stats": {
+    "l": 10,
+    "t": 10,
+    "r": 313,
+    "b": 54,
+    "w": 303,
+    "h": 44
+   },
+   "statValue": {
+    "fontSize": "19.52px",
+    "fontFamily": "\"Cormorant Garamond\"",
+    "numeric": "tabular-nums",
+    "color": "rgb(255, 240, 196)"
+   },
+   "statLabel": {
+    "fontSize": "9.6px",
+    "letterSpacing": "1.344px"
+   },
+   "dpad": {
+    "l": 169,
+    "t": 434,
+    "r": 359,
+    "b": 624,
+    "w": 190,
+    "h": 190
+   },
+   "dbtn": [
+    {
+     "l": 235,
+     "t": 434,
+     "r": 287,
+     "b": 486,
+     "w": 52,
+     "h": 52
+    },
+    {
+     "l": 169,
+     "t": 500,
+     "r": 221,
+     "b": 552,
+     "w": 52,
+     "h": 52
+    },
+    {
+     "l": 301,
+     "t": 500,
+     "r": 353,
+     "b": 552,
+     "w": 52,
+     "h": 52
+    },
+    {
+     "l": 235,
+     "t": 566,
+     "r": 287,
+     "b": 618,
+     "w": 52,
+     "h": 52
+    }
+   ],
+   "dash": {
+    "l": 97,
+    "t": 568,
+    "r": 153,
+    "b": 624,
+    "w": 56,
+    "h": 56
+   },
+   "padHit": 0.281
+  },
+  "titleTaps": [
+   {
+    "name": "Change camera angle (C k",
+    "w": 44,
+    "h": 44
+   },
+   {
+    "name": "Toggle virtual controls",
+    "w": 44,
+    "h": 44
+   },
+   {
+    "name": "Mute",
+    "w": 44,
+    "h": 44
+   },
+   {
+    "name": "Start playing",
+    "w": 320,
+    "h": 48
+   },
+   {
+    "name": "\ud83c\udfee Garden",
+    "w": 320,
+    "h": 48
+   },
+   {
+    "name": "How to play",
+    "w": 320,
+    "h": 48
+   },
+   {
+    "name": "Camera: Classic 3D",
+    "w": 320,
+    "h": 48
+   },
+   {
+    "name": "\ud83d\udc0dClassic",
+    "w": 83,
+    "h": 57
+   },
+   {
+    "name": "\ud83c\udfeeLantern Rush",
+    "w": 125,
+    "h": 57
+   },
+   {
+    "name": "\ud83c\udf43Zen Garden",
+    "w": 110,
+    "h": 57
+   },
+   {
+    "name": "\ud83c\udf11New",
+    "w": 54,
+    "h": 57
+   },
+   {
+    "name": "\ud83c\udf12Crescent",
+    "w": 84,
+    "h": 57
+   },
+   {
+    "name": "\ud83c\udf13Half",
+    "w": 54,
+    "h": 57
+   },
+   {
+    "name": "\ud83c\udf14Gibbous",
+    "w": 73,
+    "h": 57
+   },
+   {
+    "name": "\ud83c\udf15Full",
+    "w": 54,
+    "h": 57
+   },
+   {
+    "name": "\ud83d\udcd6 Journal \u00b7 0/40 whispe",
+    "w": 348,
+    "h": 59
+   }
+  ],
+  "pauseTaps": [
+   {
+    "name": "Resume",
+    "w": 143,
+    "h": 64
+   },
+   {
+    "name": "Back to title",
+    "w": 143,
+    "h": 64
+   },
+   {
+    "name": "\ud83c\udf43 End session",
+    "w": 299,
+    "h": 48
+   },
+   {
+    "name": "Change camera angle (C k",
+    "w": 130,
+    "h": 44
+   },
+   {
+    "name": "Toggle virtual controls",
+    "w": 129,
+    "h": 44
+   },
+   {
+    "name": "Mute",
+    "w": 122,
+    "h": 44
+   }
+  ],
+  "errs": []
+ },
+ "p390safe": {
+  "id": "p390safe",
+  "w": 390,
+  "h": 844,
+  "dpr": 3,
+  "safe": {
+   "top": 47,
+   "bottom": 34,
+   "left": 0,
+   "right": 0
+  },
+  "play": {
+   "status": "playing",
+   "bar": {
+    "l": 10,
+    "t": 47,
+    "r": 380,
+    "b": 91,
+    "w": 370,
+    "h": 44
+   },
+   "stats": {
+    "l": 10,
+    "t": 47,
+    "r": 328,
+    "b": 91,
+    "w": 318,
+    "h": 44
+   },
+   "statValue": {
+    "fontSize": "19.52px",
+    "fontFamily": "\"Cormorant Garamond\"",
+    "numeric": "tabular-nums",
+    "color": "rgb(255, 240, 196)"
+   },
+   "statLabel": {
+    "fontSize": "9.6px",
+    "letterSpacing": "1.344px"
+   },
+   "dpad": {
+    "l": 184,
+    "t": 620,
+    "r": 374,
+    "b": 810,
+    "w": 190,
+    "h": 190
+   },
+   "dbtn": [
+    {
+     "l": 250,
+     "t": 620,
+     "r": 302,
+     "b": 672,
+     "w": 52,
+     "h": 52
+    },
+    {
+     "l": 184,
+     "t": 686,
+     "r": 236,
+     "b": 738,
+     "w": 52,
+     "h": 52
+    },
+    {
+     "l": 316,
+     "t": 686,
+     "r": 368,
+     "b": 738,
+     "w": 52,
+     "h": 52
+    },
+    {
+     "l": 250,
+     "t": 752,
+     "r": 302,
+     "b": 804,
+     "w": 52,
+     "h": 52
+    }
+   ],
+   "dash": {
+    "l": 112,
+    "t": 754,
+    "r": 168,
+    "b": 810,
+    "w": 56,
+    "h": 56
+   },
+   "padHit": 0.281
+  },
+  "titleTaps": [
+   {
+    "name": "Change camera angle (C k",
+    "w": 44,
+    "h": 44
+   },
+   {
+    "name": "Toggle virtual controls",
+    "w": 44,
+    "h": 44
+   },
+   {
+    "name": "Mute",
+    "w": 44,
+    "h": 44
+   },
+   {
+    "name": "Start playing",
+    "w": 320,
+    "h": 48
+   },
+   {
+    "name": "\ud83c\udfee Garden",
+    "w": 320,
+    "h": 48
+   },
+   {
+    "name": "How to play",
+    "w": 320,
+    "h": 48
+   },
+   {
+    "name": "Camera: Classic 3D",
+    "w": 320,
+    "h": 48
+   },
+   {
+    "name": "\ud83d\udc0dClassic",
+    "w": 83,
+    "h": 57
+   },
+   {
+    "name": "\ud83c\udfeeLantern Rush",
+    "w": 125,
+    "h": 57
+   },
+   {
+    "name": "\ud83c\udf43Zen Garden",
+    "w": 110,
+    "h": 57
+   },
+   {
+    "name": "\ud83c\udf11New",
+    "w": 54,
+    "h": 57
+   },
+   {
+    "name": "\ud83c\udf12Crescent",
+    "w": 84,
+    "h": 57
+   },
+   {
+    "name": "\ud83c\udf13Half",
+    "w": 54,
+    "h": 57
+   },
+   {
+    "name": "\ud83c\udf14Gibbous",
+    "w": 73,
+    "h": 57
+   },
+   {
+    "name": "\ud83c\udf15Full",
+    "w": 54,
+    "h": 57
+   },
+   {
+    "name": "\ud83d\udcd6 Journal \u00b7 0/40 whispe",
+    "w": 348,
+    "h": 59
+   }
+  ],
+  "pauseTaps": [
+   {
+    "name": "Resume",
+    "w": 150,
+    "h": 64
+   },
+   {
+    "name": "Back to title",
+    "w": 150,
+    "h": 64
+   },
+   {
+    "name": "\ud83c\udf43 End session",
+    "w": 314,
+    "h": 48
+   },
+   {
+    "name": "Change camera angle (C k",
+    "w": 130,
+    "h": 44
+   },
+   {
+    "name": "Toggle virtual controls",
+    "w": 129,
+    "h": 44
+   },
+   {
+    "name": "Mute",
+    "w": 122,
+    "h": 44
+   }
+  ],
+  "errs": []
+ }
+}

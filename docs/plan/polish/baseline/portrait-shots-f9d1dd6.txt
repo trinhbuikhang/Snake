@@ -1,0 +1,5 @@
+before p390 playing statValue=19.52px "Cormorant Garamond" numeric=tabular-nums label=9.6px dpad=190x190@y638 dbtn=52px padHit=0.281 dash=56px@x112,y772 pauseTaps<44=0 errs=0
+before p375 playing statValue=19.52px "Cormorant Garamond" numeric=tabular-nums label=9.6px dpad=190x190@y461 dbtn=52px padHit=0.281 dash=56px@x97,y595 pauseTaps<44=0 errs=0
+before p414 playing statValue=19.52px "Cormorant Garamond" numeric=tabular-nums label=9.6px dpad=190x190@y690 dbtn=52px padHit=0.281 dash=56px@x136,y824 pauseTaps<44=0 errs=0
+before teams375 playing statValue=19.52px "Cormorant Garamond" numeric=tabular-nums label=9.6px dpad=190x190@y434 dbtn=52px padHit=0.281 dash=56px@x97,y568 pauseTaps<44=0 errs=0
+before p390safe playing statValue=19.52px "Cormorant Garamond" numeric=tabular-nums label=9.6px dpad=190x190@y620 dbtn=52px padHit=0.281 dash=56px@x112,y754 pauseTaps<44=0 errs=0

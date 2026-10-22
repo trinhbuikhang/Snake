@@ -1,0 +1,42 @@
+speeds (ms/tick): base=165 floor=80 dash=41.6 worst=30.8
+
+[1] quick double turns: dropped 0/24000 (deaths 0)
+  base  dropped 0/6000
+  floor dropped 0/6000
+  dash  dropped 0/6000
+  worst dropped 0/6000
+
+[2] triple tap in one tick (up,left,down within 8 ms): third input accepted
+  base  18/200
+  floor 70/200
+  dash  2/200
+  worst 165/200
+
+[3] input -> direction change (ms)   logic mean/max(ticks)   first painted frame mean/p95/max
+  base    165ms/tick 120fps   80.8/161.4 (0.98)   85.8/159/166.4
+  base    165ms/tick  60fps   76/161.5 (0.98)   80.9/159.1/166.5
+  base    165ms/tick  30fps   78.9/161.6 (0.98)   83.9/157.6/166.6
+  floor    80ms/tick 120fps   29.9/73 (0.91)   31.8/71.1/74.6
+  floor    80ms/tick  60fps   34.8/73.2 (0.92)   44.3/79.8/83.2
+  floor    80ms/tick  30fps   33.3/73.2 (0.92)   57.8/96.2/99.9
+  dash   41.6ms/tick 120fps   19.8/41.1 (0.99)   20/38.8/41.3
+  dash   41.6ms/tick  60fps   19.8/41.3 (0.99)   28.3/47.8/49.9
+  dash   41.6ms/tick  30fps   8/24.8 (0.6)   16.7/31.7/33.3
+  worst  30.8ms/tick 120fps   10.4/25.5 (0.83)   17.2/32/33.3
+  worst  30.8ms/tick  60fps   10.2/25.6 (0.83)   17.1/31.7/33.3
+  worst  30.8ms/tick  30fps   11/25.6 (0.83)   18/31.9/33.3
+
+[4] head yaw smoothing: master (min(1, dt * 20) per frame)
+[4] head yaw settle after the turning step (within 9 deg): target(geometry) / drawn head (ms, ticks)
+  base    165ms/tick 120fps   71.7 / 155 (0.94 ticks)
+  base    165ms/tick  60fps   71.7 / 138.3 (0.84 ticks)
+  base    165ms/tick  30fps   71.7 / 138.3 (0.84 ticks)
+  floor    80ms/tick 120fps   35 / 126.7 (1.58 ticks)
+  floor    80ms/tick  60fps   43.3 / 110 (1.37 ticks)
+  floor    80ms/tick  30fps   60 / 93.3 (1.17 ticks)
+  dash   41.6ms/tick 120fps   16.9 / 116.9 (2.81 ticks)
+  dash   41.6ms/tick  60fps   25.2 / 108.5 (2.61 ticks)
+  dash   41.6ms/tick  30fps   16.8 / 83.5 (2.01 ticks)
+  worst  30.8ms/tick 120fps   16.1 / 116.1 (3.77 ticks)
+  worst  30.8ms/tick  60fps   24.4 / 107.7 (3.5 ticks)
+  worst  30.8ms/tick  30fps   41.1 / 74.4 (2.42 ticks)

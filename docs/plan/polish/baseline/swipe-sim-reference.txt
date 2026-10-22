@@ -1,0 +1,11 @@
+handlers: REFERENCE swipeTracker (C02)
+S1 OK   expect [up] got [up]  straight swipe up 60px
+S2 OK   expect [] got [—]  tap with 8px jitter
+S3 OK   expect [up] got [up]  flick up 40px that curls 30px right at the end
+S4 OK   expect [up,right] got [up,right]  L-swipe: up 50px then right 50px (two turns intended)
+S5 OK   expect [up|right] got [right]  diagonal-ish swipe 24px right / 22px up
+S6 OK   expect [up] got [up]  Dash held (thumb 1) + swipe up 60px (thumb 2)
+S7 OK   expect [left] got [left]  Dash held + swipe left 60px
+S8 OK   expect [right] got [right]  swipe right starts, Dash released mid-swipe, finger moves 4px more
+S9 OK   expect [up] got [up]  second finger lands on the lake while first swipes up
+swipe scenarios ok: 9/9

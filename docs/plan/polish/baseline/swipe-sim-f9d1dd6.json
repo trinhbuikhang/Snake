@@ -1,0 +1,65 @@
+[
+ {
+  "id": "S1",
+  "name": "straight swipe up 60px",
+  "expect": "up",
+  "got": "up",
+  "ok": true
+ },
+ {
+  "id": "S2",
+  "name": "tap with 8px jitter",
+  "expect": "",
+  "got": "—",
+  "ok": true
+ },
+ {
+  "id": "S3",
+  "name": "flick up 40px that curls 30px right at the end",
+  "expect": "up",
+  "got": "up,right",
+  "ok": false
+ },
+ {
+  "id": "S4",
+  "name": "L-swipe: up 50px then right 50px (two turns intended)",
+  "expect": "up,right",
+  "got": "up,right",
+  "ok": true
+ },
+ {
+  "id": "S5",
+  "name": "diagonal-ish swipe 24px right / 22px up",
+  "expect": "up|right",
+  "got": "right",
+  "ok": true
+ },
+ {
+  "id": "S6",
+  "name": "Dash held (thumb 1) + swipe up 60px (thumb 2)",
+  "expect": "up",
+  "got": "—",
+  "ok": false
+ },
+ {
+  "id": "S7",
+  "name": "Dash held + swipe left 60px",
+  "expect": "left",
+  "got": "—",
+  "ok": false
+ },
+ {
+  "id": "S8",
+  "name": "swipe right starts, Dash released mid-swipe, finger moves 4px more",
+  "expect": "right",
+  "got": "up",
+  "ok": false
+ },
+ {
+  "id": "S9",
+  "name": "second finger lands on the lake while first swipes up",
+  "expect": "up",
+  "got": "up",
+  "ok": true
+ }
+]

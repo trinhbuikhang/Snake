@@ -87,7 +87,7 @@ Nguyên nhân (tại `aabe5b7`):
 | 4 | H04 | Cao | `feat/h04-camera-follows-hud` | Camera lấy lề từ HUD thật: thanh, safe-area, cụm điều khiển khi hiện; canh giữa dọc |
 | 5 | H05 | Trung bình | `feat/h05-coach-placement` | Coach card gọn, đặt theo layout, không che d-pad/bàn |
 | 6 | H06 | Trung bình | `docs/h06-agent-md-hud` | Cập nhật `AGENT.md` (layout HUD, camera margins, tooling) |
-| 7 | H07 | Thấp *(tuỳ chọn)* | `feat/h07-portrait-polish` | Ý tưởng thêm cho màn dọc (hỏi chủ repo trước) |
+| 7 | H07 | — | — | **Đã chuyển sang `docs/plan/POLISH_PLAN.md`** (V03: camera dọc / `el`; V05: copy coach theo thiết bị). Không làm ở đây. |
 
 ---
 
@@ -229,9 +229,11 @@ Một module thuần (không React/Three) chứa mọi con số layout HUD mà C
 
 ---
 
-## H07 — Tinh chỉnh màn dọc *(tuỳ chọn, hỏi chủ repo trước)*
+## H07 — Tinh chỉnh màn dọc *(đã chuyển sang `POLISH_PLAN.md`)*
 
-- [ ] **H07** · Mức: **Thấp** · Branch: `feat/h07-portrait-polish`
+- [ ] **H07** · **Đã chuyển sang [`docs/plan/POLISH_PLAN.md`](./POLISH_PLAN.md) — task V03 (camera dọc) và V05 (copy coach theo thiết bị). Không làm task này; checkbox giữ trống có chủ đích.**
+
+> Nội dung gốc giữ lại bên dưới để tham khảo; số đo mới (trên `f9d1dd6`) và tiêu chí nằm ở V03/V05.
 
 **Ý tưởng**
 - Màn dọc bị giới hạn theo bề ngang nên luôn còn khoảng trống dọc. Có thể nghiêng camera dọc hơn một chút **chỉ khi aspect < 1** (đo: `el` 1.0 → 1.2 ở 390×844 làm bàn cao 277 → 317px, bề ngang giữ nguyên) — đổi cảm giác nhìn mặt rắn, cần chủ repo duyệt bằng ảnh.
@@ -257,7 +259,7 @@ Một module thuần (không React/Three) chứa mọi con số layout HUD mà C
 | H04 | #52 | Merge `563da93`. Camera theo HUD thật (`alignedCamera`/`fitMargins`/`anchor: 'middle'`, bỏ `pointer: coarse`); ô bị thanh/Dash/d-pad che = 0 ở 11 viewport; suite 192 → 223. |
 | H05 | #53 | Merge `e5a23a9`. Coach đặt theo `coachPlacement`; 0/0 ở cả 11 viewport. Vòng review: `top-left` nới 250px → 272px (thẻ 88.3px ≤ `coachH` 92 ở cả 3 bước). |
 | H06 | #54 | Merge `20bda30`. `AGENT.md` mô tả hệ layout HUD + camera; đối chiếu `rg` với code. |
-| H07 | — | Tuỳ chọn — chưa làm (chỉ làm khi chủ repo yêu cầu). |
+| H07 | — | Chuyển sang `POLISH_PLAN.md` (V03 + V05). |
 
 Output harness cuối trên `master` (đo bởi reviewer ở vòng 2 của H05 trên đúng code đã merge; H06 chỉ đổi tài liệu nên số không đổi) — trạng thái `playing`, coach đang hiện, `smallTaps=0`, `errs=0`:
 

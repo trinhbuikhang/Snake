@@ -1,0 +1,1465 @@
+{
+ "commitNote": "run on the checked-out commit",
+ "speeds": {
+  "base": 0.165,
+  "floor": 0.08,
+  "dash": 0.041600000000000005,
+  "worst": 0.03076013013901213
+ },
+ "doubleTurns": [
+  {
+   "speed": "base",
+   "interval": 0.165,
+   "fps": 120,
+   "pair": "U-turn up,left",
+   "gapMs": 0,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "base",
+   "interval": 0.165,
+   "fps": 120,
+   "pair": "U-turn up,left",
+   "gapMs": 8,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "base",
+   "interval": 0.165,
+   "fps": 120,
+   "pair": "U-turn up,left",
+   "gapMs": 16,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "base",
+   "interval": 0.165,
+   "fps": 120,
+   "pair": "U-turn up,left",
+   "gapMs": 33,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "base",
+   "interval": 0.165,
+   "fps": 120,
+   "pair": "U-turn up,left",
+   "gapMs": 50,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "base",
+   "interval": 0.165,
+   "fps": 120,
+   "pair": "lane up,right",
+   "gapMs": 0,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "base",
+   "interval": 0.165,
+   "fps": 120,
+   "pair": "lane up,right",
+   "gapMs": 8,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "base",
+   "interval": 0.165,
+   "fps": 120,
+   "pair": "lane up,right",
+   "gapMs": 16,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "base",
+   "interval": 0.165,
+   "fps": 120,
+   "pair": "lane up,right",
+   "gapMs": 33,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "base",
+   "interval": 0.165,
+   "fps": 120,
+   "pair": "lane up,right",
+   "gapMs": 50,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "base",
+   "interval": 0.165,
+   "fps": 60,
+   "pair": "U-turn up,left",
+   "gapMs": 0,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "base",
+   "interval": 0.165,
+   "fps": 60,
+   "pair": "U-turn up,left",
+   "gapMs": 8,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "base",
+   "interval": 0.165,
+   "fps": 60,
+   "pair": "U-turn up,left",
+   "gapMs": 16,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "base",
+   "interval": 0.165,
+   "fps": 60,
+   "pair": "U-turn up,left",
+   "gapMs": 33,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "base",
+   "interval": 0.165,
+   "fps": 60,
+   "pair": "U-turn up,left",
+   "gapMs": 50,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "base",
+   "interval": 0.165,
+   "fps": 60,
+   "pair": "lane up,right",
+   "gapMs": 0,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "base",
+   "interval": 0.165,
+   "fps": 60,
+   "pair": "lane up,right",
+   "gapMs": 8,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "base",
+   "interval": 0.165,
+   "fps": 60,
+   "pair": "lane up,right",
+   "gapMs": 16,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "base",
+   "interval": 0.165,
+   "fps": 60,
+   "pair": "lane up,right",
+   "gapMs": 33,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "base",
+   "interval": 0.165,
+   "fps": 60,
+   "pair": "lane up,right",
+   "gapMs": 50,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "base",
+   "interval": 0.165,
+   "fps": 30,
+   "pair": "U-turn up,left",
+   "gapMs": 0,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "base",
+   "interval": 0.165,
+   "fps": 30,
+   "pair": "U-turn up,left",
+   "gapMs": 8,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "base",
+   "interval": 0.165,
+   "fps": 30,
+   "pair": "U-turn up,left",
+   "gapMs": 16,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "base",
+   "interval": 0.165,
+   "fps": 30,
+   "pair": "U-turn up,left",
+   "gapMs": 33,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "base",
+   "interval": 0.165,
+   "fps": 30,
+   "pair": "U-turn up,left",
+   "gapMs": 50,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "base",
+   "interval": 0.165,
+   "fps": 30,
+   "pair": "lane up,right",
+   "gapMs": 0,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "base",
+   "interval": 0.165,
+   "fps": 30,
+   "pair": "lane up,right",
+   "gapMs": 8,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "base",
+   "interval": 0.165,
+   "fps": 30,
+   "pair": "lane up,right",
+   "gapMs": 16,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "base",
+   "interval": 0.165,
+   "fps": 30,
+   "pair": "lane up,right",
+   "gapMs": 33,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "base",
+   "interval": 0.165,
+   "fps": 30,
+   "pair": "lane up,right",
+   "gapMs": 50,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "floor",
+   "interval": 0.08,
+   "fps": 120,
+   "pair": "U-turn up,left",
+   "gapMs": 0,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "floor",
+   "interval": 0.08,
+   "fps": 120,
+   "pair": "U-turn up,left",
+   "gapMs": 8,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "floor",
+   "interval": 0.08,
+   "fps": 120,
+   "pair": "U-turn up,left",
+   "gapMs": 16,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "floor",
+   "interval": 0.08,
+   "fps": 120,
+   "pair": "U-turn up,left",
+   "gapMs": 33,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "floor",
+   "interval": 0.08,
+   "fps": 120,
+   "pair": "U-turn up,left",
+   "gapMs": 50,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "floor",
+   "interval": 0.08,
+   "fps": 120,
+   "pair": "lane up,right",
+   "gapMs": 0,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "floor",
+   "interval": 0.08,
+   "fps": 120,
+   "pair": "lane up,right",
+   "gapMs": 8,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "floor",
+   "interval": 0.08,
+   "fps": 120,
+   "pair": "lane up,right",
+   "gapMs": 16,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "floor",
+   "interval": 0.08,
+   "fps": 120,
+   "pair": "lane up,right",
+   "gapMs": 33,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "floor",
+   "interval": 0.08,
+   "fps": 120,
+   "pair": "lane up,right",
+   "gapMs": 50,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "floor",
+   "interval": 0.08,
+   "fps": 60,
+   "pair": "U-turn up,left",
+   "gapMs": 0,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "floor",
+   "interval": 0.08,
+   "fps": 60,
+   "pair": "U-turn up,left",
+   "gapMs": 8,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "floor",
+   "interval": 0.08,
+   "fps": 60,
+   "pair": "U-turn up,left",
+   "gapMs": 16,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "floor",
+   "interval": 0.08,
+   "fps": 60,
+   "pair": "U-turn up,left",
+   "gapMs": 33,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "floor",
+   "interval": 0.08,
+   "fps": 60,
+   "pair": "U-turn up,left",
+   "gapMs": 50,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "floor",
+   "interval": 0.08,
+   "fps": 60,
+   "pair": "lane up,right",
+   "gapMs": 0,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "floor",
+   "interval": 0.08,
+   "fps": 60,
+   "pair": "lane up,right",
+   "gapMs": 8,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "floor",
+   "interval": 0.08,
+   "fps": 60,
+   "pair": "lane up,right",
+   "gapMs": 16,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "floor",
+   "interval": 0.08,
+   "fps": 60,
+   "pair": "lane up,right",
+   "gapMs": 33,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "floor",
+   "interval": 0.08,
+   "fps": 60,
+   "pair": "lane up,right",
+   "gapMs": 50,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "floor",
+   "interval": 0.08,
+   "fps": 30,
+   "pair": "U-turn up,left",
+   "gapMs": 0,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "floor",
+   "interval": 0.08,
+   "fps": 30,
+   "pair": "U-turn up,left",
+   "gapMs": 8,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "floor",
+   "interval": 0.08,
+   "fps": 30,
+   "pair": "U-turn up,left",
+   "gapMs": 16,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "floor",
+   "interval": 0.08,
+   "fps": 30,
+   "pair": "U-turn up,left",
+   "gapMs": 33,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "floor",
+   "interval": 0.08,
+   "fps": 30,
+   "pair": "U-turn up,left",
+   "gapMs": 50,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "floor",
+   "interval": 0.08,
+   "fps": 30,
+   "pair": "lane up,right",
+   "gapMs": 0,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "floor",
+   "interval": 0.08,
+   "fps": 30,
+   "pair": "lane up,right",
+   "gapMs": 8,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "floor",
+   "interval": 0.08,
+   "fps": 30,
+   "pair": "lane up,right",
+   "gapMs": 16,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "floor",
+   "interval": 0.08,
+   "fps": 30,
+   "pair": "lane up,right",
+   "gapMs": 33,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "floor",
+   "interval": 0.08,
+   "fps": 30,
+   "pair": "lane up,right",
+   "gapMs": 50,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "dash",
+   "interval": 0.041600000000000005,
+   "fps": 120,
+   "pair": "U-turn up,left",
+   "gapMs": 0,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "dash",
+   "interval": 0.041600000000000005,
+   "fps": 120,
+   "pair": "U-turn up,left",
+   "gapMs": 8,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "dash",
+   "interval": 0.041600000000000005,
+   "fps": 120,
+   "pair": "U-turn up,left",
+   "gapMs": 16,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "dash",
+   "interval": 0.041600000000000005,
+   "fps": 120,
+   "pair": "U-turn up,left",
+   "gapMs": 33,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "dash",
+   "interval": 0.041600000000000005,
+   "fps": 120,
+   "pair": "U-turn up,left",
+   "gapMs": 50,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "dash",
+   "interval": 0.041600000000000005,
+   "fps": 120,
+   "pair": "lane up,right",
+   "gapMs": 0,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "dash",
+   "interval": 0.041600000000000005,
+   "fps": 120,
+   "pair": "lane up,right",
+   "gapMs": 8,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "dash",
+   "interval": 0.041600000000000005,
+   "fps": 120,
+   "pair": "lane up,right",
+   "gapMs": 16,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "dash",
+   "interval": 0.041600000000000005,
+   "fps": 120,
+   "pair": "lane up,right",
+   "gapMs": 33,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "dash",
+   "interval": 0.041600000000000005,
+   "fps": 120,
+   "pair": "lane up,right",
+   "gapMs": 50,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "dash",
+   "interval": 0.041600000000000005,
+   "fps": 60,
+   "pair": "U-turn up,left",
+   "gapMs": 0,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "dash",
+   "interval": 0.041600000000000005,
+   "fps": 60,
+   "pair": "U-turn up,left",
+   "gapMs": 8,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "dash",
+   "interval": 0.041600000000000005,
+   "fps": 60,
+   "pair": "U-turn up,left",
+   "gapMs": 16,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "dash",
+   "interval": 0.041600000000000005,
+   "fps": 60,
+   "pair": "U-turn up,left",
+   "gapMs": 33,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "dash",
+   "interval": 0.041600000000000005,
+   "fps": 60,
+   "pair": "U-turn up,left",
+   "gapMs": 50,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "dash",
+   "interval": 0.041600000000000005,
+   "fps": 60,
+   "pair": "lane up,right",
+   "gapMs": 0,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "dash",
+   "interval": 0.041600000000000005,
+   "fps": 60,
+   "pair": "lane up,right",
+   "gapMs": 8,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "dash",
+   "interval": 0.041600000000000005,
+   "fps": 60,
+   "pair": "lane up,right",
+   "gapMs": 16,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "dash",
+   "interval": 0.041600000000000005,
+   "fps": 60,
+   "pair": "lane up,right",
+   "gapMs": 33,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "dash",
+   "interval": 0.041600000000000005,
+   "fps": 60,
+   "pair": "lane up,right",
+   "gapMs": 50,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "dash",
+   "interval": 0.041600000000000005,
+   "fps": 30,
+   "pair": "U-turn up,left",
+   "gapMs": 0,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "dash",
+   "interval": 0.041600000000000005,
+   "fps": 30,
+   "pair": "U-turn up,left",
+   "gapMs": 8,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "dash",
+   "interval": 0.041600000000000005,
+   "fps": 30,
+   "pair": "U-turn up,left",
+   "gapMs": 16,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "dash",
+   "interval": 0.041600000000000005,
+   "fps": 30,
+   "pair": "U-turn up,left",
+   "gapMs": 33,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "dash",
+   "interval": 0.041600000000000005,
+   "fps": 30,
+   "pair": "U-turn up,left",
+   "gapMs": 50,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "dash",
+   "interval": 0.041600000000000005,
+   "fps": 30,
+   "pair": "lane up,right",
+   "gapMs": 0,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "dash",
+   "interval": 0.041600000000000005,
+   "fps": 30,
+   "pair": "lane up,right",
+   "gapMs": 8,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "dash",
+   "interval": 0.041600000000000005,
+   "fps": 30,
+   "pair": "lane up,right",
+   "gapMs": 16,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "dash",
+   "interval": 0.041600000000000005,
+   "fps": 30,
+   "pair": "lane up,right",
+   "gapMs": 33,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "dash",
+   "interval": 0.041600000000000005,
+   "fps": 30,
+   "pair": "lane up,right",
+   "gapMs": 50,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "worst",
+   "interval": 0.03076013013901213,
+   "fps": 120,
+   "pair": "U-turn up,left",
+   "gapMs": 0,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "worst",
+   "interval": 0.03076013013901213,
+   "fps": 120,
+   "pair": "U-turn up,left",
+   "gapMs": 8,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "worst",
+   "interval": 0.03076013013901213,
+   "fps": 120,
+   "pair": "U-turn up,left",
+   "gapMs": 16,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "worst",
+   "interval": 0.03076013013901213,
+   "fps": 120,
+   "pair": "U-turn up,left",
+   "gapMs": 33,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "worst",
+   "interval": 0.03076013013901213,
+   "fps": 120,
+   "pair": "U-turn up,left",
+   "gapMs": 50,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "worst",
+   "interval": 0.03076013013901213,
+   "fps": 120,
+   "pair": "lane up,right",
+   "gapMs": 0,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "worst",
+   "interval": 0.03076013013901213,
+   "fps": 120,
+   "pair": "lane up,right",
+   "gapMs": 8,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "worst",
+   "interval": 0.03076013013901213,
+   "fps": 120,
+   "pair": "lane up,right",
+   "gapMs": 16,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "worst",
+   "interval": 0.03076013013901213,
+   "fps": 120,
+   "pair": "lane up,right",
+   "gapMs": 33,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "worst",
+   "interval": 0.03076013013901213,
+   "fps": 120,
+   "pair": "lane up,right",
+   "gapMs": 50,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "worst",
+   "interval": 0.03076013013901213,
+   "fps": 60,
+   "pair": "U-turn up,left",
+   "gapMs": 0,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "worst",
+   "interval": 0.03076013013901213,
+   "fps": 60,
+   "pair": "U-turn up,left",
+   "gapMs": 8,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "worst",
+   "interval": 0.03076013013901213,
+   "fps": 60,
+   "pair": "U-turn up,left",
+   "gapMs": 16,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "worst",
+   "interval": 0.03076013013901213,
+   "fps": 60,
+   "pair": "U-turn up,left",
+   "gapMs": 33,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "worst",
+   "interval": 0.03076013013901213,
+   "fps": 60,
+   "pair": "U-turn up,left",
+   "gapMs": 50,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "worst",
+   "interval": 0.03076013013901213,
+   "fps": 60,
+   "pair": "lane up,right",
+   "gapMs": 0,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "worst",
+   "interval": 0.03076013013901213,
+   "fps": 60,
+   "pair": "lane up,right",
+   "gapMs": 8,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "worst",
+   "interval": 0.03076013013901213,
+   "fps": 60,
+   "pair": "lane up,right",
+   "gapMs": 16,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "worst",
+   "interval": 0.03076013013901213,
+   "fps": 60,
+   "pair": "lane up,right",
+   "gapMs": 33,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "worst",
+   "interval": 0.03076013013901213,
+   "fps": 60,
+   "pair": "lane up,right",
+   "gapMs": 50,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "worst",
+   "interval": 0.03076013013901213,
+   "fps": 30,
+   "pair": "U-turn up,left",
+   "gapMs": 0,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "worst",
+   "interval": 0.03076013013901213,
+   "fps": 30,
+   "pair": "U-turn up,left",
+   "gapMs": 8,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "worst",
+   "interval": 0.03076013013901213,
+   "fps": 30,
+   "pair": "U-turn up,left",
+   "gapMs": 16,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "worst",
+   "interval": 0.03076013013901213,
+   "fps": 30,
+   "pair": "U-turn up,left",
+   "gapMs": 33,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "worst",
+   "interval": 0.03076013013901213,
+   "fps": 30,
+   "pair": "U-turn up,left",
+   "gapMs": 50,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "worst",
+   "interval": 0.03076013013901213,
+   "fps": 30,
+   "pair": "lane up,right",
+   "gapMs": 0,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "worst",
+   "interval": 0.03076013013901213,
+   "fps": 30,
+   "pair": "lane up,right",
+   "gapMs": 8,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "worst",
+   "interval": 0.03076013013901213,
+   "fps": 30,
+   "pair": "lane up,right",
+   "gapMs": 16,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "worst",
+   "interval": 0.03076013013901213,
+   "fps": 30,
+   "pair": "lane up,right",
+   "gapMs": 33,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  },
+  {
+   "speed": "worst",
+   "interval": 0.03076013013901213,
+   "fps": 30,
+   "pair": "lane up,right",
+   "gapMs": 50,
+   "trials": 200,
+   "dropped": 0,
+   "deaths": 0
+  }
+ ],
+ "tripleTap": [
+  {
+   "speed": "base",
+   "trials": 200,
+   "thirdAccepted": 18
+  },
+  {
+   "speed": "floor",
+   "trials": 200,
+   "thirdAccepted": 70
+  },
+  {
+   "speed": "dash",
+   "trials": 200,
+   "thirdAccepted": 2
+  },
+  {
+   "speed": "worst",
+   "trials": 200,
+   "thirdAccepted": 165
+  }
+ ],
+ "latency": [
+  {
+   "speed": "base",
+   "intervalMs": 165,
+   "fps": 120,
+   "logicMeanMs": 80.8,
+   "logicMaxMs": 161.4,
+   "logicMaxTicks": 0.98,
+   "visibleMeanMs": 85.8,
+   "visibleP95Ms": 159,
+   "visibleMaxMs": 166.4
+  },
+  {
+   "speed": "base",
+   "intervalMs": 165,
+   "fps": 60,
+   "logicMeanMs": 76,
+   "logicMaxMs": 161.5,
+   "logicMaxTicks": 0.98,
+   "visibleMeanMs": 80.9,
+   "visibleP95Ms": 159.1,
+   "visibleMaxMs": 166.5
+  },
+  {
+   "speed": "base",
+   "intervalMs": 165,
+   "fps": 30,
+   "logicMeanMs": 78.9,
+   "logicMaxMs": 161.6,
+   "logicMaxTicks": 0.98,
+   "visibleMeanMs": 83.9,
+   "visibleP95Ms": 157.6,
+   "visibleMaxMs": 166.6
+  },
+  {
+   "speed": "floor",
+   "intervalMs": 80,
+   "fps": 120,
+   "logicMeanMs": 29.9,
+   "logicMaxMs": 73,
+   "logicMaxTicks": 0.91,
+   "visibleMeanMs": 31.8,
+   "visibleP95Ms": 71.1,
+   "visibleMaxMs": 74.6
+  },
+  {
+   "speed": "floor",
+   "intervalMs": 80,
+   "fps": 60,
+   "logicMeanMs": 34.8,
+   "logicMaxMs": 73.2,
+   "logicMaxTicks": 0.92,
+   "visibleMeanMs": 44.3,
+   "visibleP95Ms": 79.8,
+   "visibleMaxMs": 83.2
+  },
+  {
+   "speed": "floor",
+   "intervalMs": 80,
+   "fps": 30,
+   "logicMeanMs": 33.3,
+   "logicMaxMs": 73.2,
+   "logicMaxTicks": 0.92,
+   "visibleMeanMs": 57.8,
+   "visibleP95Ms": 96.2,
+   "visibleMaxMs": 99.9
+  },
+  {
+   "speed": "dash",
+   "intervalMs": 41.6,
+   "fps": 120,
+   "logicMeanMs": 19.8,
+   "logicMaxMs": 41.1,
+   "logicMaxTicks": 0.99,
+   "visibleMeanMs": 20,
+   "visibleP95Ms": 38.8,
+   "visibleMaxMs": 41.3
+  },
+  {
+   "speed": "dash",
+   "intervalMs": 41.6,
+   "fps": 60,
+   "logicMeanMs": 19.8,
+   "logicMaxMs": 41.3,
+   "logicMaxTicks": 0.99,
+   "visibleMeanMs": 28.3,
+   "visibleP95Ms": 47.8,
+   "visibleMaxMs": 49.9
+  },
+  {
+   "speed": "dash",
+   "intervalMs": 41.6,
+   "fps": 30,
+   "logicMeanMs": 8,
+   "logicMaxMs": 24.8,
+   "logicMaxTicks": 0.6,
+   "visibleMeanMs": 16.7,
+   "visibleP95Ms": 31.7,
+   "visibleMaxMs": 33.3
+  },
+  {
+   "speed": "worst",
+   "intervalMs": 30.8,
+   "fps": 120,
+   "logicMeanMs": 10.4,
+   "logicMaxMs": 25.5,
+   "logicMaxTicks": 0.83,
+   "visibleMeanMs": 17.2,
+   "visibleP95Ms": 32,
+   "visibleMaxMs": 33.3
+  },
+  {
+   "speed": "worst",
+   "intervalMs": 30.8,
+   "fps": 60,
+   "logicMeanMs": 10.2,
+   "logicMaxMs": 25.6,
+   "logicMaxTicks": 0.83,
+   "visibleMeanMs": 17.1,
+   "visibleP95Ms": 31.7,
+   "visibleMaxMs": 33.3
+  },
+  {
+   "speed": "worst",
+   "intervalMs": 30.8,
+   "fps": 30,
+   "logicMeanMs": 11,
+   "logicMaxMs": 25.6,
+   "logicMaxTicks": 0.83,
+   "visibleMeanMs": 18,
+   "visibleP95Ms": 31.9,
+   "visibleMaxMs": 33.3
+  }
+ ],
+ "yawSettle": [
+  {
+   "speed": "base",
+   "intervalMs": 165,
+   "fps": 120,
+   "targetSettleMs": 71.7,
+   "viewSettleMs": 155,
+   "viewSettleTicks": 0.94
+  },
+  {
+   "speed": "base",
+   "intervalMs": 165,
+   "fps": 60,
+   "targetSettleMs": 71.7,
+   "viewSettleMs": 138.3,
+   "viewSettleTicks": 0.84
+  },
+  {
+   "speed": "base",
+   "intervalMs": 165,
+   "fps": 30,
+   "targetSettleMs": 71.7,
+   "viewSettleMs": 138.3,
+   "viewSettleTicks": 0.84
+  },
+  {
+   "speed": "floor",
+   "intervalMs": 80,
+   "fps": 120,
+   "targetSettleMs": 35,
+   "viewSettleMs": 126.7,
+   "viewSettleTicks": 1.58
+  },
+  {
+   "speed": "floor",
+   "intervalMs": 80,
+   "fps": 60,
+   "targetSettleMs": 43.3,
+   "viewSettleMs": 110,
+   "viewSettleTicks": 1.37
+  },
+  {
+   "speed": "floor",
+   "intervalMs": 80,
+   "fps": 30,
+   "targetSettleMs": 60,
+   "viewSettleMs": 93.3,
+   "viewSettleTicks": 1.17
+  },
+  {
+   "speed": "dash",
+   "intervalMs": 41.6,
+   "fps": 120,
+   "targetSettleMs": 16.9,
+   "viewSettleMs": 116.9,
+   "viewSettleTicks": 2.81
+  },
+  {
+   "speed": "dash",
+   "intervalMs": 41.6,
+   "fps": 60,
+   "targetSettleMs": 25.2,
+   "viewSettleMs": 108.5,
+   "viewSettleTicks": 2.61
+  },
+  {
+   "speed": "dash",
+   "intervalMs": 41.6,
+   "fps": 30,
+   "targetSettleMs": 16.8,
+   "viewSettleMs": 83.5,
+   "viewSettleTicks": 2.01
+  },
+  {
+   "speed": "worst",
+   "intervalMs": 30.8,
+   "fps": 120,
+   "targetSettleMs": 16.1,
+   "viewSettleMs": 116.1,
+   "viewSettleTicks": 3.77
+  },
+  {
+   "speed": "worst",
+   "intervalMs": 30.8,
+   "fps": 60,
+   "targetSettleMs": 24.4,
+   "viewSettleMs": 107.7,
+   "viewSettleTicks": 3.5
+  },
+  {
+   "speed": "worst",
+   "intervalMs": 30.8,
+   "fps": 30,
+   "targetSettleMs": 41.1,
+   "viewSettleMs": 74.4,
+   "viewSettleTicks": 2.42
+  }
+ ]
+}

@@ -1,0 +1,11 @@
+handlers: master engine.js @ f9d1dd6 (copy)
+S1 OK   expect [up] got [up]  straight swipe up 60px
+S2 OK   expect [] got [—]  tap with 8px jitter
+S3 FAIL expect [up] got [up,right]  flick up 40px that curls 30px right at the end
+S4 OK   expect [up,right] got [up,right]  L-swipe: up 50px then right 50px (two turns intended)
+S5 OK   expect [up|right] got [right]  diagonal-ish swipe 24px right / 22px up
+S6 FAIL expect [up] got [—]  Dash held (thumb 1) + swipe up 60px (thumb 2)
+S7 FAIL expect [left] got [—]  Dash held + swipe left 60px
+S8 FAIL expect [right] got [up]  swipe right starts, Dash released mid-swipe, finger moves 4px more
+S9 OK   expect [up] got [up]  second finger lands on the lake while first swipes up
+swipe scenarios ok: 5/9

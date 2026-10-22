@@ -1,0 +1,4 @@
+ambient phase=new: 19.0 notes/min, longest silence 19.8s, pitch 110-294 Hz (minor pentatonic), oscillators/min 38.0
+ambient phase=half: 19.7 notes/min, longest silence 14.3s, pitch 110-294 Hz (minor pentatonic), oscillators/min 39.4
+ambient phase=full: 28.5 notes/min, longest silence 8.7s, pitch 147-392 Hz (minor pentatonic), oscillators/min 57.0
+pad (setPadOn): 3 oscillators 55/110.4/219.7 Hz + looped noise + LFO, lowpass 520 Hz — a constant drone under the ambient while playing

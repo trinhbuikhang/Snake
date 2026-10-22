@@ -1,0 +1,11 @@
+before p390 playing coarse=true controls=true hudOverlaps=0 cellsCovered=0 (>=25%: 0) offscreen=0 board y 170..441/844 smallTaps=0 errs=0
+before p375 playing coarse=true controls=true hudOverlaps=0 cellsCovered=0 (>=25%: 0) offscreen=0 board y 83..333/667 smallTaps=0 errs=0
+before p414 playing coarse=true controls=true hudOverlaps=0 cellsCovered=0 (>=25%: 0) offscreen=0 board y 189..478/896 smallTaps=0 errs=0
+before teams375 playing coarse=true controls=true hudOverlaps=0 cellsCovered=0 (>=25%: 0) offscreen=0 board y 69..316/640 smallTaps=0 errs=0
+before p390safe playing coarse=true controls=true hudOverlaps=0 cellsCovered=0 (>=25%: 0) offscreen=0 board y 167..438/844 smallTaps=0 errs=0
+before l844t playing coarse=true controls=true hudOverlaps=0 cellsCovered=0 (>=25%: 0) offscreen=0 board y 62..373/390 smallTaps=0 errs=0
+before l844safe playing coarse=true controls=true hudOverlaps=0 cellsCovered=0 (>=25%: 0) offscreen=0 board y 63..361/390 smallTaps=0 errs=0
+before t768 playing coarse=true controls=true hudOverlaps=0 cellsCovered=0 (>=25%: 0) offscreen=0 board y 147..663/1024 smallTaps=0 errs=0
+before w600 playing coarse=false controls=true hudOverlaps=0 cellsCovered=0 (>=25%: 0) offscreen=0 board y 83..478/800 smallTaps=0 errs=0
+before d1280 playing coarse=false controls=false hudOverlaps=0 cellsCovered=0 (>=25%: 0) offscreen=0 board y 80..763/800 smallTaps=0 errs=0
+before l844m playing coarse=false controls=true hudOverlaps=0 cellsCovered=0 (>=25%: 0) offscreen=0 board y 62..373/390 smallTaps=0 errs=0
