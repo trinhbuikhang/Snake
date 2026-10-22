@@ -108,7 +108,7 @@ export function createEngine(canvas, { reduced } = {}) {
   // in place (see snapBufs below and cellBuffer.js).
   const _shake = new THREE.Vector3()
   const _headOff = new THREE.Vector3(0, 1.2, 0)
-  const paintParams = { cur: null, prev: null, t: 0, death: null, animT: 0, dt: 0, isBoosting: false }
+  const paintParams = { cur: null, prev: null, t: 0, death: null, animT: 0, dt: 0, isBoosting: false, interval: BASE_INTERVAL }
 
   // ---- adaptive quality ------------------------------------------------------
   // The ladder itself (QUALITY_STEPS) lives in qualityGovernor.js,
@@ -550,6 +550,7 @@ export function createEngine(canvas, { reduced } = {}) {
     paintParams.animT = animT
     paintParams.dt = 0
     paintParams.isBoosting = false
+    paintParams.interval = tickClock.interval
     rig.paint(paintParams)
     if (logic.food) {
       const w = gridToWorld(logic.food.x, logic.food.y)
@@ -1139,6 +1140,7 @@ export function createEngine(canvas, { reduced } = {}) {
     paintParams.animT = animT
     paintParams.dt = dt
     paintParams.isBoosting = isBoosting
+    paintParams.interval = tickClock.interval
     rig.paint(paintParams)
 
     // Headlight follows snake head

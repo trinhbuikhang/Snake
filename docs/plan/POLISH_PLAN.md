@@ -208,7 +208,7 @@ Khoá bằng test cái đang đúng (hàng đợi rẽ, độ trễ ≤ 1 tick) 
 
 ## C04 — Đầu rắn quay kịp tick
 
-- [ ] **C04** · Mức: **Trung bình** · Branch: `feat/c04-head-yaw-tick`
+- [x] **C04** · Mức: **Trung bình** · Branch: `feat/c04-head-yaw-tick`
 
 **Vấn đề**
 - `serpentBase.js` L444 `rig.yawView += dyaw * Math.min(1, dt * 20)` → đầu vẽ ra mất **108–117 ms** để quay xong (≤ 9°) **ở mọi tốc độ** → `dash` 2.6–2.8 tick, `worst` 3.5–3.8 tick; phụ thuộc fps (120 fps chậm hơn 60 fps).

@@ -5,6 +5,7 @@ import {
   buildPath,
   radiusAt,
   writeTube,
+  yawAlpha,
   STEP,
   ARC_K,
   CORNER_R,
@@ -145,5 +146,58 @@ describe('radiusAt()', () => {
     expect(radiusAt(8, total, 1, PROF)).toBeCloseTo(PROF.bodyR, 6)
     // bulge multiplies through
     expect(radiusAt(8, total, 1.28, PROF)).toBeCloseTo(PROF.bodyR * 1.28, 6)
+  })
+})
+
+describe('yawAlpha() head-yaw smoothing (C04)', () => {
+  const SPEEDS = [0.165, 0.08, 0.0416, 0.0308] // base, floor, dash, worst intervals (s)
+
+  it('stays in (0, 1] for any real frame time and speed', () => {
+    for (const iv of SPEEDS) {
+      for (const dt of [1 / 240, 1 / 120, 1 / 60, 1 / 30, 0.1]) {
+        const a = yawAlpha(dt, iv)
+        expect(a).toBeGreaterThan(0)
+        expect(a).toBeLessThanOrEqual(1)
+      }
+    }
+  })
+
+  it('grows monotonically with dt and shrinks as the tick gets faster', () => {
+    let prev = 0
+    for (const dt of [0.004, 0.008, 0.016, 0.033, 0.066]) {
+      const a = yawAlpha(dt, 0.165)
+      expect(a).toBeGreaterThan(prev)
+      prev = a
+    }
+    // A faster tick means a smaller tau, so the same frame closes more.
+    expect(yawAlpha(0.016, 0.0308)).toBeGreaterThan(yawAlpha(0.016, 0.165))
+  })
+
+  it('tau is 0.25 * interval below the cap and exactly 50 ms at/above interval 0.2 s', () => {
+    for (const dt of [0.008, 0.016, 0.033]) {
+      expect(yawAlpha(dt, 0.1)).toBeCloseTo(1 - Math.exp(-dt / 0.025), 12)
+      expect(yawAlpha(dt, 0.2)).toBeCloseTo(1 - Math.exp(-dt / 0.05), 12)
+      expect(yawAlpha(dt, 0.4)).toBeCloseTo(1 - Math.exp(-dt / 0.05), 12)
+    }
+  })
+
+  it('is frame-rate independent: the residual after the same total time agrees within 1% at 30/60/120 fps', () => {
+    const T = 0.3 // seconds of painted frames after a turn
+    for (const iv of SPEEDS) {
+      const residual = (fps) => {
+        let r = 1 // fraction of the yaw gap still open
+        const frames = Math.round(T * fps)
+        for (let i = 0; i < frames; i++) r *= 1 - yawAlpha(1 / fps, iv)
+        return r
+      }
+      const r30 = residual(30)
+      const r60 = residual(60)
+      const r120 = residual(120)
+      const spread = Math.max(r30, r60, r120) - Math.min(r30, r60, r120)
+      expect(spread / r60).toBeLessThanOrEqual(0.01)
+      // And it matches the closed form exp(-T / tau).
+      const tau = Math.min(0.05, 0.25 * iv)
+      expect(r60).toBeCloseTo(Math.exp(-T / tau), 6)
+    }
   })
 })

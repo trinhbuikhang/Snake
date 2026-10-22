@@ -19,6 +19,7 @@ import {
   buildPath,
   writeTube,
   spineBob,
+  yawAlpha,
   smoothstep,
   RADIAL,
   CAP,
@@ -397,7 +398,9 @@ export function createSerpent(scene, cfg) {
       }
       for (const d of new Set(disposables)) d.dispose?.()
     },
-    paint({ cur, prev, t, death, animT, dt, isBoosting = false }) {
+    // interval: the engine's current tick length (s), for the C04 yaw
+    // smoothing; callers that predate it keep the base-speed behaviour.
+    paint({ cur, prev, t, death, animT, dt, isBoosting = false, interval = 0.165 }) {
       const n = cur.length
       if (!n) return
       rig.chomp = Math.max(0, rig.chomp - dt * 3.8)
@@ -441,7 +444,7 @@ export function createSerpent(scene, cfg) {
       let dyaw = yaw - rig.yawView
       while (dyaw > Math.PI) dyaw -= Math.PI * 2
       while (dyaw < -Math.PI) dyaw += Math.PI * 2
-      rig.yawView += dyaw * Math.min(1, dt * 20)
+      rig.yawView += dyaw * yawAlpha(dt, interval)
       rig.rollView = THREE.MathUtils.lerp(rig.rollView, -Math.max(-0.2, Math.min(0.2, dyaw * 1.4)), Math.min(1, dt * 8))
       const sq = Math.sin(rig.chomp * Math.PI) * 0.1
       headMesh.scale.set(1 + sq, 1 - sq * 0.5, 1 + sq * 0.3)

@@ -26,6 +26,21 @@ export function spineBob(animT, d) {
   return Math.sin(animT * 2.6 - d * 0.9) * 0.022
 }
 
+// Head-yaw smoothing factor for one painted frame (POLISH_PLAN C04).
+//
+// Exponential approach with a time constant tied to the tick:
+// tau = min(50 ms, 0.25 * interval). Because the residual after any
+// total time T is exp(-T / tau) no matter how T is sliced into frames,
+// the drawn head settles in the same wall time at 30, 60 or 120 fps —
+// unlike the old min(1, dt * 20) factor, whose effective rate changed
+// with the frame rate (and took 2.6-3.8 ticks at dash/worst speeds).
+// Returns the fraction of the remaining yaw gap to close this frame,
+// in (0, 1] for dt > 0.
+export function yawAlpha(dt, interval) {
+  const tau = Math.min(0.05, 0.25 * interval)
+  return tau > 0 ? 1 - Math.exp(-dt / tau) : 1
+}
+
 // Scratch state, allocated once per rig and reused every frame.
 //   P: input polyline (xyz triplets)      C: per-point corner radius
 //   S: sampled spine points (xyz)         D: cumulative distance per sample
