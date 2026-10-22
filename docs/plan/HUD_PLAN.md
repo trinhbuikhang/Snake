@@ -197,7 +197,7 @@ Một module thuần (không React/Three) chứa mọi con số layout HUD mà C
 
 ## H05 — Coach card gọn, đặt theo layout
 
-- [ ] **H05** · Mức: **Trung bình** · Branch: `feat/h05-coach-placement`
+- [x] **H05** · Mức: **Trung bình** · Branch: `feat/h05-coach-placement`
 
 **Vấn đề**
 - `.coach-marks` (styles.css L935) cố định `bottom: 110px`, rộng 430px, căn giữa: dọc đè nút Up/Left/Right của d-pad (3 cặp), `teams375` che 20 ô; ngang che ~196–200 ô; desktop che 30 ô.

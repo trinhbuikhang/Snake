@@ -79,6 +79,33 @@ describe('coachPlacement (H01)', () => {
     expect(coachPlacement({ w: 1280, h: 800, showControls: true })).toBe('pad-column')
     expect(coachPlacement({ w: 600, h: 800 })).toBe('above-pad') // narrow portrait window, cluster by width
   })
+
+  it('covers the 11 harness viewports (H05, showControls off)', () => {
+    const table = [
+      ['p390', 390, 844, 'above-pad'],
+      ['p375', 375, 667, 'above-pad'],
+      ['p414', 414, 896, 'above-pad'],
+      ['teams375', 375, 640, 'above-pad'],
+      ['p390safe', 390, 844, 'above-pad'],
+      ['t768', 768, 1024, 'above-pad'],
+      ['w600', 600, 800, 'above-pad'],
+      ['l844t', 844, 390, 'pad-column'],
+      ['l844safe', 844, 390, 'pad-column'],
+      ['l844m', 844, 390, 'pad-column'],
+      ['d1280', 1280, 800, 'top-left'],
+    ]
+    for (const [name, w, h, want] of table) {
+      expect(coachPlacement({ w, h, showControls: false }), name).toBe(want)
+    }
+  })
+
+  it('the three placement classes exist in styles.css (H05)', () => {
+    const css = readFileSync(new URL('../styles.css', import.meta.url), 'utf8')
+    for (const cls of ['coach-marks--above-pad', 'coach-marks--pad-column', 'coach-marks--top-left']) {
+      expect(css).toContain(`.${cls}`)
+    }
+    expect(css).toContain('.coach-card__foot')
+  })
 })
 
 describe('CSS sync (H01)', () => {

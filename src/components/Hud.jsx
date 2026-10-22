@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useGame } from '../game/store.js'
 import { inputBus } from '../game/inputBus.js'
-import { isCompact, controlsVisible } from '../game/hudLayout.js'
+import { isCompact, controlsVisible, coachPlacement } from '../game/hudLayout.js'
 import { MOON_PHASES, moonPhaseById, GAME_MODES, gameModeById } from '../game/logic.js'
 import { WHISPERS, WHISPER_COUNT } from '../game/whispers.js'
 import { VERSES, VERSE_COUNT } from '../game/verses.js'
@@ -896,6 +896,8 @@ function CoachMarks() {
   const coachStep = useGame((s) => s.coachStep)
   const advanceCoach = useGame((s) => s.advanceCoach)
   const dismissCoach = useGame((s) => s.dismissCoach)
+  const showControls = useGame((s) => s.showControls)
+  const vp = useViewport()
 
   useEffect(() => {
     if (coachStep < 0) return undefined
@@ -905,17 +907,23 @@ function CoachMarks() {
 
   if (coachStep < 0 || coachStep >= COACH_COPY.length) return null
   const step = COACH_COPY[coachStep]
+  // H05: placement comes from hudLayout (the same numbers the
+  // camera reserved in H04): above the pad in portrait, the pad's
+  // column in landscape, top-left under the bar without a cluster.
+  const place = coachPlacement({ ...vp, showControls })
   return (
-    <div className="coach-marks" role="status" aria-live="polite">
+    <div className={`coach-marks coach-marks--${place}`} role="status" aria-live="polite">
       <button type="button" className="coach-card" onClick={dismissCoach} aria-label="Skip the guide">
         <p className="coach-card__title">{step.title}</p>
         <p className="coach-card__text">{step.text}</p>
-        <p className="coach-card__dots" aria-hidden="true">
-          {COACH_COPY.map((_, i) => (
-            <span key={i} className={i === coachStep ? 'on' : ''} />
-          ))}
+        <p className="coach-card__foot">
+          <span className="coach-card__dots" aria-hidden="true">
+            {COACH_COPY.map((_, i) => (
+              <span key={i} className={i === coachStep ? 'on' : ''} />
+            ))}
+          </span>
+          <span className="coach-card__skip">tap to skip</span>
         </p>
-        <p className="coach-card__skip">tap to skip</p>
       </button>
     </div>
   )
