@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useGame } from '../game/store.js'
 import { inputBus } from '../game/inputBus.js'
+import { padDirection } from '../game/padInput.js'
 import { isCompact, controlsVisible, coachPlacement } from '../game/hudLayout.js'
 import { MOON_PHASES, moonPhaseById, GAME_MODES, gameModeById } from '../game/logic.js'
 import { WHISPERS, WHISPER_COUNT } from '../game/whispers.js'
@@ -1387,6 +1388,38 @@ function OnScreenControls() {
     ['right', 'right', icons.right],
     ['down', 'down', icons.down],
   ]
+  // C03: the whole pad square steers — direction comes from the finger's
+  // offset to the pad centre (padDirection), and sliding the finger into
+  // another quadrant steers again. The buttons are display + a11y only
+  // (pointer-events: none in CSS); the pad owns the pointer via capture.
+  const padRef = useRef(null)
+  const padPointer = useRef(null) // pointerId currently steering, if any
+  const shownDir = useRef(null) // direction currently lit on the pad
+  const sentDir = useRef(null) // last direction emitted this touch
+  const [activeDir, setActiveDir] = useState(null)
+
+  const showDir = (dir) => {
+    if (shownDir.current === dir) return
+    shownDir.current = dir
+    setActiveDir(dir)
+  }
+  const steerTo = (dir) => {
+    showDir(dir)
+    if (dir && dir !== sentDir.current) {
+      sentDir.current = dir
+      inputBus.emit({ type: 'turn', key: dir })
+    }
+  }
+  const dirFromEvent = (e) => {
+    const r = padRef.current.getBoundingClientRect()
+    return padDirection(e.clientX - (r.left + r.width / 2), e.clientY - (r.top + r.height / 2))
+  }
+  const endPadPointer = (e) => {
+    if (e.pointerId !== padPointer.current) return
+    padPointer.current = null
+    sentDir.current = null
+    showDir(null)
+  }
 
   return (
     <div className="touch-controls-wrapper">
@@ -1398,6 +1431,8 @@ function OnScreenControls() {
         title="Hold to dash"
         onPointerDown={(e) => {
           e.preventDefault()
+          // Capture: sliding off the button must not lose the release.
+          e.currentTarget.setPointerCapture?.(e.pointerId)
           inputBus.emit({ type: 'boost', boosting: true })
         }}
         onPointerUp={(e) => {
@@ -1413,17 +1448,31 @@ function OnScreenControls() {
       </button>
 
       {/* D-Pad */}
-      <div className="dpad" aria-label="Direction pad" role="group">
+      <div
+        className="dpad"
+        aria-label="Direction pad"
+        role="group"
+        ref={padRef}
+        onPointerDown={(e) => {
+          if (padPointer.current !== null) return
+          e.preventDefault()
+          padPointer.current = e.pointerId
+          e.currentTarget.setPointerCapture?.(e.pointerId)
+          steerTo(dirFromEvent(e))
+        }}
+        onPointerMove={(e) => {
+          if (e.pointerId !== padPointer.current) return
+          steerTo(dirFromEvent(e))
+        }}
+        onPointerUp={endPadPointer}
+        onPointerCancel={endPadPointer}
+      >
         {dirs.map(([key, cls, icon]) => (
           <button
             key={key}
             type="button"
-            className={`dbtn dbtn--${cls}`}
+            className={`dbtn dbtn--${cls}${activeDir === key ? ' dbtn--active' : ''}`}
             aria-label={`Go ${key}`}
-            onPointerDown={(e) => {
-              e.preventDefault()
-              inputBus.emit({ type: 'turn', key })
-            }}
           >
             {arr(icon)}
           </button>
@@ -1455,6 +1504,13 @@ export default function Hud() {
         <>
           <NightBanner />
           <ReadyVeil />
+          {/* C03 (review fix): the touch controls render during the ready
+              beat too, so a player can pre-hold Dash (and pre-steer on the
+              pad) before the run starts — without this the button is not
+              in the DOM during 'ready' and the held-Dash boost can never
+              trigger. Both veils are pointer-events: none, so nothing
+              covers the controls. */}
+          {controlsVisible(vp.w, showControls) && <OnScreenControls />}
         </>
       )}
       {status === 'playing' && (

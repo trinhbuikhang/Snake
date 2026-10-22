@@ -187,7 +187,7 @@ Khoá bằng test cái đang đúng (hàng đợi rẽ, độ trễ ≤ 1 tick) 
 
 ## C03 — Cả ô d-pad là vùng lái + trượt ngón + Dash giữ qua `ready`
 
-- [ ] **C03** · Mức: **Cao** · Branch: `feat/c03-dpad-hit-zone`
+- [x] **C03** · Mức: **Cao** · Branch: `feat/c03-dpad-hit-zone`
 
 **Vấn đề**
 - `OnScreenControls` (`Hud.jsx` L1383): mỗi `.dbtn` có `onPointerDown` riêng → chỉ **28.1%** ô 190×190 "sống"; không trượt ngón đổi hướng được. Dash `onPointerDown` không `setPointerCapture`; giữ Dash từ `ready` không boost (`setBoost` L687 bỏ qua ngoài `playing`).
