@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import * as THREE from 'three'
-import { fitAligned } from './cameraFit.js'
+import { fitAligned, fitMargins, alignedCamera } from './cameraFit.js'
+import { hudReserve } from '../game/hudLayout.js'
 
 // S05 acceptance: with the aligned preset's el/fov and the board
 // half (rim included), every board corner projects inside the NDC
@@ -107,5 +108,129 @@ describe('fitAligned (S05)', () => {
       const pts = projectWith(fit, 2.17, edge)
       for (const p of pts) expect(p.x).toBeLessThanOrEqual(LAND.right + EPS)
     })
+  })
+})
+
+// ---- H04: the fit follows the real HUD -------------------------------
+// alignedCamera() = hudReserve (bar + safe-area + cluster by the one
+// controlsVisible rule) -> fitMargins -> fitAligned. Verified at the
+// plan's 11 mandatory viewports by re-projecting EVERY board cell
+// with a real PerspectiveCamera: no cell may enter the reserved
+// rects (top bar band, the cluster rect, the safe-area bands).
+const PRESET = { el: EL, fov: FOV, perspFit: { x: 0.97, top: 0.8, bottom: 0.93 } }
+const GAP = 8
+const VIEWPORTS = [
+  { name: 'p390', w: 390, h: 844, safe: {} },
+  { name: 'p375', w: 375, h: 667, safe: {} },
+  { name: 'p414', w: 414, h: 896, safe: {} },
+  { name: 'teams375', w: 375, h: 640, safe: {} },
+  { name: 'p390safe', w: 390, h: 844, safe: { top: 47, bottom: 34 } },
+  { name: 't768', w: 768, h: 1024, safe: {} },
+  { name: 'w600', w: 600, h: 800, safe: {} },
+  { name: 'l844t', w: 844, h: 390, safe: {} },
+  { name: 'l844safe', w: 844, h: 390, safe: { left: 47, right: 47, bottom: 21 } },
+  { name: 'l844m', w: 844, h: 390, safe: {} },
+  { name: 'd1280', w: 1280, h: 800, safe: {} },
+]
+const GRID = []
+for (let i = 0; i <= 20; i += 1) {
+  for (let j = 0; j <= 20; j += 1) GRID.push([-10 + i, -10 + j])
+}
+const toScreen = (p, w, h) => ({ x: ((p.x + 1) / 2) * w, y: ((1 - p.y) / 2) * h })
+const fitVp = (vp, showControls = false) =>
+  alignedCamera({ w: vp.w, h: vp.h, safe: vp.safe, showControls, preset: PRESET, boardHalf: BOARD_HALF })
+
+describe('fitMargins (H04)', () => {
+  const BASE = { x: 0.97, top: 0.8, bottom: 0.93 }
+
+  it('portrait + cluster: bottom and softBottom come from the cluster, anchor middle', () => {
+    const m = fitMargins(hudReserve({ w: 390, h: 844, safe: {}, showControls: false }), BASE, GAP)
+    expect(m.anchor).toBe('middle')
+    expect(m.bottom).toBeCloseTo(1 - (2 * (206 + GAP)) / 844, 6) // cluster.h = 190 + 16 inset
+    expect(m.softBottom).toBeCloseTo(1 - (2 * (206 + 104 + GAP)) / 844, 6) // + coachStrip 104
+    expect(m.right).toBeCloseTo(0.97, 6)
+  })
+
+  it('landscape + cluster: the right margin comes from the cluster, no softBottom', () => {
+    const m = fitMargins(hudReserve({ w: 844, h: 390, safe: {}, showControls: false }), BASE, GAP)
+    expect(m.anchor).toBe('min')
+    expect(m.right).toBeCloseTo(1 - (2 * (288 + GAP)) / 844, 6) // cluster.w = 272 + 16 inset
+    expect(m.softBottom).toBeUndefined()
+    expect(m.top).toBeCloseTo(1 - (2 * (54 + GAP)) / 390, 6) // bar bottom 54 = edge 10 + 44
+  })
+
+  it('no cluster (desktop): margins are the preset caps, top still clears the bar', () => {
+    const m = fitMargins(hudReserve({ w: 1280, h: 800, safe: {}, showControls: false }), BASE, GAP)
+    expect(m).toMatchObject({ x: 0.97, right: 0.97, top: 0.8, bottom: 0.93, anchor: 'min' })
+  })
+})
+
+describe('alignedCamera at the 11 viewports (H04)', () => {
+  for (const vp of VIEWPORTS) {
+    it(`${vp.name}: every board cell clears the bar band, the cluster rect and the safe bands`, () => {
+      const fit = fitVp(vp)
+      const res = hudReserve({ w: vp.w, h: vp.h, safe: vp.safe, showControls: false })
+      const pts = projectWith(fit, vp.w / vp.h, [...GRID, ...CORNERS])
+      expect(violates(pts, fit.margins)).toBe(false)
+      const scr = pts.map((p) => toScreen(p, vp.w, vp.h))
+      for (const s of scr) expect(s.y).toBeGreaterThanOrEqual(res.top + GAP - 0.5)
+      if (res.cluster && vp.w / vp.h > 1) {
+        for (const s of scr) expect(s.x).toBeLessThanOrEqual(vp.w - res.cluster.w - GAP + 0.5)
+      }
+      if (res.cluster && vp.w / vp.h <= 1) {
+        for (const s of scr) expect(s.y).toBeLessThanOrEqual(vp.h - res.cluster.h - GAP + 0.5)
+      }
+    })
+
+    it(`${vp.name}: dist - 2% (same look) violates a margin`, () => {
+      const fit = fitVp(vp)
+      const tighter = projectWith({ ...fit, dist: fit.dist * 0.98 }, vp.w / vp.h, CORNERS)
+      expect(violates(tighter, fit.margins)).toBe(true)
+    })
+  }
+})
+
+// The aabe5b7 engine model, replicated from
+// docs/plan/hud/tooling/fit-baseline-aabe5b7.mjs (mouse / no cluster).
+const baselineFit = (w, h) => {
+  let top = 0.8
+  if (h > 164) top = Math.min(top, 1 - (2 * 82) / h)
+  return fitAligned({
+    el: EL, fov: FOV, aspect: w / h, boardHalf: BOARD_HALF,
+    margins: { x: 0.97, right: 0.97, top, bottom: 0.93 },
+  })
+}
+const nearWidth = (fit, aspect) => {
+  const near = projectWith(fit, aspect, [[-BOARD_HALF, BOARD_HALF], [BOARD_HALF, BOARD_HALF]])
+  return Math.abs(near[1].x - near[0].x)
+}
+const boardHeight = (fit, aspect) => {
+  const cs = projectWith(fit, aspect, CORNERS)
+  return Math.max(...cs.map((c) => c.y)) - Math.min(...cs.map((c) => c.y))
+}
+
+describe('alignedCamera portrait centring + regression bounds (H04)', () => {
+  for (const vp of [VIEWPORTS[0], VIEWPORTS[3]]) { // p390, teams375
+    it(`${vp.name}: top gap and soft-bottom gap balance within 8px`, () => {
+      const fit = fitVp(vp)
+      const cs = projectWith(fit, vp.w / vp.h, CORNERS)
+      const farY = Math.max(...cs.filter((c, i) => i % 2 === 0).map((c) => c.y)) // z = -B corners (idx 0, 2)
+      const nearY = Math.min(...cs.filter((c, i) => i % 2 === 1).map((c) => c.y)) // z = +B corners (idx 1, 3)
+      const gapTopPx = ((fit.margins.top - farY) * vp.h) / 2
+      const gapSoftPx = ((nearY + fit.margins.softBottom) * vp.h) / 2
+      expect(Math.abs(gapTopPx - gapSoftPx)).toBeLessThanOrEqual(8)
+    })
+
+    it(`${vp.name}: near-edge width is within 1% of the aabe5b7 fit`, () => {
+      const aspect = vp.w / vp.h
+      expect(nearWidth(fitVp(vp), aspect)).toBeGreaterThanOrEqual(nearWidth(baselineFit(vp.w, vp.h), aspect) * 0.99)
+    })
+  }
+
+  it('d1280: board height within 2% of the aabe5b7 fit', () => {
+    const aspect = 1280 / 800
+    const base = boardHeight(baselineFit(1280, 800), aspect)
+    const next = boardHeight(fitVp(VIEWPORTS[10]), aspect)
+    expect(Math.abs(next - base) / base).toBeLessThanOrEqual(0.02)
   })
 })

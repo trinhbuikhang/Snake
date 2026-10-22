@@ -28,6 +28,50 @@
 // re-projects the corners with a real THREE.PerspectiveCamera so
 // this convention is verified end to end.
 
+import { hudReserve, HUD } from '../game/hudLayout.js'
+
+// HUD plan (H04): margins derived from the HUD bands hudReserve()
+// reports, so the board never sits under the bar, the touch cluster
+// or a safe-area inset. base = the preset's caps (tall screens);
+// gap = breathing room past each band (HUD.fitGap).
+export function fitMargins(res, base, gap = 8) {
+  const { w, h } = res
+  const ndcX = (px) => 1 - (2 * px) / w
+  const ndcY = (px) => 1 - (2 * px) / h
+  const m = {
+    x: Math.min(base.x, ndcX(res.left + (res.left ? gap : 0))),
+    right: Math.min(base.x, ndcX(res.right + (res.right ? gap : 0))),
+    top: Math.min(base.top, ndcY(res.top + gap)),
+    bottom: Math.min(base.bottom, ndcY(res.bottom + (res.bottom ? gap : 0))),
+    anchor: w / h > 1 ? 'min' : 'middle',
+  }
+  if (res.cluster) {
+    // Landscape: keep the board left of the cluster (the board
+    // slides sideways). Portrait: keep it above the cluster.
+    if (w / h > 1) m.right = Math.min(m.right, ndcX(res.cluster.w + gap))
+    else m.bottom = Math.min(m.bottom, ndcY(res.cluster.h + gap))
+    // Soft reserve: centre the board above the coach strip when
+    // it fits (fitAligned's 'middle' anchor aims at softBottom;
+    // the hard bottom above is the real limit).
+    if (res.coachStrip) m.softBottom = Math.min(m.bottom, ndcY(res.cluster.h + res.coachStrip + gap))
+  }
+  return m
+}
+
+// The one pure entry the engine calls for the aligned preset:
+// viewport + safe-area + control visibility in, camera fit out.
+export function alignedCamera({ w, h, safe, showControls, preset, boardHalf = 10.25 }) {
+  const margins = fitMargins(hudReserve({ w, h, safe, showControls }), preset.perspFit, HUD.fitGap)
+  const { dist, lookZ, lookX } = fitAligned({
+    el: preset.el,
+    fov: preset.fov,
+    aspect: w / h,
+    boardHalf,
+    margins,
+  })
+  return { dist, lookX, lookZ, margins }
+}
+
 export function fitAligned({ el, fov, aspect, boardHalf, margins }) {
   const sinEl = Math.sin(el)
   const cosEl = Math.cos(el)
@@ -76,6 +120,42 @@ export function fitAligned({ el, fov, aspect, boardHalf, margins }) {
         bestX = lx
       }
     }
+  }
+  // anchor 'middle' (portrait, H04): the fit is width-limited, so
+  // the board can slide vertically at (almost) the same distance.
+  // Centre it in the free band between the HUD bar (top margin) and
+  // the touch cluster / coach strip (softBottom) instead of leaving
+  // it wherever the coarse search stopped — that gap above the
+  // board was the empty band in the owner's screenshots.
+  if (margins.anchor === 'middle') {
+    const edgeY = (d, lz, sz) => {
+      const py = -sinEl * d
+      const pz = sz * boardHalf - lz - cosEl * d
+      const depth = -(py * sinEl + pz * cosEl)
+      return (py * cosEl - pz * sinEl) / (depth * tanHalf)
+    }
+    const softBottom = margins.softBottom ?? margins.bottom
+    let bestErr = Infinity
+    let bestDist = Infinity
+    for (let lz = -2; lz <= 14; lz += 0.1) {
+      let lo = 4
+      let hi = 120
+      for (let i = 0; i < 26; i += 1) {
+        const mid = (lo + hi) / 2
+        if (fitsAt(mid, lz, bestX)) hi = mid
+        else lo = mid
+      }
+      if (!fitsAt(hi, lz, bestX)) continue
+      // Only slide while the board keeps (about) its on-screen size.
+      if (hi > best * 1.02) continue
+      const err = Math.abs((margins.top - edgeY(hi, lz, -1)) - (softBottom + edgeY(hi, lz, 1)))
+      if (err < bestErr) {
+        bestErr = err
+        bestZ = lz
+        bestDist = hi
+      }
+    }
+    if (bestErr < Infinity) best = bestDist
   }
   return { dist: best, lookZ: bestZ, lookX: bestX }
 }
