@@ -126,7 +126,7 @@ Một module thuần (không React/Three) chứa mọi con số layout HUD mà C
 
 ## H02 — Toggle có nhãn trong sheet Pause
 
-- [ ] **H02** · Mức: **Cao** · Branch: `feat/h02-pause-settings`
+- [x] **H02** · Mức: **Cao** · Branch: `feat/h02-pause-settings`
 
 **Vấn đề**
 - Để thanh trên màn hẹp chỉ còn Pause (H03), Camera / Touch pad / Sound phải có chỗ khác dễ tìm. Hiện `PauseOverlay` (`Hud.jsx` L526) chỉ có Resume / Back to title (+ End session ở Zen).

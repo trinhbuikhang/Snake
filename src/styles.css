@@ -456,6 +456,40 @@ body {
   to { transform: scale(1); opacity: 1; }
 }
 
+/* Pause sheet settings (H02): camera / touch pad / sound as
+   labelled pills — icon + text show the current state. */
+.pause-settings {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin: 1.1rem 0 0.4rem;
+}
+
+.pill-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: rgba(217, 203, 255, 0.08);
+  border: 1.5px solid rgba(217, 203, 255, 0.28);
+  color: var(--cream);
+  font: 600 0.85rem var(--font-ui);
+  cursor: pointer;
+}
+
+.pill-toggle svg {
+  width: 18px;
+  height: 18px;
+}
+
+.pill-toggle--active {
+  border-color: var(--jade);
+  color: var(--jade);
+}
+
 /* ---------------- legend & controls ---------------- */
 
 .legend {
