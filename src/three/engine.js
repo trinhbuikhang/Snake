@@ -29,6 +29,7 @@ import { createGovernor, observeWarmupFrame, settleWarmup, nextQualityIdx, msaaR
 import { disposeObject3D } from './dispose.js'
 import { rescaleAccum } from './tickClock.js'
 import { writeCellsInto } from './cellBuffer.js'
+import { fitAligned } from './cameraFit.js'
 import { buildGarden } from './garden.js'
 import { createSnakeRig } from './snakeRig.js'
 import { buildDecor } from './decor.js'
@@ -38,6 +39,14 @@ import { SKIN_IDS } from '../game/skins.js'
 
 const FOV = 42
 const FIT_HALF = 11.8
+const BOARD_HALF = 10.25 // board edge (±10) + rim, for the perspective fit
+// S05 review: HUD geometry the aligned fit must respect. The pill
+// row's bottom edge sits ~74px from the top; the touch cluster
+// (Dash + d-pad, anchored bottom-right: 16px inset + 66px Dash +
+// 16px gap + 190px pad) starts 288px from the right edge.
+const HUD_BOTTOM_PX = 74
+const TOUCH_CLUSTER_W_PX = 288
+const FIT_GAP_PX = 8 // breathing room between board and HUD/cluster
 const DEMO_INTERVAL = 0.15
 const DEATH_DURATION = 1.6
 const BLOOM_BASE = 0.42
@@ -47,7 +56,10 @@ const BLOOM_BASE = 0.42
 // 'topdown': Overhead tactical 2.5D view for maximum precision.
 // 'cinematic': Gentle isometric tilt for artistic elegance.
 const CAM_PRESETS = {
-  aligned: { az: 0, el: 1.05, fov: 42, distMult: 1.08 },
+  // S05: 'aligned' fits the board perspective-correctly (cameraFit.js):
+  // el a touch lower so the serpent's face reads, NDC margins leave
+  // the top 20% to the HUD pills.
+  aligned: { az: 0, el: 1.0, fov: 42, distMult: 1, perspFit: { x: 0.97, top: 0.8, bottom: 0.93 } },
   topdown: { az: 0, el: 1.48, fov: 44, distMult: 1.15 },
   cinematic: { az: 0.54, el: 0.88, fov: 42, distMult: 1.12 },
 }
@@ -918,19 +930,56 @@ export function createEngine(canvas, { reduced } = {}) {
     const right = new THREE.Vector3().crossVectors(viewDir, worldUp).normalize()
     const up = new THREE.Vector3().crossVectors(right, viewDir).normalize()
 
-    let maxR = 0
-    let maxU = 0
-    for (const sx of [-1, 1]) {
-      for (const sz of [-1, 1]) {
-        const v = new THREE.Vector3(sx * FIT_HALF, 0, sz * FIT_HALF)
-        maxR = Math.max(maxR, Math.abs(v.dot(right)))
-        maxU = Math.max(maxU, Math.abs(v.dot(up)) + 0.3)
+    if (preset.perspFit) {
+      // S05: perspective-correct fit (aligned only) — the closest
+      // distance keeping every board corner inside the NDC margins,
+      // with the look point slid toward the near edge so the board
+      // centres vertically instead of wasting the far half-screen.
+      //
+      // The preset margins are the tall-screen values. Two runtime
+      // adjustments (S05 review, measured once per resize — this
+      // function never runs per frame):
+      // - Short screens: the fixed top margin reserves 10% of the
+      //   height, but the HUD pill row is ~74px tall regardless —
+      //   at 390px high that is 39px of room for 74px of pills and
+      //   the far rows hid underneath. Reserve the pill row's real
+      //   height + gap instead whenever that asks for more room.
+      let top = preset.perspFit.top
+      const hudReserve = HUD_BOTTOM_PX + FIT_GAP_PX
+      if (h > hudReserve * 2) top = Math.min(top, 1 - (2 * hudReserve) / h)
+      // - Touch landscape: keep the board's right edge left of the
+      //   Dash/d-pad cluster via an asymmetric right margin;
+      //   fitAligned slides the look point sideways (lookX) to
+      //   satisfy it, so the board shifts instead of shrinking.
+      let right = preset.perspFit.x
+      if (camera.aspect > 1 && window.matchMedia?.('(pointer: coarse)')?.matches) {
+        right = Math.min(right, 1 - (2 * (TOUCH_CLUSTER_W_PX + FIT_GAP_PX)) / w)
       }
-    }
+      const { dist, lookZ, lookX } = fitAligned({
+        el: preset.el,
+        fov: preset.fov,
+        aspect: camera.aspect,
+        boardHalf: BOARD_HALF,
+        margins: { x: preset.perspFit.x, right, top, bottom: preset.perspFit.bottom },
+      })
+      camLookTarget.set(lookX, 0, lookZ)
+      camPosTarget.copy(viewDir).multiplyScalar(dist * preset.distMult).add(camLookTarget)
+    } else {
+      let maxR = 0
+      let maxU = 0
+      for (const sx of [-1, 1]) {
+        for (const sz of [-1, 1]) {
+          const v = new THREE.Vector3(sx * FIT_HALF, 0, sz * FIT_HALF)
+          maxR = Math.max(maxR, Math.abs(v.dot(right)))
+          maxU = Math.max(maxU, Math.abs(v.dot(up)) + 0.3)
+        }
+      }
 
-    const tanHalf = Math.tan((camera.fov * Math.PI) / 360)
-    const dist = Math.max(maxU / tanHalf, maxR / (tanHalf * camera.aspect)) * preset.distMult
-    camPosTarget.copy(viewDir).multiplyScalar(dist)
+      const tanHalf = Math.tan((camera.fov * Math.PI) / 360)
+      const dist = Math.max(maxU / tanHalf, maxR / (tanHalf * camera.aspect)) * preset.distMult
+      camLookTarget.set(0, 0, 0)
+      camPosTarget.copy(viewDir).multiplyScalar(dist)
+    }
     camera.updateProjectionMatrix()
   }
 

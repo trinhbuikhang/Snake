@@ -322,7 +322,7 @@ Prototype đầy đủ đã chạy được (xem `docs/plan/skins/reference/`). 
 
 ## S05 — Camera mặc định fit sát bàn chơi
 
-- [ ] **S05** · Mức: **Trung bình** · Branch: `feat/s05-camera-fit`
+- [x] **S05** · Mức: **Trung bình** · Branch: `feat/s05-camera-fit`
 
 **Vấn đề**
 - `src/three/engine.js` L36 `FIT_HALF = 11.8` (bàn chỉ rộng ±10) + preset `aligned` L45–46 (`el: 1.05`, `distMult: 1.08`) + `updateCameraTarget()` L691–722 fit kiểu trực giao, nhìn vào gốc toạ độ → mép gần bị bó, **mép xa thừa ~1/3 màn hình**, rắn và mặt rất nhỏ. Đo: chiều cao bàn trên màn hình (NDC) 1.48 → prototype 1.66 (~12% to hơn theo chiều dài, ~26% diện tích). Xem `images/gameplay-cam-before-after.jpg`.
