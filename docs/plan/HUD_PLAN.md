@@ -251,10 +251,28 @@ Một module thuần (không React/Three) chứa mọi con số layout HUD mà C
 
 | Task | PR | Ghi chú |
 |------|----|---------|
-| H01 | — | |
-| H02 | — | |
-| H03 | — | |
-| H04 | — | |
-| H05 | — | |
-| H06 | — | |
-| H07 | — | Tuỳ chọn. |
+| H01 | #49 | Merge `3c0a4d3`. Token + luật layout thuần (`hudLayout.js`) + test đồng bộ CSS; harness master ↔ PR giống hệt (chưa đổi giao diện). |
+| H02 | #50 | Merge `8c572a8`. Toggle có nhãn trong sheet Pause (cả 3 pill cao 44px, bấm thử đạt); title giữ nút góc. |
+| H03 | #51 | Merge `3f00194`. Thanh trên duy nhất (capsule pastel + Pause; compact < 560px); HUD↔HUD = 0 ở 11 viewport (bản cũ: 8 ở các cỡ điện thoại). |
+| H04 | #52 | Merge `563da93`. Camera theo HUD thật (`alignedCamera`/`fitMargins`/`anchor: 'middle'`, bỏ `pointer: coarse`); ô bị thanh/Dash/d-pad che = 0 ở 11 viewport; suite 192 → 223. |
+| H05 | #53 | Merge `e5a23a9`. Coach đặt theo `coachPlacement`; 0/0 ở cả 11 viewport. Vòng review: `top-left` nới 250px → 272px (thẻ 88.3px ≤ `coachH` 92 ở cả 3 bước). |
+| H06 | #54 | Merge `20bda30`. `AGENT.md` mô tả hệ layout HUD + camera; đối chiếu `rg` với code. |
+| H07 | — | Tuỳ chọn — chưa làm (chỉ làm khi chủ repo yêu cầu). |
+
+Output harness cuối trên `master` (đo bởi reviewer ở vòng 2 của H05 trên đúng code đã merge; H06 chỉ đổi tài liệu nên số không đổi) — trạng thái `playing`, coach đang hiện, `smallTaps=0`, `errs=0`:
+
+```text
+p390     hudOverlaps=0 cellsCovered=0   coach 358x88 above-pad
+p375     hudOverlaps=0 cellsCovered=0   coach 343x88 above-pad
+p414     hudOverlaps=0 cellsCovered=0   coach 382x88 above-pad
+teams375 hudOverlaps=0 cellsCovered=0   coach 343x88 above-pad
+p390safe hudOverlaps=0 cellsCovered=0   coach 358x88 above-pad
+t768     hudOverlaps=0 cellsCovered=0   coach 430x88 above-pad
+w600     hudOverlaps=0 cellsCovered=0   coach 430x88 above-pad
+l844t    hudOverlaps=0 cellsCovered=0   coach 272x88 pad-column
+l844safe hudOverlaps=0 cellsCovered=0   coach 272x88 pad-column
+l844m    hudOverlaps=0 cellsCovered=0   coach 272x88 pad-column
+d1280    hudOverlaps=0 cellsCovered=0   coach 272x88 top-left
+```
+
+**HUD_PLAN hoàn thành** (H01–H06, 2026-10-22): từ baseline `aabe5b7` (8 chỗ HUD đè nhau ở các cỡ điện thoại, 196–200 ô bị che ở màn ngang, 30 ô ở desktop, dải trống ~170px trên bàn dọc) tới **0/0 ở cả 11 viewport bắt buộc**. Suite lúc đóng plan: 225 test.
