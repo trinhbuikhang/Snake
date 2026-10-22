@@ -39,11 +39,22 @@ src/
   game/
     logic.js            # pure grid Snake: step, turn, food, demo orbit
     store.js            # Zustand UI/game status + localStorage prefs
+    skins.js            # serpent skin registry (data + unlock rules, pure)
     inputBus.js         # keyboard / touch / swipe → direction + boost
   three/
     engine.js           # render loop, camera modes, couples logic ↔ scene
     garden.js           # night-garden scene (ground, props, lighting feel)
-    snakeRig.js         # snake mesh / animation on the grid path
+    snakeRig.js         # dispatcher: builds the rig for the selected skin
+    snakeRig.old.js     # legacy pearl-chain rig — debug only, via ?rig=old
+    cameraFit.js        # perspective fit for the aligned camera (pure)
+    tickClock.js        # tick-phase rescale on speed change (pure)
+    cellBuffer.js       # double-buffered per-tick cell snapshots (pure)
+    skins/
+      serpentPath.js    # continuous path math for the tube rig (pure)
+      serpentBase.js    # shared tube-rig factory: createSerpent(scene, cfg)
+      moonJade.js       # Moon Jade skin builder
+      plushMoon.js      # Plush Moon skin builder
+      index.js          # SKIN_RIGS: skin id → builder
   audio/
     sound.js            # procedural SFX + pad/water ambience (respects mute)
 ```
@@ -76,9 +87,39 @@ src/
 
 ### Camera modes (`store` + `engine`)
 
-- `aligned` — axes match screen (default “Classic 3D”)
-- `topdown` — near-overhead 2.5D
-- `cinematic` — gentle isometric tilt
+- `aligned` — axes match screen (default “Classic 3D”). Framing is a true perspective fit (S05): `fitAligned({el, fov, aspect, boardHalf, margins})` in `src/three/cameraFit.js` finds the closest distance keeping all four board corners (±10.25, rim included) inside NDC margins (x 0.97 / top 0.80 / bottom 0.93), sliding the look point (`lookZ`, and `lookX` when asymmetric) instead of the old ortho-style `FIT_HALF` sizing. Two runtime margin adjustments in `updateCameraTarget()` (resize-time only, never per frame): on short screens the top margin derives from the real HUD pill height (`HUD_BOTTOM_PX`), and on touch landscape a right margin (`TOUCH_CLUSTER_W_PX`) keeps the board clear of the Dash/d-pad cluster. The fit runs only in `updateCameraTarget()`.
+- `topdown` — near-overhead 2.5D (legacy `FIT_HALF` framing)
+- `cinematic` — gentle isometric tilt (legacy `FIT_HALF` framing)
+
+### Serpent skins (S01–S06)
+
+The snake is a **continuous tube rig**, not a chain of pearls: `serpentPath.js` turns the grid path into a smooth spine (arc-length steps, rounded corners) and `serpentBase.js`'s `createSerpent(scene, cfg)` builds a tube + a lathe head fused into it, sharing ONE material per skin — so draw calls are fixed at any snake length (Moon Jade 9, Plush Moon 6) and the paint path allocates nothing per frame (positions are written into preallocated buffers; per-tick cell snapshots are double-buffered via `cellBuffer.js`'s `writeCellsInto`).
+
+- **Skin config (`cfg`)**: `{ id, bodyR, flat, tailTip, neckR, head, material, uniforms, buildFace, beads, tailCurl, applyInk, update }`. `uniforms.uPulse` (vec4) is required. `head` is exposed to builders as `H`; an optional `H.sculpt(nx, ny, nz)` hook offsets head vertices in head-normalised coords (Plush Moon's muzzle). `tailCurl` shapes the resting tail curl; `beads` adds an instanced bead strand (Moon Jade's moonstones); `applyInk`/`update` are per-skin hooks (ink accents, blinking).
+- **Material patching**: skins start from `MeshPhysicalMaterial` and inject GLSL via `patchSerpentMaterial(mat, uniforms, chunks, key)` (an `onBeforeCompile`): chunk slots `common`, `color`, `roughness`, `normal`, `emissive` are spliced after the standard three.js includes (`<common>`, `<color_fragment>`, `<metalnessmap_fragment>`, `<normal_fragment_maps>`, `<emissivemap_fragment>`); the vertex side adds an `aBody` attribute (`vBody`/`vLocal` varyings) so shaders know where along/across the body a fragment sits. The `key` becomes the material's `customProgramCacheKey` — skins never share programs by accident.
+- **Faces**: `cfg.buildFace(api)` receives `{ track, headMesh, H, ZC, HL, HEAD_CY, zAt, surf, place }`; `api.place(obj, ...)` positions face parts on the head's curved surface. Static face parts are merged per material into single meshes (shared materials do NOT merge draw calls). Never pass the `THREE` namespace itself through `api` — modules import three themselves (a leaked namespace reference once cost +179 kB of tree-shaking).
+- **Rig API** (what `engine.js` drives): `group` (light anchor), `setSnapshots`, `setInk`, `setDir`, `onStep`, `onEat`, `startDeath`, `advanceDeath`, `reset`, `deathCoil`, `paint`, plus `detach()` (remove from scene now) / `dispose()` (GPU teardown) and `skin` (the cfg id). Ink (`setInk`) only tints accents on skins — rim light, beads, embroidery — never the whole body.
+- **Dispatch**: `snakeRig.js`'s `createSnakeRig(scene, skinId)` looks up `SKIN_RIGS` in `three/skins/index.js`; unknown ids fall back to Moon Jade. `snakeRig.old.js` is the pre-S01 pearl rig, reachable only via `?rig=old` (`isDebugOldRig()`) for debugging — it has no `dispose`/`detach` and never swaps.
+- **Registry & unlocks**: player-facing data lives in `src/game/skins.js` (`SKINS`: English `name`, Vietnamese `nameVi` subtitle, `desc`, `swatch`, `accent`, `unlock`). The store's `skins` slice `{ owned, selected }` persists under **`ran-xinh-skin`**; `chooseSkin(id)` wears owned skins only, `buySkin(id)` buys with moonlight through `_spend` (and wears at once). Unlock rules are an OR-list in `SKINS[*].unlock` — `{type:'default'}`, `{type:'moonlight', cost}`, `{type:'milestone', id:'first-moonrise'}` — evaluated by the pure `skinUnlockState(skin, ctx)` / `checkSkinMilestones(ctx)` in `game/skins.js`. Completing a Moonrise Night grants milestone skins in `completeRun()` (recorded as a `runUnlocks` entry of `kind: 'skin'` for the game-over sheet); `hydrate()` records the same grant for players who finished a Moonrise before S06. The picker in the Garden sheet (`Hud.jsx`) renders price/hint states straight from `skinUnlockState`.
+- **Engine swap**: the boot rig is built from `readSkins().selected` (persisted state read directly — the store hydrates later). `swapRig()` builds the new rig, synchronously compiles its materials if needed, detaches the old rig immediately but defers its `dispose()` until any pending async precompile settles (disposing mid-compile breaks three.js). `precompileSpareSkin()` compiles the non-selected skin at boot inside `precompileShaders()` so the first swap is hitch-free.
+
+**Adding a new skin** (no store/picker/engine changes needed):
+
+1. Add one entry to `SKINS` in `src/game/skins.js` (id, names, desc, swatch, accent, unlock rules).
+2. Add `src/three/skins/<id>.js` exporting a `create<Name>Rig(scene)` builder on top of `createSerpent` (follow `moonJade.js` / `plushMoon.js`).
+3. Register it in `SKIN_RIGS` in `src/three/skins/index.js`.
+4. Add tests for its unlock state if it introduces a new rule shape.
+
+### Performance rules (P01–P06)
+
+Settled by `docs/plan/SKINS_PERF_PLAN.md`; do not regress them:
+
+- **P01 — linear motion**: the snake interpolates linearly between ticks (no easing on the movement path — easing reads as speed wobble). `rescaleAccum()` in `tickClock.js` rescales the tick accumulator whenever the interval changes so speed changes keep phase.
+- **P02 — shader precompile**: all programs are compiled up front against the composer's read buffer (`precompileShaders()` + one synchronous warm-up render on loop frame 2), so gameplay never pays a first-use compile hitch. The food light is never hidden — hiding it would change `NUM_POINT_LIGHTS` and re-link every program; food visibility is written by the single state-driven `applyFoodVisibility()` in `garden.js`, which always re-applies the *current* logical state.
+- **P03 — renderer budget**: `useComposer` is decided before the renderer is created; canvas MSAA is on only without the composer (`antialias: !useComposer`), DPR is clamped to 1.5, composer MSAA samples come from `msaaFor(dpr)` in `qualityGovernor.js`, and the moon shadow map starts at 1024.
+- **P04 — refresh-aware governor**: `snapRefresh()` snaps the target FPS to the display's real refresh rate; a window steps quality down when its average FPS is below 0.75× target OR its spike ratio (frames over 2× the median) reaches 0.1 (`nextQualityIdx` in `qualityGovernor.js`). Ladder: `QUALITY_STEPS` (DPR/shadow/bloom rungs).
+- **P05 — no in-play blur**: HUD elements visible during play use solid translucent backgrounds, never `backdrop-filter` (static sheets may keep a small ≤8px blur).
+- **P06 — zero per-frame allocation** on the paint path: cell snapshots are double-buffered (`cellBuffer.js`), garden burst palettes are module constants, and scratch vectors are reused. If a per-frame `new` sneaks into `engine.js`'s frame loop or the rig's `paint`, that's a regression.
 
 ## Conventions for agents
 
@@ -90,13 +131,14 @@ src/
 6. Avoid drive-by refactors and unrelated file edits.
 7. **Never claim "tests pass" without committed tests runnable via `npm test`.** Sandbox-only checks are fine, but they must be labeled as manual. (Audit rule, from T04.)
 8. **Binary files (icons, images, fonts) must be committed through real git.** Never push them through a UTF-8-text-only API — base64 text masquerading as binaries was exactly how production ended up serving "PNGs" that were text files. (Audit rule, from T01.)
-9. Check `docs/audit/FIX_PLAN.md` before touching anything the audit covers — settled decisions there are final. Ambiguity → stop and ask.
+9. Check `docs/audit/FIX_PLAN.md` before touching anything the audit covers — settled decisions there are final. Same for `docs/plan/SKINS_PERF_PLAN.md` (skins + performance): its settled decisions (skin prices, storage key, camera scope, perf budgets) are final. Ambiguity → stop and ask.
 
 ## Out of scope unless asked
 
 - Backend / multiplayer / accounts
 - Native mobile wrappers
 - Changing the art direction away from the night ink garden
+- Real-money purchases / in-app purchase — skins are earned with moonlight or milestones only; IAP would need a backend + accounts (future work)
 
 ## Quick mental model
 

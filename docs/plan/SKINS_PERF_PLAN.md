@@ -366,7 +366,7 @@ Prototype đầy đủ đã chạy được (xem `docs/plan/skins/reference/`). 
 
 ## D01 — Cập nhật `AGENT.md`
 
-- [ ] **D01** · Mức: **Trung bình** · Branch: `docs/d01-agent-md-skins`
+- [x] **D01** · Mức: **Trung bình** · Branch: `docs/d01-agent-md-skins`
 
 **Tiêu chí nghiệm thu**
 - `AGENT.md` mô tả đúng code trên `master` lúc làm task:
