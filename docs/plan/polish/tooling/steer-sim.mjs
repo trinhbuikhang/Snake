@@ -6,7 +6,8 @@
 // tick loop — runTicks() in src/three/tickClock.js, the exact function
 // engine.js calls since POLISH_PLAN C01 (at a fixed interval per speed,
 // so no syncInterval) — and the rig's head-yaw smoothing (serpentBase.js
-// paint(): yawView += dyaw * min(1, dt * 20), target = atan2 of the spine
+// paint(): yawView += dyaw * yawAlpha(dt, interval), the real function
+// from serpentPath.js since POLISH_PLAN C04; target = atan2 of the spine
 // 0.35 cells behind the head). Scripted inputs are delivered as DOM
 // events are: before the next animation frame's tick update.
 //
@@ -14,11 +15,9 @@
 // Deterministic (seeded RNG) — the same commit always prints the same numbers.
 import fs from 'fs'
 import { createGame, turn, step, speedInterval, gridToWorld, DIR } from '../../../../src/game/logic.js'
-import { createPathState, buildPathPoints, buildPath } from '../../../../src/three/skins/serpentPath.js'
+import { createPathState, buildPathPoints, buildPath, yawAlpha } from '../../../../src/three/skins/serpentPath.js'
 import { runTicks } from '../../../../src/three/tickClock.js'
 
-const yawArg = process.argv.indexOf('--yaw-tau-k')
-const YAW_K = yawArg > 0 ? +process.argv[yawArg + 1] : 0
 let seed = 0x5eed
 const rnd = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296)
 
@@ -86,10 +85,8 @@ function run({ interval, fps, inputs, duration, yaw = false }) {
       let d = target - yawView
       while (d > Math.PI) d -= Math.PI * 2
       while (d < -Math.PI) d += Math.PI * 2
-      // master @ f9d1dd6: frame-rate-dependent factor min(1, dt * 20).
-      // --yaw-tau-k K (reference for C04): exponential smoothing with a
-      // time constant tied to the tick, tau = min(0.05 s, K * interval).
-      yawView += d * (YAW_K > 0 ? 1 - Math.exp(-dt / Math.min(0.05, YAW_K * interval)) : Math.min(1, dt * 20))
+      // C04: the real yawAlpha from src (tau = min(50 ms, 0.25 * interval)).
+      yawView += d * yawAlpha(dt, interval)
       frames.push({ t: now, yawView, target })
     }
   }
@@ -204,7 +201,7 @@ console.log('\n[2] triple tap in one tick (up,left,down within 8 ms): third inpu
 for (const x of res.tripleTap) console.log(`  ${x.speed.padEnd(5)} ${x.thirdAccepted}/${x.trials}`)
 console.log('\n[3] input -> direction change (ms)   logic mean/max(ticks)   first painted frame mean/p95/max')
 for (const x of res.latency) console.log(`  ${x.speed.padEnd(5)} ${String(x.intervalMs).padStart(5)}ms/tick ${String(x.fps).padStart(3)}fps   ${x.logicMeanMs}/${x.logicMaxMs} (${x.logicMaxTicks})   ${x.visibleMeanMs}/${x.visibleP95Ms}/${x.visibleMaxMs}`)
-console.log(`\n[4] head yaw smoothing: ${YAW_K > 0 ? `REFERENCE tau = min(50 ms, ${YAW_K} x interval)` : 'master (min(1, dt * 20) per frame)'}`)
+console.log('\n[4] head yaw smoothing: src yawAlpha, tau = min(50 ms, 0.25 x interval) (C04)')
 console.log('[4] head yaw settle after the turning step (within 9 deg): target(geometry) / drawn head (ms, ticks)')
 for (const x of res.yawSettle) console.log(`  ${x.speed.padEnd(5)} ${String(x.intervalMs).padStart(5)}ms/tick ${String(x.fps).padStart(3)}fps   ${x.targetSettleMs} / ${x.viewSettleMs} (${x.viewSettleTicks} ticks)`)
 
