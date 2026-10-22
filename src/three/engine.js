@@ -31,6 +31,7 @@ import { rescaleAccum, runTicks } from './tickClock.js'
 import { writeCellsInto } from './cellBuffer.js'
 import { alignedCamera } from './cameraFit.js'
 import { readSafeArea } from '../game/hudLayout.js'
+import { createSwipeTracker } from '../game/swipe.js'
 import { buildGarden } from './garden.js'
 import { createSnakeRig } from './snakeRig.js'
 import { buildDecor } from './decor.js'
@@ -799,38 +800,33 @@ export function createEngine(canvas, { reduced } = {}) {
     if (ev.type === 'camera') useGame.getState().toggleCameraMode()
   })
 
-  // Touch swipe on the canvas with smooth threshold
-  const pointer = { active: false, sx: 0, sy: 0 }
+  // Touch swipe on the canvas (C02): the tracker in game/swipe.js
+  // follows the one finger that landed on the canvas by touch
+  // identifier — a thumb holding Dash never hijacks the swipe — and a
+  // second turn inside one gesture needs a clear axis (no curl turns).
+  const swipe = createSwipeTracker()
   const onTouchStart = (e) => {
     unlock()
-    const t = e.touches[0]
-    pointer.active = true
-    pointer.sx = t.clientX
-    pointer.sy = t.clientY
+    swipe.start(e)
   }
 
   const onTouchMove = (e) => {
-    if (!pointer.active) return
-    const t = e.touches[0]
-    const dx = t.clientX - pointer.sx
-    const dy = t.clientY - pointer.sy
-    const ax = Math.abs(dx)
-    const ay = Math.abs(dy)
-    if (Math.max(ax, ay) < 18) return
-    const key = ax > ay ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up')
-    pointer.sx = t.clientX
-    pointer.sy = t.clientY
-    requestTurn(key)
+    const key = swipe.move(e)
+    if (key) requestTurn(key)
   }
 
-  const onTouchEnd = () => {
-    pointer.active = false
+  const onTouchEnd = (e) => {
+    swipe.end(e)
+  }
+
+  const onTouchCancel = () => {
+    swipe.cancel()
   }
 
   canvas.addEventListener('touchstart', onTouchStart, { passive: true })
   canvas.addEventListener('touchmove', onTouchMove, { passive: false })
   canvas.addEventListener('touchend', onTouchEnd, { passive: true })
-  canvas.addEventListener('touchcancel', onTouchEnd, { passive: true })
+  canvas.addEventListener('touchcancel', onTouchCancel, { passive: true })
 
   // Pause on tab blur / visibility loss
   const onBlur = () => {
@@ -1189,7 +1185,7 @@ export function createEngine(canvas, { reduced } = {}) {
     canvas.removeEventListener('touchstart', onTouchStart)
     canvas.removeEventListener('touchmove', onTouchMove)
     canvas.removeEventListener('touchend', onTouchEnd)
-    canvas.removeEventListener('touchcancel', onTouchEnd)
+    canvas.removeEventListener('touchcancel', onTouchCancel)
     unsubBus()
     unsubStore()
     unsubGarden()
