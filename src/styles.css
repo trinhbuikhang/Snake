@@ -1025,7 +1025,10 @@ kbd {
 .coach-marks--top-left {
   left: max(16px, env(safe-area-inset-left, 0px));
   top: calc(max(var(--hud-edge), env(safe-area-inset-top, 0px)) + var(--hud-bar-h) + 14px);
-  width: 250px;
+  /* 272px (the cluster column's width), not the prototype's 250px:
+     at 250px every coach step wrapped to 3 lines and the card
+     measured 106px — over HUD.coachH (92). At 272px it is 88px. */
+  width: 272px;
 }
 
 .coach-card {

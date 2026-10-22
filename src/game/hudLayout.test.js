@@ -105,6 +105,10 @@ describe('coachPlacement (H01)', () => {
       expect(css).toContain(`.${cls}`)
     }
     expect(css).toContain('.coach-card__foot')
+    // Review fix (PR #53): at 250px the top-left card wrapped to 3
+    // lines and measured 106px — over HUD.coachH (92). 272px keeps
+    // it at 88px; pin the width so it cannot drift back.
+    expect(css).toMatch(/\.coach-marks--top-left\s*{[^}]*width: 272px/)
   })
 })
 
