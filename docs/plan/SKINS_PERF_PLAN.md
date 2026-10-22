@@ -405,17 +405,17 @@ Prototype đầy đủ đã chạy được (xem `docs/plan/skins/reference/`). 
 
 | Task | PR | Ghi chú |
 |------|----|---------|
-| P01 | — | |
-| P02 | — | |
-| P03 | — | |
-| P04 | — | |
-| P05 | — | |
-| P06 | — | Tuỳ chọn |
-| S01 | — | |
-| S02 | — | |
-| S03 | — | |
-| S04 | — | |
-| S05 | — | |
-| S06 | — | |
-| D01 | — | |
-| S07 | — | Tuỳ chọn, làm sau |
+| P01 | #34 | Chuyển động nội suy tuyến tính + `rescaleAccum` giữ pha khi đổi tốc độ; tốc độ đầu đo được hằng 6.06 ô/s. |
+| P02 | #35 | Precompile shader vào render target của composer + 1 warm-up render; đèn food không bao giờ ẩn (giữ nguyên số đèn), `applyFoodVisibility` là nơi ghi duy nhất. |
+| P03 | #36 | `antialias: !useComposer`, DPR clamp 1.5, MSAA theo `msaaFor(dpr)`, shadow mặt trăng 1024; FPS máy chậm 0.6 → 2.4. |
+| P04 | #37 | Governor theo tần số màn hình (`snapRefresh`) + tiêu chí spike; máy ~10fps tự hạ bậc ở ~10s và ~16s. |
+| P05 | #38 | Bỏ `backdrop-filter` khỏi mọi HUD hiện khi chơi; sheet tĩnh giữ blur ≤ 8px. |
+| P06 | #39 | Tuỳ chọn — đã làm: snapshot ô double-buffer (`cellBuffer`), probe GC 625 → 13 lần thu gom, 450ms → 173ms. |
+| S01 | #40 | Rig ống liên tục thay chuỗi ngọc (draw call phẳng ở mọi độ dài); rig cũ giữ ở `snakeRig.old.js`, chỉ mở bằng `?rig=old`. |
+| S02 | #41 | Skin Moon Jade hoàn chỉnh: vảy bụng bạc hà, hạt moonstone, mắt nắp + má hồng + cánh hoa. |
+| S03 | #42 | Skin Plush Moon hoàn chỉnh: vải nỉ, chỉ vàng thêu, mõm kem; chi tiết mặt gộp geometry → rig 6 draw call. |
+| S04 | #43 | Registry `src/game/skins.js` + picker ở Garden, trạng thái lưu ở khoá `ran-xinh-skin`; đổi skin tại chỗ không tải lại. |
+| S05 | #44 | Camera `aligned` fit phối cảnh (`fitAligned`) + lề theo HUD thật và lề cụm điều khiển cảm ứng; đo khách quan 0 ô bị che ở 844×390. |
+| S06 | #45 | Mở khoá Plush Moon: 800 ☾ hoặc hoàn thành Moonrise Night đầu tiên; hàm thuần `skinUnlockState` / `checkSkinMilestones`. Hai góp ý nhỏ sau review xử lý ở PR #46. |
+| D01 | #47 | `AGENT.md` mô tả kiến trúc skins, camera fit, luật perf P01–P06 + checklist thêm skin mới; mọi tên nhắc tới đều kiểm chứng bằng `rg`. |
+| S07 | — | Tuỳ chọn, làm sau — chưa làm; chỉ thực hiện khi chủ repo yêu cầu. |
