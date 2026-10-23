@@ -430,7 +430,7 @@ body {
 }
 
 .hud-stat__label {
-  font-size: 0.6rem;
+  font-size: 0.64rem;
   font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -438,20 +438,24 @@ body {
   line-height: 1;
 }
 
+/* V01: stat values use the UI font with lining tabular numerals — the
+   display serif's old-style figures made 0 read as "o" and dropped 3
+   below the baseline, and the values changed width as they ticked. */
 .hud-stat__value {
-  font-family: var(--font-display);
-  font-size: 1.22rem;
-  font-weight: 700;
+  font-family: var(--font-ui);
+  font-size: 1.15rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
   line-height: 1.05;
   color: var(--cream);
-  font-variant-numeric: tabular-nums;
+  font-variant-numeric: lining-nums tabular-nums;
   white-space: nowrap;
 }
 
 .hud-stat--score .hud-stat__value { color: var(--pastel-moon); text-shadow: 0 0 10px rgba(255, 240, 196, 0.45); }
 .hud-stat--length .hud-stat__value { color: var(--pastel-mint); }
 .hud-stat--best .hud-stat__value { color: var(--pastel-lilac); }
-.hud-stat--dir .hud-stat__value { color: var(--pastel-peach); font-family: var(--font-ui); font-size: 1.05rem; }
+.hud-stat--dir .hud-stat__value { color: var(--pastel-peach); font-family: var(--font-ui); font-size: 1.05rem; font-weight: 600; }
 .hud-stat--timer .hud-stat__value { color: var(--pastel-peach); }
 .hud-stat--timer-low .hud-stat__value { color: var(--pastel-rose); animation: timer-pulse 1s ease-in-out infinite; }
 .hud-stat--dir { min-width: 52px; }
