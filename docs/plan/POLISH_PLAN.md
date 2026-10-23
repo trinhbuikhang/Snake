@@ -247,7 +247,7 @@ Khoá bằng test cái đang đúng (hàng đợi rẽ, độ trễ ≤ 1 tick) 
 
 ## V02 — Cụm d-pad + Dash pastel
 
-- [ ] **V02** · Mức: **Trung bình** · Branch: `feat/v02-pastel-touch-cluster`
+- [x] **V02** · Mức: **Trung bình** · Branch: `feat/v02-pastel-touch-cluster`
 
 **Vấn đề**
 - `.dbtn` (L610) 4 ô vuông tối rời rạc, `.btn-boost` (L567) cam–đỏ — lệch tông pastel (ảnh `polish/images/portrait-before-play.jpg`).

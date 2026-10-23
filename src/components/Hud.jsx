@@ -18,7 +18,7 @@ import { SKINS, skinUnlockState } from '../game/skins.js'
 import { composeMoonCard, composeVerseCard, composeHighlightCard } from '../game/moonCard.js'
 
 const arr = (d) => (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     {d}
   </svg>
 )
