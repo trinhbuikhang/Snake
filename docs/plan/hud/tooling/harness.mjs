@@ -2,7 +2,7 @@
 // rects, HUD-HUD overlaps and board cells covered by HUD (cells projected
 // with the same perspective camera the engine fits).
 // Tooling for docs/plan/HUD_PLAN.md (not part of the game build).
-// usage: node docs/plan/hud/tooling/harness.mjs <url> <label> <outdir> <fitmodel.mjs> [only=id,id]
+// usage: node docs/plan/hud/tooling/harness.mjs <url> <label> <outdir> <fitmodel.mjs> [only=id,id] [coach=off]
 //   env PW_CORE = path to playwright-core's index.mjs (default: 'playwright-core')
 //   env CHROME  = Chrome/Chromium binary (default: /usr/bin/google-chrome)
 // Run from the repo root so 'three' resolves from node_modules.
@@ -10,7 +10,11 @@ import fs from 'fs'
 import path from 'path'
 import * as THREE from 'three'
 const { chromium } = await import(process.env.PW_CORE || 'playwright-core')
-const [url, label, outdir, fitModelPath, only] = process.argv.slice(2)
+const [url, label, outdir, fitModelPath, only, coachArg] = process.argv.slice(2)
+// V03: a `coach=off` pass measures the returning-player framing — the
+// context is seeded with ran-xinh-onboarded=1 so the first-night
+// coach never shows, and the fit model gets coachVisible: false.
+const coachVisible = coachArg !== 'coach=off'
 const { cameraFor } = await import(path.resolve(fitModelPath))
 fs.mkdirSync(outdir, { recursive: true })
 const sleep = (ms) => new Promise(r => setTimeout(r, ms))
@@ -43,6 +47,7 @@ for (const vp of VIEWPORTS) {
     })
   }
   const page = await ctx.newPage(); const errs = []
+  if (!coachVisible) await page.addInitScript(() => { try { localStorage.setItem('ran-xinh-onboarded', '1') } catch {} })
   page.on('pageerror', e => errs.push('pageerror: ' + e.message))
   await page.goto(url, { waitUntil: 'load' })
   await page.waitForFunction(() => document.querySelector('.garden-canvas--ready'), null, { timeout: 90000 })
@@ -72,7 +77,7 @@ for (const vp of VIEWPORTS) {
     if (ow > 0.5 && oh > 0.5) overlaps.push({ a: a.name, b: q.name, area: Math.round(ow * oh) })
   }
   // project board cells
-  const cam = cameraFor({ w: info.canvas.w, h: info.canvas.h, coarse: info.coarse, controls: info.showsControls, rects, safe: vp.safe })
+  const cam = cameraFor({ w: info.canvas.w, h: info.canvas.h, coarse: info.coarse, controls: info.showsControls, rects, safe: vp.safe, coachVisible })
   const camera = new THREE.PerspectiveCamera(cam.fov, info.canvas.w / info.canvas.h, 0.1, 500)
   camera.position.set(...cam.pos); camera.lookAt(new THREE.Vector3(...cam.look)); camera.updateMatrixWorld(); camera.updateProjectionMatrix()
   const P = (x, z) => { const v = new THREE.Vector3(x, 0, z).project(camera); return [(v.x + 1) / 2 * info.canvas.w, (1 - v.y) / 2 * info.canvas.h] }

@@ -58,10 +58,20 @@ export function fitMargins(res, base, gap = 8) {
   return m
 }
 
+// V03: the portrait framing preset. While the first-night coach is
+// up (or anywhere else) the base preset stands; once the coach is
+// gone on a portrait screen the camera steepens to el 1.2 so the
+// board — no longer holding a coach strip in reserve — fills the
+// height the HUD plan's portrait fit could not use.
+export function presetFor(base, { w, h, coachVisible }) {
+  if (w / h < 1 && !coachVisible) return { ...base, el: 1.2 }
+  return base
+}
+
 // The one pure entry the engine calls for the aligned preset:
 // viewport + safe-area + control visibility in, camera fit out.
-export function alignedCamera({ w, h, safe, showControls, preset, boardHalf = 10.25 }) {
-  const margins = fitMargins(hudReserve({ w, h, safe, showControls }), preset.perspFit, HUD.fitGap)
+export function alignedCamera({ w, h, safe, showControls, preset, boardHalf = 10.25, coachVisible = true }) {
+  const margins = fitMargins(hudReserve({ w, h, safe, showControls, coachVisible }), preset.perspFit, HUD.fitGap)
   const { dist, lookZ, lookX } = fitAligned({
     el: preset.el,
     fov: preset.fov,

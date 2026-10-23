@@ -29,7 +29,7 @@ import { createGovernor, observeWarmupFrame, settleWarmup, nextQualityIdx, msaaR
 import { disposeObject3D } from './dispose.js'
 import { rescaleAccum, runTicks } from './tickClock.js'
 import { writeCellsInto } from './cellBuffer.js'
-import { alignedCamera } from './cameraFit.js'
+import { alignedCamera, presetFor } from './cameraFit.js'
 import { readSafeArea } from '../game/hudLayout.js'
 import { createSwipeTracker } from '../game/swipe.js'
 import { buildGarden } from './garden.js'
@@ -930,6 +930,9 @@ export function createEngine(canvas, { reduced } = {}) {
     }
     if (s.muted !== prev.muted) audio.setMuted(s.muted)
     if (s.cameraMode !== prev.cameraMode || s.showControls !== prev.showControls) updateCameraTarget()
+    // V03: the portrait reframe keys off the coach being up or gone —
+    // refit only on the show/hide edge, not on every coach step.
+    if ((s.coachStep >= 0) !== (prev.coachStep >= 0)) updateCameraTarget()
     if (s.moonPhase !== prev.moonPhase || s.gameMode !== prev.gameMode) applyRunModifiers() // title-screen pickers: update ambience & speed live
   })
 
@@ -940,10 +943,15 @@ export function createEngine(canvas, { reduced } = {}) {
   function updateCameraTarget() {
     const st = useGame.getState()
     const mode = st.cameraMode || 'aligned'
-    const preset = CAM_PRESETS[mode] || CAM_PRESETS.aligned
+    const basePreset = CAM_PRESETS[mode] || CAM_PRESETS.aligned
 
     const w = canvas.clientWidth || 1
     const h = canvas.clientHeight || 1
+    // V03: portrait with the first-night coach gone reframes steeper
+    // and taller (presetFor); only the aligned preset reframes —
+    // topdown/cinematic keep their exact framing.
+    const coachVisible = st.coachStep >= 0
+    const preset = basePreset.perspFit ? presetFor(basePreset, { w, h, coachVisible }) : basePreset
     camera.aspect = w / h
     camera.fov = preset.fov
 
@@ -975,6 +983,7 @@ export function createEngine(canvas, { reduced } = {}) {
         showControls: st.showControls,
         preset,
         boardHalf: BOARD_HALF,
+        coachVisible,
       })
       camLookTarget.set(lookX, 0, lookZ)
       camPosTarget.copy(viewDir).multiplyScalar(dist * preset.distMult).add(camLookTarget)

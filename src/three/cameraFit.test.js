@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import * as THREE from 'three'
-import { fitAligned, fitMargins, alignedCamera } from './cameraFit.js'
+import { fitAligned, fitMargins, alignedCamera, presetFor } from './cameraFit.js'
 import { hudReserve } from '../game/hudLayout.js'
 
 // S05 acceptance: with the aligned preset's el/fov and the board
@@ -233,4 +233,105 @@ describe('alignedCamera portrait centring + regression bounds (H04)', () => {
     const next = boardHeight(fitVp(VIEWPORTS[10]), aspect)
     expect(Math.abs(next - base) / base).toBeLessThanOrEqual(0.02)
   })
+})
+
+// ---- V03: portrait reframe once the first-night coach is gone --------
+// presetFor() steepens the aligned preset to el 1.2 on portrait while
+// the coach is hidden, and hudReserve stops reserving the coach strip
+// — the board grows into the freed band. With the coach up, and on
+// every non-portrait screen, the fit must stay bit-identical to the
+// pre-V03 chain (fitVp above: base preset, default coachVisible).
+const projectWithEl = (fit, el, aspect, points) => {
+  const camera = new THREE.PerspectiveCamera(FOV, aspect, 0.1, 500)
+  const viewDir = new THREE.Vector3(0, Math.sin(el), Math.cos(el))
+  const look = new THREE.Vector3(fit.lookX ?? 0, 0, fit.lookZ)
+  camera.position.copy(viewDir).multiplyScalar(fit.dist).add(look)
+  camera.lookAt(look)
+  camera.updateMatrixWorld()
+  return points.map(([x, z]) => new THREE.Vector3(x, 0, z).project(camera))
+}
+const boardHeightPx = (fit, el, vp) => {
+  const cs = projectWithEl(fit, el, vp.w / vp.h, CORNERS)
+  return ((Math.max(...cs.map((c) => c.y)) - Math.min(...cs.map((c) => c.y))) * vp.h) / 2
+}
+const nearWidthEl = (fit, el, aspect) => {
+  const near = projectWithEl(fit, el, aspect, [[-BOARD_HALF, BOARD_HALF], [BOARD_HALF, BOARD_HALF]])
+  return Math.abs(near[1].x - near[0].x)
+}
+const fitCoachOff = (vp) => {
+  const preset = presetFor(PRESET, { w: vp.w, h: vp.h, coachVisible: false })
+  return {
+    el: preset.el,
+    fit: alignedCamera({ w: vp.w, h: vp.h, safe: vp.safe, showControls: false, preset, boardHalf: BOARD_HALF, coachVisible: false }),
+  }
+}
+
+describe('presetFor (V03)', () => {
+  it('steepens to el 1.2 only for portrait with the coach hidden', () => {
+    const off = presetFor(PRESET, { w: 390, h: 844, coachVisible: false })
+    expect(off.el).toBe(1.2)
+    expect(off).not.toBe(PRESET)
+    expect(PRESET.el).toBe(EL) // base preset not mutated
+    expect(presetFor(PRESET, { w: 390, h: 844, coachVisible: true })).toBe(PRESET)
+    expect(presetFor(PRESET, { w: 844, h: 390, coachVisible: false })).toBe(PRESET)
+    expect(presetFor(PRESET, { w: 800, h: 800, coachVisible: false })).toBe(PRESET)
+  })
+
+  it('hudReserve reserves the coach strip only while the coach can show', () => {
+    const on = hudReserve({ w: 390, h: 844, safe: {}, showControls: false })
+    const off = hudReserve({ w: 390, h: 844, safe: {}, showControls: false, coachVisible: false })
+    expect(on.coachStrip).toBeGreaterThan(0)
+    expect(off.coachStrip).toBeUndefined()
+    expect(off.cluster).toEqual(on.cluster)
+  })
+})
+
+describe('portrait board with the coach gone (V03)', () => {
+  const MIN_H = { p390: 320, p375: 300, p414: 340, teams375: 300, p390safe: 320 }
+  for (const vp of VIEWPORTS.slice(0, 5)) {
+    it(`${vp.name}: board is at least ${MIN_H[vp.name]}px tall and no narrower at the near edge`, () => {
+      const { fit, el } = fitCoachOff(vp)
+      expect(el).toBe(1.2)
+      expect(boardHeightPx(fit, el, vp)).toBeGreaterThanOrEqual(MIN_H[vp.name])
+      const aspect = vp.w / vp.h
+      const masterNearPx = (nearWidth(fitVp(vp), aspect) * vp.w) / 2
+      const nearPx = (nearWidthEl(fit, el, aspect) * vp.w) / 2
+      expect(nearPx).toBeGreaterThanOrEqual(masterNearPx - 1)
+    })
+  }
+  // Every portrait viewport (incl. the t768 / w600 windows) keeps the
+  // H04 clearance guarantee in the reframed fit.
+  for (const vp of VIEWPORTS.filter((v) => v.w / v.h <= 1)) {
+    it(`${vp.name}: every board cell still clears the bar band, the cluster rect and the safe bands`, () => {
+      const { fit, el } = fitCoachOff(vp)
+      const res = hudReserve({ w: vp.w, h: vp.h, safe: vp.safe, showControls: false, coachVisible: false })
+      const pts = projectWithEl(fit, el, vp.w / vp.h, [...GRID, ...CORNERS])
+      expect(violates(pts, fit.margins)).toBe(false)
+      const scr = pts.map((p) => toScreen(p, vp.w, vp.h))
+      for (const s of scr) expect(s.y).toBeGreaterThanOrEqual(res.top + GAP - 0.5)
+      for (const s of scr) expect(s.y).toBeLessThanOrEqual(vp.h - res.cluster.h - GAP + 0.5)
+    })
+  }
+})
+
+describe('coach visible / non-portrait fits are unchanged (V03)', () => {
+  for (const vp of VIEWPORTS) {
+    it(`${vp.name}: coach-visible fit equals the pre-V03 fit exactly`, () => {
+      const preset = presetFor(PRESET, { w: vp.w, h: vp.h, coachVisible: true })
+      const fit = alignedCamera({ w: vp.w, h: vp.h, safe: vp.safe, showControls: false, preset, boardHalf: BOARD_HALF, coachVisible: true })
+      const before = fitVp(vp)
+      expect(fit.dist).toBe(before.dist)
+      expect(fit.lookX).toBe(before.lookX)
+      expect(fit.lookZ).toBe(before.lookZ)
+    })
+  }
+  for (const vp of VIEWPORTS.filter((v) => v.w / v.h > 1)) {
+    it(`${vp.name}: coach state changes nothing outside portrait`, () => {
+      const { fit } = fitCoachOff(vp)
+      const before = fitVp(vp)
+      expect(fit.dist).toBe(before.dist)
+      expect(fit.lookX).toBe(before.lookX)
+      expect(fit.lookZ).toBe(before.lookZ)
+    })
+  }
 })
