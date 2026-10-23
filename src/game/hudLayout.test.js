@@ -136,6 +136,25 @@ describe('CSS sync (H01)', () => {
   })
 })
 
+describe('stat numerals (V01)', () => {
+  const css = readFileSync(new URL('../styles.css', import.meta.url), 'utf8')
+
+  it('.hud-stat__value uses the UI font with lining tabular numerals', () => {
+    // V01: the display serif's old-style figures made 0 read as "o";
+    // pin the replacement so nobody drifts back to it.
+    const block = css.match(/\.hud-stat__value\s*\{([^}]*)\}/)?.[1] ?? ''
+    expect(block).toContain('font-family: var(--font-ui)')
+    expect(block).toContain('font-weight: 600')
+    expect(block).toContain('font-size: 1.15rem')
+    expect(block).toContain('font-variant-numeric: lining-nums tabular-nums')
+  })
+
+  it('.hud-stat__label stays at or above 0.64rem (10.24px)', () => {
+    const block = css.match(/\.hud-stat__label\s*\{([^}]*)\}/)?.[1] ?? ''
+    expect(block).toContain('font-size: 0.64rem')
+  })
+})
+
 describe('readSafeArea (H01)', () => {
   afterEach(() => {
     delete globalThis.document

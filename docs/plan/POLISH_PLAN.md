@@ -230,7 +230,7 @@ Khoá bằng test cái đang đúng (hàng đợi rẽ, độ trễ ≤ 1 tick) 
 
 ## V01 — Số trên viên nang dễ đọc
 
-- [ ] **V01** · Mức: **Trung bình** · Branch: `feat/v01-stat-numerals`
+- [x] **V01** · Mức: **Trung bình** · Branch: `feat/v01-stat-numerals`
 
 **Vấn đề**
 - `.hud-stat__value` (styles.css L441) `Cormorant Garamond` 1.22rem chữ số kiểu cũ: "0" ≈ "o", "3" thòng xuống (`polish/images/before-p390-play.png`); nhãn 0.6rem = 9.6px.
