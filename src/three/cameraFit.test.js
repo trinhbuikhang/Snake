@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import * as THREE from 'three'
-import { fitAligned, fitMargins, alignedCamera, presetFor } from './cameraFit.js'
+import { fitAligned, fitMargins, alignedCamera, presetFor, coachBlocksCamera } from './cameraFit.js'
 import { hudReserve } from '../game/hudLayout.js'
 
 // S05 acceptance: with the aligned preset's el/fov and the board
@@ -334,4 +334,53 @@ describe('coach visible / non-portrait fits are unchanged (V03)', () => {
       expect(fit.lookZ).toBe(before.lookZ)
     })
   }
+})
+
+// V03 fix (owner review): on the first night the coach is due from the
+// ready beat — the camera must hold the coach framing for the whole run
+// so it never tilts el 1.2 → 1.0 → 1.2 mid-game.
+describe('coachBlocksCamera (V03 fix — first night holds the old framing)', () => {
+  it('a visible coach step always blocks', () => {
+    for (const status of ['title', 'ready', 'playing', 'paused', 'dead'])
+      expect(coachBlocksCamera({ coachStep: 0, night: 3, onboarded: true, status })).toBe(true)
+  })
+
+  it('night 1, not onboarded: blocked from the ready beat through the run', () => {
+    for (const status of ['ready', 'playing', 'paused'])
+      expect(coachBlocksCamera({ coachStep: -1, night: 1, onboarded: false, status })).toBe(true)
+  })
+
+  it('night 1, not onboarded: not blocked outside the run (title/prologue/dead)', () => {
+    for (const status of ['title', 'prologue', 'dead'])
+      expect(coachBlocksCamera({ coachStep: -1, night: 1, onboarded: false, status })).toBe(false)
+  })
+
+  it('once onboarded, night 1 no longer blocks (the one reframe to el 1.2)', () => {
+    for (const status of ['ready', 'playing', 'paused'])
+      expect(coachBlocksCamera({ coachStep: -1, night: 1, onboarded: true, status })).toBe(false)
+  })
+
+  it('later nights never block on the pending rule', () => {
+    for (const status of ['ready', 'playing', 'paused'])
+      expect(coachBlocksCamera({ coachStep: -1, night: 2, onboarded: false, status })).toBe(false)
+  })
+
+  it('the held night-1 framing equals the coach-visible fit; onboarded reframes', () => {
+    // p390 chain exactly as the engine runs it.
+    const vp = VIEWPORTS[0]
+    const fit = (coachVisible) =>
+      alignedCamera({
+        w: vp.w, h: vp.h, safe: vp.safe, showControls: false,
+        preset: presetFor(PRESET, { w: vp.w, h: vp.h, coachVisible }),
+        boardHalf: BOARD_HALF,
+        coachVisible,
+      })
+    const held = coachBlocksCamera({ coachStep: -1, night: 1, onboarded: false, status: 'ready' })
+    expect(held).toBe(true)
+    expect(fit(held).dist).toBe(fitVp(vp).dist) // ready on night 1 = pre-V03 framing
+    const done = coachBlocksCamera({ coachStep: -1, night: 1, onboarded: true, status: 'playing' })
+    expect(done).toBe(false)
+    expect(fit(done).dist).toBe(fitCoachOff(vp).fit.dist) // coach done → the V03 reframe
+    expect(fit(done).dist).not.toBe(fitVp(vp).dist)
+  })
 })

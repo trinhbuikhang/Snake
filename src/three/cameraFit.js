@@ -68,6 +68,22 @@ export function presetFor(base, { w, h, coachVisible }) {
   return base
 }
 
+// V03 fix (owner review): does the first-night coach hold the camera on
+// the coach framing? True while a coach step is up — and, on the first
+// night before onboarding, from the ready beat on: the coach is due this
+// run (the store arms it in enterPlaying under exactly this condition),
+// so the camera keeps the old angle from the start instead of tilting
+// el 1.2 → 1.0 when the card appears and back when it leaves. It flips
+// to the new framing exactly once, when the coach is done.
+export function coachBlocksCamera({ coachStep, night, onboarded, status }) {
+  if (coachStep >= 0) return true
+  return (
+    !onboarded &&
+    night === 1 &&
+    (status === 'ready' || status === 'playing' || status === 'paused')
+  )
+}
+
 // The one pure entry the engine calls for the aligned preset:
 // viewport + safe-area + control visibility in, camera fit out.
 export function alignedCamera({ w, h, safe, showControls, preset, boardHalf = 10.25, coachVisible = true }) {
