@@ -58,10 +58,36 @@ export function fitMargins(res, base, gap = 8) {
   return m
 }
 
+// V03: the portrait framing preset. While the first-night coach is
+// up (or anywhere else) the base preset stands; once the coach is
+// gone on a portrait screen the camera steepens to el 1.2 so the
+// board — no longer holding a coach strip in reserve — fills the
+// height the HUD plan's portrait fit could not use.
+export function presetFor(base, { w, h, coachVisible }) {
+  if (w / h < 1 && !coachVisible) return { ...base, el: 1.2 }
+  return base
+}
+
+// V03 fix (owner review): does the first-night coach hold the camera on
+// the coach framing? True while a coach step is up — and, on the first
+// night before onboarding, from the ready beat on: the coach is due this
+// run (the store arms it in enterPlaying under exactly this condition),
+// so the camera keeps the old angle from the start instead of tilting
+// el 1.2 → 1.0 when the card appears and back when it leaves. It flips
+// to the new framing exactly once, when the coach is done.
+export function coachBlocksCamera({ coachStep, night, onboarded, status }) {
+  if (coachStep >= 0) return true
+  return (
+    !onboarded &&
+    night === 1 &&
+    (status === 'ready' || status === 'playing' || status === 'paused')
+  )
+}
+
 // The one pure entry the engine calls for the aligned preset:
 // viewport + safe-area + control visibility in, camera fit out.
-export function alignedCamera({ w, h, safe, showControls, preset, boardHalf = 10.25 }) {
-  const margins = fitMargins(hudReserve({ w, h, safe, showControls }), preset.perspFit, HUD.fitGap)
+export function alignedCamera({ w, h, safe, showControls, preset, boardHalf = 10.25, coachVisible = true }) {
+  const margins = fitMargins(hudReserve({ w, h, safe, showControls, coachVisible }), preset.perspFit, HUD.fitGap)
   const { dist, lookZ, lookX } = fitAligned({
     el: preset.el,
     fov: preset.fov,
