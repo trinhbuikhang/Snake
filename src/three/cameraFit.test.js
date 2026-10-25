@@ -344,6 +344,11 @@ describe('coachBlocksCamera (V03 fix — first night holds the old framing)', ()
     expect(coachBlocksCamera({ coachStep: 0, night: 3, onboarded: true })).toBe(true)
   })
 
+  it('night 0 (fresh storage, no night started) also blocks', () => {
+    expect(coachBlocksCamera({ coachStep: -1, night: 0, onboarded: false })).toBe(true)
+    expect(coachBlocksCamera({ coachStep: -1, night: 0, onboarded: true })).toBe(false)
+  })
+
   it('night 1, not onboarded: blocked on every screen, title included', () => {
     for (const _status of ['title', 'prologue', 'ready', 'playing', 'paused', 'dead'])
       expect(coachBlocksCamera({ coachStep: -1, night: 1, onboarded: false })).toBe(true)
@@ -357,11 +362,13 @@ describe('coachBlocksCamera (V03 fix — first night holds the old framing)', ()
     expect(coachBlocksCamera({ coachStep: -1, night: 2, onboarded: false })).toBe(false)
   })
 
-  it('night-1 journey: title → prologue → ready → playing → coach 0..2 → dismiss changes exactly once', () => {
-    // onboarded flips to true at dismiss, exactly as dismissCoach does
-    // (writeItem before set({coachStep: -1})).
+  it('night-1 journey: title (night 0) → prologue → ready → playing → coach 0..2 → dismiss changes exactly once', () => {
+    // The real store starts at night 0 on fresh storage and only becomes
+    // 1 in start() — the round-2 test fed night 1 for title and missed
+    // the title→prologue tilt. onboarded flips to true at dismiss,
+    // exactly as dismissCoach does (writeItem before set({coachStep: -1})).
     const journey = [
-      { status: 'title', coachStep: -1, night: 1, onboarded: false },
+      { status: 'title', coachStep: -1, night: 0, onboarded: false },
       { status: 'prologue', coachStep: -1, night: 1, onboarded: false },
       { status: 'ready', coachStep: -1, night: 1, onboarded: false },
       { status: 'playing', coachStep: -1, night: 1, onboarded: false },
