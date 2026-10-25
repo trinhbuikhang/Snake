@@ -68,20 +68,20 @@ export function presetFor(base, { w, h, coachVisible }) {
   return base
 }
 
-// V03 fix (owner review): does the first-night coach hold the camera on
-// the coach framing? True while a coach step is up — and, on the first
-// night before onboarding, from the ready beat on: the coach is due this
-// run (the store arms it in enterPlaying under exactly this condition),
-// so the camera keeps the old angle from the start instead of tilting
-// el 1.2 → 1.0 when the card appears and back when it leaves. It flips
-// to the new framing exactly once, when the coach is done.
-export function coachBlocksCamera({ coachStep, night, onboarded, status }) {
-  if (coachStep >= 0) return true
-  return (
-    !onboarded &&
-    night === 1 &&
-    (status === 'ready' || status === 'playing' || status === 'paused')
-  )
+// V03 fix (owner review round 2): does the first-night coach hold the
+// camera on the coach framing? True while a coach step is up — and, on
+// the first night before onboarding, on EVERY screen: the coach is due
+// this run (the store arms it in enterPlaying under exactly this
+// condition), so the camera keeps the old angle from the title onward
+// instead of tilting el 1.2 → 1.0 at ready and back after the coach.
+// Dropping the hold at `dead` would re-tilt on retry when the player
+// died before the coach showed (still not onboarded, coach still due),
+// so `dead` stays held too. It flips to the new framing exactly once,
+// when the coach is done — `onboarded` is written before
+// `set({coachStep: -1})` in dismissCoach/completeRun, so the edge
+// fires a single time.
+export function coachBlocksCamera({ coachStep, night, onboarded }) {
+  return coachStep >= 0 || (night === 1 && !onboarded)
 }
 
 // The one pure entry the engine calls for the aligned preset:

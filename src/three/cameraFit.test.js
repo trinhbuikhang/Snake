@@ -341,28 +341,47 @@ describe('coach visible / non-portrait fits are unchanged (V03)', () => {
 // so it never tilts el 1.2 → 1.0 → 1.2 mid-game.
 describe('coachBlocksCamera (V03 fix — first night holds the old framing)', () => {
   it('a visible coach step always blocks', () => {
-    for (const status of ['title', 'ready', 'playing', 'paused', 'dead'])
-      expect(coachBlocksCamera({ coachStep: 0, night: 3, onboarded: true, status })).toBe(true)
+    expect(coachBlocksCamera({ coachStep: 0, night: 3, onboarded: true })).toBe(true)
   })
 
-  it('night 1, not onboarded: blocked from the ready beat through the run', () => {
-    for (const status of ['ready', 'playing', 'paused'])
-      expect(coachBlocksCamera({ coachStep: -1, night: 1, onboarded: false, status })).toBe(true)
-  })
-
-  it('night 1, not onboarded: not blocked outside the run (title/prologue/dead)', () => {
-    for (const status of ['title', 'prologue', 'dead'])
-      expect(coachBlocksCamera({ coachStep: -1, night: 1, onboarded: false, status })).toBe(false)
+  it('night 1, not onboarded: blocked on every screen, title included', () => {
+    for (const _status of ['title', 'prologue', 'ready', 'playing', 'paused', 'dead'])
+      expect(coachBlocksCamera({ coachStep: -1, night: 1, onboarded: false })).toBe(true)
   })
 
   it('once onboarded, night 1 no longer blocks (the one reframe to el 1.2)', () => {
-    for (const status of ['ready', 'playing', 'paused'])
-      expect(coachBlocksCamera({ coachStep: -1, night: 1, onboarded: true, status })).toBe(false)
+    expect(coachBlocksCamera({ coachStep: -1, night: 1, onboarded: true })).toBe(false)
   })
 
   it('later nights never block on the pending rule', () => {
-    for (const status of ['ready', 'playing', 'paused'])
-      expect(coachBlocksCamera({ coachStep: -1, night: 2, onboarded: false, status })).toBe(false)
+    expect(coachBlocksCamera({ coachStep: -1, night: 2, onboarded: false })).toBe(false)
+  })
+
+  it('night-1 journey: title → prologue → ready → playing → coach 0..2 → dismiss changes exactly once', () => {
+    // onboarded flips to true at dismiss, exactly as dismissCoach does
+    // (writeItem before set({coachStep: -1})).
+    const journey = [
+      { status: 'title', coachStep: -1, night: 1, onboarded: false },
+      { status: 'prologue', coachStep: -1, night: 1, onboarded: false },
+      { status: 'ready', coachStep: -1, night: 1, onboarded: false },
+      { status: 'playing', coachStep: -1, night: 1, onboarded: false },
+      { status: 'playing', coachStep: 0, night: 1, onboarded: false },
+      { status: 'playing', coachStep: 1, night: 1, onboarded: false },
+      { status: 'playing', coachStep: 2, night: 1, onboarded: false },
+      { status: 'playing', coachStep: -1, night: 1, onboarded: true },
+    ]
+    const held = journey.map((s) => coachBlocksCamera(s))
+    expect(held.slice(0, 7)).toEqual([true, true, true, true, true, true, true])
+    expect(held[7]).toBe(false)
+    const changes = held.slice(1).filter((v, i) => v !== held[i]).length
+    expect(changes).toBe(1)
+    // The camera angle follows the same single transition (p390 chain).
+    const vp = VIEWPORTS[0]
+    const els = journey.map(
+      (s) => presetFor(PRESET, { w: vp.w, h: vp.h, coachVisible: coachBlocksCamera(s) }).el,
+    )
+    expect(els.slice(0, 7)).toEqual([1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0])
+    expect(els[7]).toBe(1.2)
   })
 
   it('the held night-1 framing equals the coach-visible fit; onboarded reframes', () => {
@@ -375,10 +394,10 @@ describe('coachBlocksCamera (V03 fix — first night holds the old framing)', ()
         boardHalf: BOARD_HALF,
         coachVisible,
       })
-    const held = coachBlocksCamera({ coachStep: -1, night: 1, onboarded: false, status: 'ready' })
+    const held = coachBlocksCamera({ coachStep: -1, night: 1, onboarded: false })
     expect(held).toBe(true)
-    expect(fit(held).dist).toBe(fitVp(vp).dist) // ready on night 1 = pre-V03 framing
-    const done = coachBlocksCamera({ coachStep: -1, night: 1, onboarded: true, status: 'playing' })
+    expect(fit(held).dist).toBe(fitVp(vp).dist) // night 1 = pre-V03 framing
+    const done = coachBlocksCamera({ coachStep: -1, night: 1, onboarded: true })
     expect(done).toBe(false)
     expect(fit(done).dist).toBe(fitCoachOff(vp).fit.dist) // coach done → the V03 reframe
     expect(fit(done).dist).not.toBe(fitVp(vp).dist)

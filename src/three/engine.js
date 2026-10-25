@@ -931,15 +931,14 @@ export function createEngine(canvas, { reduced } = {}) {
     if (s.muted !== prev.muted) audio.setMuted(s.muted)
     if (s.cameraMode !== prev.cameraMode || s.showControls !== prev.showControls) updateCameraTarget()
     // V03: the portrait reframe keys off the coach holding the camera —
-    // on the first night that includes the run-up before the card shows
-    // (coachBlocksCamera), so the refit fires once when the coach is
-    // done, not when the card appears or steps change.
+    // on the first night that includes every screen before the card
+    // shows (coachBlocksCamera), so the refit fires once when the coach
+    // is done, not when the card appears or steps change.
     const coachHeld = (x) =>
       coachBlocksCamera({
         coachStep: x.coachStep,
         night: x.night,
         onboarded: readOnboarded(),
-        status: x.status,
       })
     if (coachHeld(s) !== coachHeld(prev)) updateCameraTarget()
     if (s.moonPhase !== prev.moonPhase || s.gameMode !== prev.gameMode) applyRunModifiers() // title-screen pickers: update ambience & speed live
@@ -957,15 +956,14 @@ export function createEngine(canvas, { reduced } = {}) {
     const w = canvas.clientWidth || 1
     const h = canvas.clientHeight || 1
     // V03: portrait with the first-night coach gone reframes steeper
-    // and taller (presetFor); the coach "holds" the old framing from
-    // the ready beat of night 1 until it is done (coachBlocksCamera).
+    // and taller (presetFor); the coach "holds" the old framing for
+    // the whole first night until it is done (coachBlocksCamera).
     // Only the aligned preset reframes — topdown/cinematic keep their
     // exact framing.
     const coachVisible = coachBlocksCamera({
       coachStep: st.coachStep,
       night: st.night,
       onboarded: readOnboarded(),
-      status: st.status,
     })
     const preset = basePreset.perspFit ? presetFor(basePreset, { w, h, coachVisible }) : basePreset
     camera.aspect = w / h
