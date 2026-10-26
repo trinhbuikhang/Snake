@@ -22,9 +22,10 @@ const TICK_MS = 200
 const HORIZON_S = 1.2
 const MAX_OSC = 10
 const BUS_GAIN = 0.25
-// Pad brightness by moon, as the old setAmbientPhase "air" was: a new
-// moon is soft and dark, a full moon bright and open.
-const BRIGHTNESS = { new: 1200, crescent: 1800, half: 2400, gibbous: 3200, full: 4200 }
+// Pad brightness by moon, as the old setAmbientPhase "air" was — but the
+// M03 spec caps the pad lowpass at 900 Hz (a new moon is soft and dark,
+// a full moon bright and open, never harsh).
+const BRIGHTNESS = { new: 500, crescent: 600, half: 700, gibbous: 800, full: 900 }
 
 const midiToFreq = (midi) => 440 * Math.pow(2, (midi - 69) / 12)
 
@@ -42,6 +43,13 @@ let notes = []
 let nextIdx = 0
 let pendingStart = null
 let brightness = BRIGHTNESS.half
+// AUDIT L5 gate: the scheduler must not create oscillators while the
+// game is muted or music is off (the old planPhrases kept this rule).
+// sound.js owns the flags and pushes them here from setMuted/setMusicOn;
+// tick() skips gated passes, and the loop pointer jumps forward on
+// re-enable, so no backed-up notes burst out.
+let gateMuted = false
+let gateMusicOn = true
 let created = 0
 const active = [] // { osc, gain, stopAt }
 
@@ -65,6 +73,11 @@ function attach(audioCtx, musicBus) {
   }
 }
 
+function setGate({ muted = gateMuted, musicOn = gateMusicOn } = {}) {
+  gateMuted = muted
+  gateMusicOn = musicOn
+}
+
 function setBrightness(phaseId) {
   brightness = BRIGHTNESS[phaseId] || BRIGHTNESS.half
   if (padFilter && ctx) {
@@ -83,16 +96,31 @@ function voice(note, at) {
   let peak
   let stopAt
   if (note.voice === 'pad') {
+    o.type = 'triangle'
     peak = 0.35 * note.vel
     g.gain.setValueAtTime(0.0001, at)
-    g.gain.linearRampToValueAtTime(peak, at + 0.3)
-    g.gain.setValueAtTime(peak, at + Math.max(0.3, durS - 0.3))
+    g.gain.linearRampToValueAtTime(peak, at + 0.4)
+    g.gain.setValueAtTime(peak, at + Math.max(0.4, durS - 0.3))
     g.gain.linearRampToValueAtTime(0.0001, at + durS)
     stopAt = at + durS + 0.1
     o.connect(g)
     g.connect(padFilter)
+  } else if (note.voice === 'box') {
+    // Music box: one oscillator carrying a very light x3 harmonic via
+    // a periodic wave (a second oscillator per box note would push the
+    // creation rate toward the 160/min ceiling), with a ~1.2s tail
+    // that outlasts the note's written duration.
+    o.setPeriodicWave(ctx.createPeriodicWave([0, 1, 0, 0.15], [0, 0, 0, 0]))
+    peak = 0.6 * note.vel
+    g.gain.setValueAtTime(0.0001, at)
+    g.gain.linearRampToValueAtTime(peak, at + 0.005)
+    g.gain.exponentialRampToValueAtTime(0.0001, at + 1.2)
+    stopAt = at + 1.3
+    o.connect(g)
+    g.connect(schedBus)
   } else {
-    peak = note.voice === 'box' ? 0.6 * note.vel : note.voice === 'bass' ? 0.5 * note.vel : 0.3 * note.vel
+    // Bass and sparkle stay plain sine with a duration-bound decay.
+    peak = note.voice === 'bass' ? 0.5 * note.vel : 0.3 * note.vel
     const attack = note.voice === 'bass' ? 0.01 : 0.005
     g.gain.setValueAtTime(0.0001, at)
     g.gain.linearRampToValueAtTime(peak, at + attack)
@@ -120,6 +148,10 @@ function voice(note, at) {
 
 function tick() {
   if (!running || !ctx || !schedBus) return
+  // Gated (muted or music off): schedule nothing. The loop pointer is
+  // left behind on purpose — the advance below jumps it forward on the
+  // first live pass after re-enable, so no backed-up notes burst out.
+  if (gateMuted || !gateMusicOn) return
   // A suspended/interrupted context schedules nothing while its timer
   // keeps firing hidden (M01 guard, same as planPhrases).
   if (ctx.state !== undefined && ctx.state !== 'running') return
@@ -198,11 +230,14 @@ function stop(fadeS = 0.6) {
   }
   if (!ctx || !schedBus) return
   const now = ctx.currentTime
-  // Fade the bus with the M01 pattern, then silence every voice.
+  // Fade the bus with the M01 pattern, then silence every voice and
+  // disconnect the per-start pad filter (round-1 review: every start()
+  // built a filter that stop() never released).
   schedBus.gain.cancelScheduledValues(now)
   schedBus.gain.setValueAtTime(schedBus.gain.value, now)
   schedBus.gain.linearRampToValueAtTime(0, now + fadeS)
   const live = active.splice(0, active.length)
+  const filter = padFilter
   setTimeout(() => {
     for (const entry of live) {
       try {
@@ -216,10 +251,18 @@ function stop(fadeS = 0.6) {
         /* already disconnected */
       }
     }
+    if (filter) {
+      try {
+        filter.disconnect()
+      } catch {
+        /* already disconnected */
+      }
+      if (padFilter === filter) padFilter = null
+    }
   }, fadeS * 1000 + 50)
 }
 
-export const music = { attach, start, stop, setBrightness, tick }
+export const music = { attach, start, stop, setBrightness, setGate, tick }
 
 export const __test__ = {
   tick,
@@ -242,6 +285,8 @@ export const __test__ = {
     notes = []
     nextIdx = 0
     brightness = BRIGHTNESS.half
+    gateMuted = false
+    gateMusicOn = true
     created = 0
     active.length = 0
   },
@@ -251,6 +296,7 @@ export const __test__ = {
     timer: timer !== null,
     activeCount: active.length,
     created,
+    gated: gateMuted || !gateMusicOn,
     schedBusGain: schedBus ? schedBus.gain.value : null,
     padFilterCutoff: padFilter ? padFilter.frequency.value : null,
   }),

@@ -64,6 +64,7 @@ export function composeLoop(seed, arrangement = 'play') {
   // A-section melody walks in small steps (a lullaby should sing, not
   // jump); the B-section (bars 8-15) is allowed wider leaps.
   let degree = 2 // start on A, the middle of the pentatonic
+  let lastSparkleBar = -2 // sparkle gap rule: never two adjacent bars
   for (let bar = 0; bar < BARS; bar++) {
     const chord = CHORDS[bar % 4]
     const t0 = bar * BEATS_PER_BAR
@@ -118,9 +119,12 @@ export function composeLoop(seed, arrangement = 'play') {
       })
     }
     // Sparkle: a high pentatonic glint on beat 3. Play sprinkles it
-    // (35% of bars); moonrise lights every bar; menu has none.
+    // (35% of bars) but never in two adjacent bars — the plan caps it
+    // at one per two bars. Moonrise lights every bar (M04 decides
+    // whether to keep that); menu has none.
     const sparkleChance = isMoonrise ? 1 : isMenu ? 0 : 0.35
-    if (rand() < sparkleChance) {
+    if (rand() < sparkleChance && bar - lastSparkleBar >= 2) {
+      lastSparkleBar = bar
       let d = Math.floor(rand() * 5)
       if (!allowed.includes(d)) d = allowed[0]
       notes.push({

@@ -63,6 +63,9 @@ function ensureCtx() {
   musicGain.connect(master)
   // M03: the lullaby scheduler feeds the M02 bus from here on.
   music.attach(ctx, musicGain)
+  // Sync the scheduler gate: toggles before the first gesture only
+  // recorded flags, so the gate must catch up now.
+  music.setGate({ muted, musicOn })
   // 0.6s of smoothed white noise, reused by every percussive voice.
   const len = Math.floor(ctx.sampleRate * 0.6)
   noiseBuf = ctx.createBuffer(1, len, ctx.sampleRate)
@@ -152,6 +155,10 @@ export function restoreAudio() {
 
 export function setMuted(m) {
   muted = m
+  // Round-1 review (M03): the lullaby scheduler must not create
+  // oscillators while muted — the gate lives in music.js, sound.js
+  // owns both flags and pushes them there.
+  music.setGate({ muted, musicOn })
   if (master && ctx) master.gain.setTargetAtTime(m ? 0 : 1, ctx.currentTime, 0.02)
   if (!m) startPendingVoices()
 }
@@ -162,6 +169,7 @@ export function setMuted(m) {
 // builds the bus from these flags when the first gesture creates it.
 export function setMusicOn(on) {
   musicOn = on
+  music.setGate({ muted, musicOn })
   if (musicGain && ctx) musicGain.gain.setTargetAtTime(on ? musicVolume : 0, ctx.currentTime, 0.03)
 }
 

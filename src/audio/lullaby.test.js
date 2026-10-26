@@ -79,6 +79,21 @@ describe('lullaby composition (M03)', () => {
     expect(diff / len).toBeGreaterThanOrEqual(0.2)
   })
 
+  it('sparkle gap (round-1 review): never in adjacent bars, for play and menu across seeds', () => {
+    for (const arrangement of ['play', 'menu']) {
+      for (let seed = 1; seed <= 14; seed++) {
+        const notes = composeLoop(seed, arrangement)
+        const bars = notes
+          .filter((n) => n.voice === 'sparkle')
+          .map((n) => Math.floor(n.t / BEATS_PER_BAR))
+          .sort((a, b) => a - b)
+        for (let i = 1; i < bars.length; i++) {
+          expect(bars[i] - bars[i - 1]).toBeGreaterThanOrEqual(2)
+        }
+      }
+    }
+  })
+
   it('melody density is 25-60 notes/min and the longest melody silence is <= 4s', () => {
     for (const arrangement of ['play', 'menu', 'moonrise']) {
       for (let seed = 1; seed <= 5; seed++) {

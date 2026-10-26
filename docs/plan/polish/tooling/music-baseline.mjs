@@ -28,6 +28,7 @@ class MockParam {
 class MockNode {
   constructor() {
     this.stoppedAt = null
+    this.type = ''
   }
   connect() {}
   disconnect() {}
@@ -37,6 +38,7 @@ class MockNode {
   stop(at) {
     this.stoppedAt = at
   }
+  setPeriodicWave() {}
 }
 class MockCtx {
   constructor() {
@@ -59,6 +61,9 @@ class MockCtx {
     const f = new MockNode()
     f.frequency = new MockParam(2400)
     return f
+  }
+  createPeriodicWave(real, imag) {
+    return { real, imag }
   }
 }
 

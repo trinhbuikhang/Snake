@@ -13,12 +13,12 @@ class MockParam {
   setValueAtTime(v) {
     this.value = v
   }
-  linearRampToValueAtTime(v) {
-    this.ramps.push(v)
+  linearRampToValueAtTime(v, t) {
+    this.ramps.push({ v, t })
     this.value = v
   }
-  exponentialRampToValueAtTime(v) {
-    this.ramps.push(v)
+  exponentialRampToValueAtTime(v, t) {
+    this.ramps.push({ v, t })
     this.value = v
   }
   setTargetAtTime(v) {
@@ -36,6 +36,8 @@ class MockNode {
     this.disconnected = false
     this.startedAt = null
     this.stoppedAt = null
+    this.type = ''
+    this.periodicWave = null
   }
   connect(target) {
     this.connectedTo.push(target)
@@ -48,6 +50,9 @@ class MockNode {
   }
   stop(at) {
     this.stoppedAt = at
+  }
+  setPeriodicWave(wave) {
+    this.periodicWave = wave
   }
 }
 
@@ -77,6 +82,9 @@ class MockCtx {
     f.frequency = new MockParam(2400)
     this.filters.push(f)
     return f
+  }
+  createPeriodicWave(real, imag) {
+    return { real, imag }
   }
 }
 
@@ -158,13 +166,18 @@ describe('music scheduler (M03)', () => {
     const { fake } = setup()
     music.start('play', 1)
     const filter = fake.filters[0]
-    expect(filter.frequency.value).toBe(2400) // half, the default
+    expect(filter.frequency.value).toBe(700) // half, the default
     music.setBrightness('full')
-    expect(filter.frequency.targets).toContain(4200)
+    expect(filter.frequency.targets).toContain(900)
     music.setBrightness('new')
-    expect(filter.frequency.targets).toContain(1200)
+    expect(filter.frequency.targets).toContain(500)
     music.setBrightness('bogus-phase')
-    expect(filter.frequency.targets).toContain(2400)
+    expect(filter.frequency.targets).toContain(700)
+    // Every phase stays at or under the 900 Hz spec cap.
+    for (const phase of ['new', 'crescent', 'half', 'gibbous', 'full']) {
+      music.setBrightness(phase)
+      expect(__test__.state().padFilterCutoff).toBeLessThanOrEqual(900)
+    }
   })
 
   it('one scheduler tick costs <= 0.5ms (p95 over 1000 ticks)', () => {
@@ -198,5 +211,55 @@ describe('music scheduler (M03)', () => {
     const schedBus = fake.gains.find((g) => g.gain.value === 0.25)
     expect(schedBus).toBeDefined()
     expect(schedBus.gain.cancelled).toBe(true)
+  })
+
+  it('timbre (round-1 review): pad is triangle with >=0.4s attack, box carries a light x3 harmonic with a ~1.2s tail', () => {
+    const { fake } = setup()
+    music.start('play', 1)
+    const pad = __test__.voice({ t: 0, dur: 3, midi: 53, voice: 'pad', vel: 0.5 }, 10)
+    expect(pad.osc.type).toBe('triangle')
+    const padAttack = pad.gain.gain.ramps.find((r) => r.v > 0)
+    expect(padAttack.t - 10).toBeGreaterThanOrEqual(0.4)
+    const box = __test__.voice({ t: 0, dur: 0.9, midi: 65, voice: 'box', vel: 0.8 }, 20)
+    expect(box.osc.periodicWave.real[1]).toBe(1) // fundamental
+    expect(box.osc.periodicWave.real[3]).toBe(0.15) // very light x3
+    const tail = box.gain.gain.ramps[box.gain.gain.ramps.length - 1]
+    expect(Math.abs(tail.t - 20 - 1.2)).toBeLessThan(0.01)
+    expect(box.osc.stoppedAt).toBe(21.3)
+    void fake
+  })
+
+  it('gate (round-1 review): muted or music-off schedules 0 oscillators; re-enable resumes from now with no burst', () => {
+    const { fake } = setup()
+    music.start('play', 1)
+    for (const gate of [{ muted: true }, { musicOn: false }]) {
+      const before = fake.oscillators.length
+      music.setGate(gate)
+      for (let i = 0; i < 150; i++) {
+        fake.currentTime += 0.2
+        __test__.tick()
+      }
+      expect(fake.oscillators.length).toBe(before) // 30 simulated seconds, nothing
+      const resumeAt = fake.currentTime
+      music.setGate({ muted: false, musicOn: true })
+      for (let i = 0; i < 10; i++) {
+        fake.currentTime += 0.2
+        __test__.tick()
+      }
+      const fresh = fake.oscillators.slice(before)
+      expect(fresh.every((o) => o.startedAt >= resumeAt)).toBe(true) // no past notes
+      expect(fresh.length).toBeLessThanOrEqual(10) // no burst
+    }
+  })
+
+  it('filter leak (round-1 review): 5 start/stop cycles leave at most 1 filter connected', () => {
+    const { fake } = setup()
+    for (let i = 0; i < 5; i++) {
+      music.start('play', 1)
+      music.stop(0.1)
+      vi.advanceTimersByTime(200) // past the 100ms fade + 50ms teardown
+    }
+    expect(fake.filters.length).toBe(5)
+    expect(fake.filters.filter((f) => !f.disconnected).length).toBeLessThanOrEqual(1)
   })
 })
