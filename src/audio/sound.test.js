@@ -93,23 +93,33 @@ class MockParam {
     this.targets = []
     this.ramps = []
     this.cancelled = false
+    // Round-2 regression: the order automation methods run in. A plain
+    // mock cannot model the AudioParam timeline, but the bug was
+    // exactly an ordering bug (setTarget inserted before an existing
+    // ramp), so pinning the call order pins the fix.
+    this.calls = []
   }
   setValueAtTime(v) {
     this.value = v
+    this.calls.push('set')
   }
   linearRampToValueAtTime(v, t) {
     this.value = v
     this.ramps.push([v, t])
+    this.calls.push('ramp')
   }
   exponentialRampToValueAtTime(v) {
     this.value = v
+    this.calls.push('expramp')
   }
   setTargetAtTime(v) {
     this.targets.push(v)
     this.value = v
+    this.calls.push('target')
   }
   cancelScheduledValues() {
     this.cancelled = true
+    this.calls.push('cancel')
   }
 }
 
@@ -408,7 +418,7 @@ describe('M01 unlock lifecycle (sound.js)', () => {
     expect(masterGain.ramps).toEqual([[0, 10.2]])
     suspendAudio()
     expect(fake.suspend).not.toHaveBeenCalled()
-    vi.advanceTimersByTime(199)
+    vi.advanceTimersByTime(249)
     expect(fake.suspend).not.toHaveBeenCalled()
     vi.advanceTimersByTime(1)
     expect(fake.suspend).toHaveBeenCalledTimes(1)
@@ -440,6 +450,25 @@ describe('M01 unlock lifecycle (sound.js)', () => {
     expect(masterGain.ramps).toEqual([[0, 5.2]])
     restoreAudio()
     expect(masterGain.targets).toContain(1)
+  })
+
+  it('restoreAudio cancels scheduled automation before restoring (round-2 regression)', () => {
+    const fake = trackedCtx(5)
+    __test__.mockCtx(fake)
+    const masterGain = fake.created.gains[0].gain
+    fadeOutAudio() // schedules cancel, set, ramp-to-0
+    restoreAudio() // must cancel that ramp BEFORE setting the target,
+    // or the ramp wins at its end time and the bus sticks at 0.
+    expect(masterGain.calls).toEqual(['cancel', 'set', 'ramp', 'cancel', 'set', 'target'])
+  })
+
+  it('unlockAudio during a fade cancels the ramp before restoring', () => {
+    const fake = trackedCtx(5) // running: no resume, just the gain path
+    __test__.mockCtx(fake)
+    const masterGain = fake.created.gains[0].gain
+    fadeOutAudio()
+    unlockAudio() // a gesture landing mid-fade hit the same bug
+    expect(masterGain.calls).toEqual(['cancel', 'set', 'ramp', 'cancel', 'set', 'target'])
   })
 
   it('planPhrases schedules nothing while suspended, resumes when running', () => {

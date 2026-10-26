@@ -84,9 +84,25 @@ export function unlockAudio() {
   if (c && (c.state === 'suspended' || c.state === 'interrupted')) c.resume().catch(() => {})
   // A hide-fade may have ramped the master bus to 0; restore it so the
   // resumed context is actually audible. No-op when already at 1.
-  if (c && master) master.gain.setTargetAtTime(muted ? 0 : 1, c.currentTime, 0.05)
+  resetMasterGain()
   unlocked = true
   startPendingVoices()
+}
+
+// Round-2 review: cancel any scheduled automation BEFORE setting the
+// restore target. A setTarget inserted before an existing linearRamp
+// loses to the ramp at its end time — on rapid hide→show the fade's
+// ramp pulled the bus back to 0 after the restore and held it there,
+// while the context stayed 'running' (so no activation listener was left
+// to rescue it). fadeOutAudio already follows this pattern; the restore
+// paths must too. Creates nothing: callers that must not create a
+// context (visible before the first gesture) use restoreAudio below.
+function resetMasterGain() {
+  if (!ctx || !master) return
+  const t = ctx.currentTime
+  master.gain.cancelScheduledValues(t)
+  master.gain.setValueAtTime(master.gain.value, t)
+  master.gain.setTargetAtTime(muted ? 0 : 1, t, 0.05)
 }
 
 // M01 hide path, as two reducer actions: fade the master bus to silence
@@ -101,10 +117,13 @@ export function fadeOutAudio() {
 
 export function suspendAudio() {
   if (!ctx || suspendTimer) return
+  // Round-2 review note: 250ms, not exactly 200ms — the fade lands at
+  // 200ms, and suspending a hair later guarantees the bus is fully
+  // silent first (one probe caught a suspend with gain still at 0.013).
   suspendTimer = setTimeout(() => {
     suspendTimer = null
     if (ctx) ctx.suspend().catch(() => {})
-  }, 200)
+  }, 250)
 }
 
 export function cancelPendingSuspend() {
@@ -120,8 +139,7 @@ export function cancelPendingSuspend() {
 // restoreAudio is a no-op with no context, so it is safe to call on
 // every visible/pageshow.
 export function restoreAudio() {
-  if (!ctx || !master) return
-  master.gain.setTargetAtTime(muted ? 0 : 1, ctx.currentTime, 0.05)
+  resetMasterGain()
 }
 
 export function setMuted(m) {
