@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { __test__, unlockAudio, fadeOutAudio, suspendAudio, restoreAudio, setMuted, setPadOn, setWaterOn, setAmbientOn } from './sound.js'
+import { __test__, unlockAudio, fadeOutAudio, suspendAudio, restoreAudio, setMuted, setMusicOn, setMusicVolume, setPadOn, setWaterOn, setAmbientOn } from './sound.js'
 
 // Minimal mock AudioContext: records every oscillator start time so a
 // test can see exactly what one planning pass scheduled. Gain/filter
@@ -133,7 +133,10 @@ function trackedCtx(now = 0) {
       {
         disconnected: false,
         stopped: false,
-        connect() {},
+        connectedTo: null,
+        connect(target) {
+          this.connectedTo = target
+        },
         disconnect() {
           this.disconnected = true
         },
@@ -209,11 +212,11 @@ describe('voice toggles (AUDIT L5)', () => {
   it('rapid ambient on/off/on disconnects the first voice and keeps the second live', () => {
     const fake = boot(0)
     setAmbientOn(true)
-    const gen1Gain = fake.created.gains[1] // gains[0] is the master bus
+    const gen1Gain = fake.created.gains[2] // [0] master, [1] music bus, [2] voice gain
     const gen1Filter = fake.created.filters[0]
     setAmbientOn(false)
     setAmbientOn(true) // 0ms later — deep inside the 1600ms teardown window
-    const gen2Gain = fake.created.gains[2]
+    const gen2Gain = fake.created.gains[3]
     const gen2Filter = fake.created.filters[1]
     expect(gen2Gain).toBeDefined()
     vi.advanceTimersByTime(2000)
@@ -252,7 +255,7 @@ describe('voice toggles (AUDIT L5)', () => {
   it('rapid water on/off/on restarts the voice instead of reviving the fading one', () => {
     const fake = boot(0)
     setWaterOn(true)
-    const gen1Gain = fake.created.gains[1] // [0] master, [1] water gain
+    const gen1Gain = fake.created.gains[2] // [0] master, [1] music bus, [2] water gain
     const gen1Src = fake.created.sources[0]
     setWaterOn(false)
     setWaterOn(true) // inside the 1500ms teardown window
@@ -274,7 +277,7 @@ describe('voice toggles (AUDIT L5)', () => {
     const fake = boot(5)
     expect(__test__.state().ambientTimer).not.toBe(null)
     expect(fake.created.filters.length).toBe(1)
-    expect(__test__.state().ambientGain).toBe(fake.created.gains[1])
+    expect(__test__.state().ambientGain).toBe(fake.created.gains[2])
   })
 
   it('enabling voices while muted creates no oscillators; they start on unmute', () => {
@@ -496,5 +499,60 @@ describe('M01 unlock lifecycle (sound.js)', () => {
     fake.state = 'running'
     vi.advanceTimersByTime(2600)
     expect(fake.created.oscillators.length).toBeGreaterThan(lfoCount)
+  })
+})
+
+// ---- M02: music bus (musicGain child of master) -----------------------
+describe('M02 music bus (sound.js)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    __test__.reset()
+  })
+
+  afterEach(() => {
+    setPadOn(false)
+    setAmbientOn(false)
+    setWaterOn(false)
+    __test__.reset()
+    vi.clearAllTimers()
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
+  it('musicGain gets the volume when on, 0 when off', () => {
+    const fake = trackedCtx(0)
+    __test__.mockCtx(fake)
+    const bus = __test__.state().musicGain
+    expect(bus).toBe(fake.created.gains[1]) // [0] master, [1] music bus
+    expect(bus.gain.value).toBe(0.6) // default volume, music on
+    setMusicVolume(0.8)
+    expect(bus.gain.targets).toContain(0.8)
+    setMusicOn(false)
+    expect(bus.gain.targets).toContain(0)
+    setMusicOn(true)
+    expect(bus.gain.targets).toContain(0.8)
+  })
+
+  it('volume changes create no new nodes', () => {
+    const fake = trackedCtx(0)
+    __test__.mockCtx(fake)
+    const before = fake.created.gains.length
+    for (let i = 0; i < 10; i++) setMusicVolume(i / 10)
+    expect(fake.created.gains.length).toBe(before)
+  })
+
+  it('pad, ambient and water route through the music bus, not master', () => {
+    const fake = trackedCtx(0)
+    __test__.mockCtx(fake)
+    const bus = __test__.state().musicGain
+    setPadOn(true)
+    const padGain = fake.created.gains.find((g) => g !== bus && g.connectedTo === bus)
+    expect(padGain).toBeDefined()
+    setAmbientOn(true)
+    const ambientGain = __test__.state().ambientGain
+    expect(ambientGain.connectedTo).toBe(bus)
+    setWaterOn(true)
+    const waterGain = fake.created.gains.find((g) => g.connectedTo === bus && g !== padGain && g !== ambientGain)
+    expect(waterGain).toBeDefined()
   })
 })

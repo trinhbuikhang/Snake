@@ -19,6 +19,7 @@ import {
 export const BEST_KEY = 'ran-xinh-best' // legacy single best, migrated into BESTS_KEY
 export const BESTS_KEY = 'ran-xinh-bests'
 export const MUTE_KEY = 'ran-xinh-muted'
+export const MUSIC_KEY = 'ran-xinh-music' // { on, volume } — M02 music toggle + volume
 export const CAM_KEY = 'ran-xinh-cam'
 export const CTRLS_KEY = 'ran-xinh-ctrls'
 export const MOON_KEY = 'ran-xinh-moon'
@@ -107,6 +108,22 @@ export const readBests = () => {
   return fresh
 }
 export const readMuted = () => readItem(MUTE_KEY) === '1'
+// M02: music toggle + volume, persisted as one JSON object. Corrupt or
+// missing fields fall back per-field to the defaults, never to a crash.
+export const readMusic = () => {
+  const defaults = { on: true, volume: 0.6 }
+  try {
+    const parsed = JSON.parse(readItem(MUSIC_KEY) || 'null')
+    if (!parsed || typeof parsed !== 'object') return defaults
+    const volume =
+      typeof parsed.volume === 'number' && Number.isFinite(parsed.volume)
+        ? Math.round(Math.min(1, Math.max(0, parsed.volume)) * 10) / 10
+        : defaults.volume
+    return { on: typeof parsed.on === 'boolean' ? parsed.on : defaults.on, volume }
+  } catch {
+    return defaults
+  }
+}
 const CAM_MODES = ['aligned', 'topdown', 'cinematic']
 export const readCam = () => {
   const v = readItem(CAM_KEY)
@@ -400,6 +417,7 @@ export const useGame = create((set, get) => ({
   best: 0,
   isNewBest: false,
   muted: false,
+  music: { on: true, volume: 0.6 },
 
   // Responsive UI feedback
   currentDir: 'right',
@@ -521,6 +539,7 @@ export const useGame = create((set, get) => ({
       bests,
       best: bests[gameMode] || 0,
       muted: readMuted(),
+      music: readMusic(),
       cameraMode: readCam(),
       showControls: readCtrls(),
       moonPhase: readMoon(),
@@ -1118,5 +1137,21 @@ export const useGame = create((set, get) => ({
   setMuted(m) {
     set({ muted: m })
     writeItem(MUTE_KEY, m ? '1' : '0')
+  },
+
+  // M02: the engine subscription mirrors these into sound.js (the same
+  // bridge setMuted uses), so the store stays the single source of
+  // truth and the audio module never reads localStorage itself.
+  setMusicOn(on) {
+    const music = { ...get().music, on }
+    set({ music })
+    writeItem(MUSIC_KEY, JSON.stringify(music))
+  },
+
+  setMusicVolume(v) {
+    const volume = Math.round(Math.min(1, Math.max(0, v)) * 10) / 10
+    const music = { ...get().music, volume }
+    set({ music })
+    writeItem(MUSIC_KEY, JSON.stringify(music))
   },
 }))
