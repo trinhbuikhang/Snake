@@ -113,6 +113,17 @@ export function cancelPendingSuspend() {
   suspendTimer = null
 }
 
+// M01 review fix: restore the master bus gain WITHOUT creating a
+// context. unlockAudio() cannot serve the visible/pageshow pre-step —
+// it calls ensureCtx, so a visible event before the first gesture would
+// create an AudioContext, breaking the no-create-before-gesture rule.
+// restoreAudio is a no-op with no context, so it is safe to call on
+// every visible/pageshow.
+export function restoreAudio() {
+  if (!ctx || !master) return
+  master.gain.setTargetAtTime(muted ? 0 : 1, ctx.currentTime, 0.05)
+}
+
 export function setMuted(m) {
   muted = m
   if (master && ctx) master.gain.setTargetAtTime(m ? 0 : 1, ctx.currentTime, 0.02)

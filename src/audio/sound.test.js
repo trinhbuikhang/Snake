@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { __test__, unlockAudio, fadeOutAudio, suspendAudio, setMuted, setPadOn, setWaterOn, setAmbientOn } from './sound.js'
+import { __test__, unlockAudio, fadeOutAudio, suspendAudio, restoreAudio, setMuted, setPadOn, setWaterOn, setAmbientOn } from './sound.js'
 
 // Minimal mock AudioContext: records every oscillator start time so a
 // test can see exactly what one planning pass scheduled. Gain/filter
@@ -428,6 +428,18 @@ describe('M01 unlock lifecycle (sound.js)', () => {
     unlockAudio() // the returning gesture wins over the pending suspend
     vi.advanceTimersByTime(500)
     expect(fake.suspend).not.toHaveBeenCalled()
+  })
+
+  it('restoreAudio restores the bus gain without creating a context', () => {
+    // No context at all: a no-op, never a creation.
+    expect(() => restoreAudio()).not.toThrow()
+    const fake = trackedCtx(5)
+    __test__.mockCtx(fake)
+    const masterGain = fake.created.gains[0].gain
+    fadeOutAudio()
+    expect(masterGain.ramps).toEqual([[0, 5.2]])
+    restoreAudio()
+    expect(masterGain.targets).toContain(1)
   })
 
   it('planPhrases schedules nothing while suspended, resumes when running', () => {
