@@ -43,6 +43,8 @@
   --z-chrome: 10;
   --z-dpad: 15;
   --z-sheet: 30;
+  /* V04: corner buttons above every sheet, below the moonrise coda (40). */
+  --z-chrome-actions: 35;
 
   /* HUD layout tokens (H01) — MUST equal HUD in src/game/hudLayout.js
      (hudLayout.test.js asserts this); the camera fit reads the same
@@ -241,6 +243,16 @@ body {
   gap: 14px;
 }
 
+/* V04: at wider widths the title-menu wrapper vanishes from layout so
+   the 3 secondary title buttons flow in .actions exactly as before. */
+.title-menu {
+  display: contents;
+}
+
+.btn-label--short {
+  display: none;
+}
+
 .best-note {
   margin: 1.5rem 0 0;
   font-size: 0.9rem;
@@ -320,7 +332,7 @@ body {
   right: max(14px, env(safe-area-inset-right, 0px));
   display: flex;
   gap: 10px;
-  z-index: var(--z-chrome);
+  z-index: var(--z-chrome-actions);
 }
 
 .icon-btn {
@@ -817,6 +829,56 @@ kbd {
   .sheet-actions .btn { flex: 1 1 42%; min-width: 140px; }
   .btn-boost { width: 56px; height: 56px; }
   .dbtn { width: 52px; height: 52px; }
+}
+
+/* ---------------- V04: narrow sheets + compact title ----------------
+   Narrow sheets reserve the corner-button row at the top so the
+   .chrome-actions trio (z 35, above sheets) never covers sheet
+   content. The compact title turns the 3 secondary actions into one
+   pill row and tightens the lockup's vertical rhythm so 390×844 needs
+   no scroll — no content is removed, only spacing and the secondary
+   labels (short labels show only in the compact row). */
+@media (max-width: 559px) {
+  .sheet {
+    padding-top: calc(max(14px, env(safe-area-inset-top, 0px)) + 44px + 8px);
+  }
+  .lockup .actions { gap: 10px; }
+  .title-menu {
+    display: flex;
+    gap: 10px;
+    width: 100%;
+  }
+  .actions .title-menu .btn {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+    padding: 0.7rem 0.5rem;
+  }
+  .btn-label--full { display: none; }
+  .btn-label--short { display: inline; }
+  .lockup .overline { margin-bottom: 0.35rem; }
+  .lockup .tagline { margin-top: 0.5rem; }
+  .lockup .rule { margin: 0.8rem auto 0.9rem; }
+  .lockup .title-wallet { margin: 0.25rem 0 0.5rem; }
+  .lockup .journey-bar { margin-bottom: 0.5rem; }
+  .lockup .journey-bar__label { margin-top: 0.25rem; }
+  .lockup .mode-picker { margin-top: 0.7rem; }
+  .lockup .moon-picker { margin-top: 0.8rem; }
+  .lockup .tonight-note { margin-top: 0.5rem; }
+  .lockup .community-sky { margin-top: 0.35rem; }
+  .lockup .journal-link { margin-top: 0.5rem; }
+}
+
+/* V04: Pause actions at 375px stack full-width so no label wraps to a
+   second line (each button stays one line, ≥ 44px). Scoped to the
+   Paused sheet only — game-over keeps its wrapping row. */
+@media (max-width: 480px) {
+  .sheet[aria-label="Paused"] .sheet-actions { flex-direction: column; }
+  .sheet[aria-label="Paused"] .sheet-actions .btn {
+    flex: none;
+    width: 100%;
+    min-width: 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
