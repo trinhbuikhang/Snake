@@ -729,3 +729,24 @@ describe('Dash held through the ready beat (C03)', () => {
     engine.destroy()
   })
 })
+
+describe('frame() negative-dt guard (dt-hang fix)', () => {
+  it('a first-frame timestamp earlier than start() paints with dt 0 instead of hanging', () => {
+    const engine = createEngine(freshCanvas(), { reduced: false })
+    engine.start()
+    // The race the bug report measured: the first rAF timestamp can
+    // arrive ~185–236 ms BEFORE start()'s performance.now(), so the
+    // frame's rawDt is negative. Unclamped, that dt drove yawAlpha
+    // hugely negative and hung paint()'s 2π wrap loop.
+    const entries = [...h.raf.entries()]
+    const [id, cb] = entries[entries.length - 1]
+    h.raf.delete(id)
+    cb(performance.now() - 5000)
+    const calls = h.rig.paint.mock.calls
+    expect(calls.length).toBeGreaterThan(0)
+    // paintParams is shared across frames, so the last call carries
+    // this frame's dt. Reverting the clamp makes this -5, failing here.
+    expect(calls[calls.length - 1][0].dt).toBe(0)
+    engine.destroy()
+  })
+})
