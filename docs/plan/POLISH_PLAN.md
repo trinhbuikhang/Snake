@@ -320,6 +320,7 @@ Khoá bằng test cái đang đúng (hàng đợi rẽ, độ trễ ≤ 1 tick) 
 ## M01 — Mở khoá iOS/Teams + vòng đời AudioContext
 
 - [x] **M01** · Mức: **Cao** · Branch: `feat/m01-audio-unlock-lifecycle`
+- [x] **M02** · Mức: **Cao** · Branch: `feat/m02-music-toggle-volume`
 
 **Vấn đề**
 - Unlock ở `touchstart` (không phải activation trên WebKit), không xử lý `'interrupted'`, không suspend/resume theo `visibilitychange`/`pagehide`/`pageshow` (xem "Hiện trạng M").

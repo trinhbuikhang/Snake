@@ -932,6 +932,11 @@ export function createEngine(canvas, { reduced } = {}) {
       if (s.status === 'playing' && prev.status === 'ready' && boostHeld) setBoost(true)
     }
     if (s.muted !== prev.muted) audio.setMuted(s.muted)
+    // M02: same bridge for the music toggle + volume.
+    if (s.music !== prev.music) {
+      audio.setMusicOn(s.music.on)
+      audio.setMusicVolume(s.music.volume)
+    }
     if (s.cameraMode !== prev.cameraMode || s.showControls !== prev.showControls) updateCameraTarget()
     // V03: the portrait reframe keys off the coach holding the camera —
     // on the first night that includes every screen before the card
@@ -949,6 +954,8 @@ export function createEngine(canvas, { reduced } = {}) {
 
   const initialStore = useGame.getState()
   audio.setMuted(initialStore.muted)
+  audio.setMusicOn(initialStore.music.on)
+  audio.setMusicVolume(initialStore.music.volume)
 
   // ---- camera calculation ----------------------------------------------------
   function updateCameraTarget() {

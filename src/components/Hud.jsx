@@ -37,6 +37,14 @@ const icons = {
       <path d="M19 6a8 8 0 0 1 0 12" />
     </svg>
   ),
+  // M02: music note for the Pause-sheet music pill.
+  music: (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M9 18V5l12-2v13" />
+      <circle cx="6" cy="18" r="3" />
+      <circle cx="18" cy="16" r="3" />
+    </svg>
+  ),
   pause: (
     <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <rect x="6" y="5" width="4" height="14" rx="1.4" />
@@ -1332,6 +1340,9 @@ function PlayingHud() {
 function SettingsToggles({ labelled = false }) {
   const muted = useGame((s) => s.muted)
   const setMuted = useGame((s) => s.setMuted)
+  const music = useGame((s) => s.music)
+  const setMusicOn = useGame((s) => s.setMusicOn)
+  const setMusicVolume = useGame((s) => s.setMusicVolume)
   const cameraMode = useGame((s) => s.cameraMode)
   const toggleCameraMode = useGame((s) => s.toggleCameraMode)
   const showControls = useGame((s) => s.showControls)
@@ -1374,6 +1385,37 @@ function SettingsToggles({ labelled = false }) {
         {labelled ? (muted ? icons.mute : icons.unmute) : muted ? icons.unmute : icons.mute}
         {labelled && <span>{muted ? 'Sound off' : 'Sound on'}</span>}
       </button>
+
+      {/* M02: Pause sheet only (labelled) — the corner icon row keeps
+          just camera / touch pad / sound. The slider shows only while
+          music is on and sound is on; otherwise it would be a dead
+          control (off music or muted master both silence the bus). */}
+      {labelled && (
+        <button
+          type="button"
+          className={`${cls}${music.on ? ` ${cls}--active` : ''}`}
+          aria-label={music.on ? 'Turn music off' : 'Turn music on'}
+          title="Music"
+          aria-pressed={music.on}
+          onClick={() => setMusicOn(!music.on)}
+        >
+          {icons.music}
+          <span>{music.on ? 'Music on' : 'Music off'}</span>
+        </button>
+      )}
+      {labelled && music.on && !muted && (
+        <div className="music-volume">
+          <input
+            type="range"
+            aria-label="Music volume"
+            min={0}
+            max={100}
+            step={10}
+            value={Math.round(music.volume * 100)}
+            onChange={(e) => setMusicVolume(Number(e.target.value) / 100)}
+          />
+        </div>
+      )}
     </>
   )
 }

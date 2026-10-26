@@ -167,6 +167,8 @@ vi.mock('../audio/sound.js', () => {
   const audio = {
     unlockAudio: vi.fn(),
     setMuted: vi.fn(),
+    setMusicOn: vi.fn(),
+    setMusicVolume: vi.fn(),
     playEat: vi.fn(),
     playBloom: vi.fn(),
     playVerse: vi.fn(),

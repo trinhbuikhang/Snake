@@ -293,3 +293,44 @@ describe('V03 first-night camera hold on real store state', () => {
     expect(changes).toBe(1)
   })
 })
+
+describe('music toggle + volume (M02)', () => {
+  it('defaults to on at 0.6 on a fresh profile', () => {
+    expect(useGame.getState().music).toEqual({ on: true, volume: 0.6 })
+  })
+
+  it('reads persisted music, and falls back per-field on bad JSON', () => {
+    localStorage.setItem('ran-xinh-music', JSON.stringify({ on: false, volume: 0.8 }))
+    useGame.getState().hydrate()
+    expect(useGame.getState().music).toEqual({ on: false, volume: 0.8 })
+    localStorage.setItem('ran-xinh-music', '{not json')
+    useGame.getState().hydrate()
+    expect(useGame.getState().music).toEqual({ on: true, volume: 0.6 })
+    localStorage.setItem('ran-xinh-music', JSON.stringify({ on: 'yes', volume: 2 }))
+    useGame.getState().hydrate()
+    expect(useGame.getState().music).toEqual({ on: true, volume: 1 })
+  })
+
+  it('setMusicOn/Volume write the key, clamped and rounded to 0.1', () => {
+    const s = useGame.getState()
+    s.setMusicOn(false)
+    expect(useGame.getState().music.on).toBe(false)
+    expect(JSON.parse(localStorage.getItem('ran-xinh-music')).on).toBe(false)
+    s.setMusicVolume(0.63)
+    expect(useGame.getState().music.volume).toBe(0.6)
+    s.setMusicVolume(1.7)
+    expect(useGame.getState().music.volume).toBe(1)
+    s.setMusicVolume(-0.4)
+    expect(useGame.getState().music.volume).toBe(0)
+    expect(JSON.parse(localStorage.getItem('ran-xinh-music')).volume).toBe(0)
+  })
+
+  it('reload keeps the persisted music (hydrate re-reads the key)', () => {
+    useGame.getState().setMusicOn(false)
+    useGame.getState().setMusicVolume(0.4)
+    useGame.setState(initialState, true) // simulate a reload: pristine state, storage kept
+    expect(useGame.getState().music).toEqual({ on: true, volume: 0.6 })
+    useGame.getState().hydrate()
+    expect(useGame.getState().music).toEqual({ on: false, volume: 0.4 })
+  })
+})

@@ -5,6 +5,13 @@ let ctx = null
 let master = null
 let muted = false
 let unlocked = false
+// M02: the music bus — a child of master carrying every music voice
+// (pad, ambient, water), but NOT the SFX, so turning music off leaves
+// eat/bloom/turn/death sounds audible. Created with master in
+// ensureCtx; volume changes only retarget it, never rebuild it.
+let musicGain = null
+let musicOn = true
+let musicVolume = 0.6
 let suspendTimer = null
 let ctxStateListener = null
 
@@ -53,6 +60,10 @@ function ensureCtx() {
   master = ctx.createGain()
   master.gain.value = muted ? 0 : 1
   master.connect(comp)
+  // M02 bus: created once, here — never on a volume drag.
+  musicGain = ctx.createGain()
+  musicGain.gain.value = musicOn ? musicVolume : 0
+  musicGain.connect(master)
   // 0.6s of smoothed white noise, reused by every percussive voice.
   const len = Math.floor(ctx.sampleRate * 0.6)
   noiseBuf = ctx.createBuffer(1, len, ctx.sampleRate)
@@ -146,6 +157,22 @@ export function setMuted(m) {
   muted = m
   if (master && ctx) master.gain.setTargetAtTime(m ? 0 : 1, ctx.currentTime, 0.02)
   if (!m) startPendingVoices()
+}
+
+// M02: music on/off + volume. Both only retarget the bus (≤0.1s via a
+// 0.03 time constant) — dragging the slider never creates or destroys
+// a node. With no context yet they only record the intent; ensureCtx
+// builds the bus from these flags when the first gesture creates it.
+export function setMusicOn(on) {
+  musicOn = on
+  if (musicGain && ctx) musicGain.gain.setTargetAtTime(on ? musicVolume : 0, ctx.currentTime, 0.03)
+}
+
+export function setMusicVolume(v) {
+  musicVolume = Math.round(Math.min(1, Math.max(0, v)) * 10) / 10
+  if (musicGain && ctx && musicOn) {
+    musicGain.gain.setTargetAtTime(musicVolume, ctx.currentTime, 0.03)
+  }
 }
 
 function pluck(freq, at, vol = 0.5) {
@@ -296,7 +323,7 @@ function startPad() {
   const c = ctx
   padGain = c.createGain()
   padGain.gain.value = 0
-  padGain.connect(master)
+  padGain.connect(musicGain)
   const o1 = c.createOscillator()
   o1.type = 'sine'
   o1.frequency.value = 55
@@ -404,7 +431,7 @@ function startWater() {
   const c = ctx
   const gain = c.createGain()
   gain.gain.value = 0
-  gain.connect(master)
+  gain.connect(musicGain)
   const src = c.createBufferSource()
   src.buffer = noiseBuf
   src.loop = true
@@ -603,7 +630,7 @@ function startAmbient() {
   ambientFilter.type = 'lowpass'
   ambientFilter.frequency.value = ambientPhase.air
   ambientFilter.connect(ambientGain)
-  ambientGain.connect(master)
+  ambientGain.connect(musicGain)
   nextPhraseAt = c.currentTime + 1.4 // first phrase arrives after the fade-in
   ambientTimer = setInterval(planPhrases, 700)
   ambientGain.gain.setTargetAtTime(1, c.currentTime, 1.2)
@@ -645,7 +672,7 @@ export function setAmbientOn(on) {
   if (!ctx || !master || muted) return
   startAmbient()
 }
-export const audio = { unlockAudio, setMuted, playEat, playBloom, playVerse, playTurn, playDeath, setPadOn, setWaterOn, setAmbientOn, setAmbientPhase }
+export const audio = { unlockAudio, setMuted, setMusicOn, setMusicVolume, playEat, playBloom, playVerse, playTurn, playDeath, setPadOn, setWaterOn, setAmbientOn, setAmbientPhase }
 
 // Test seam (T05/T10d): lets unit tests drive the phrase scheduler and the
 // voice toggles against a mock AudioContext and observe what gets
@@ -664,6 +691,9 @@ export const __test__ = {
   mockCtx(fakeCtx) {
     ctx = fakeCtx
     master = fakeCtx.createGain()
+    // M02 bus, created alongside master exactly as ensureCtx does.
+    musicGain = fakeCtx.createGain()
+    musicGain.gain.value = musicOn ? musicVolume : 0
     // startWater refuses without the shared noise buffer (normally built
     // by ensureCtx); a mock buffer object is enough for its source node.
     noiseBuf = fakeCtx.createBuffer ? fakeCtx.createBuffer(1, 10, fakeCtx.sampleRate || 44100) : {}
@@ -678,6 +708,9 @@ export const __test__ = {
     master = null
     muted = false
     unlocked = false
+    musicGain = null
+    musicOn = true
+    musicVolume = 0.6
     padOn = false
     pad = null
     padGain = null
@@ -695,6 +728,9 @@ export const __test__ = {
   },
   state: () => ({
     muted,
+    musicOn,
+    musicVolume,
+    musicGain,
     padOn,
     pad,
     waterOn,
