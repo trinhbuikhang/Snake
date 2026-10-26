@@ -320,7 +320,6 @@ Khoá bằng test cái đang đúng (hàng đợi rẽ, độ trễ ≤ 1 tick) 
 ## M01 — Mở khoá iOS/Teams + vòng đời AudioContext
 
 - [x] **M01** · Mức: **Cao** · Branch: `feat/m01-audio-unlock-lifecycle`
-- [x] **M02** · Mức: **Cao** · Branch: `feat/m02-music-toggle-volume`
 
 **Vấn đề**
 - Unlock ở `touchstart` (không phải activation trên WebKit), không xử lý `'interrupted'`, không suspend/resume theo `visibilitychange`/`pagehide`/`pageshow` (xem "Hiện trạng M").
@@ -339,7 +338,7 @@ Khoá bằng test cái đang đúng (hàng đợi rẽ, độ trễ ≤ 1 tick) 
 
 ## M02 — Music on/off + âm lượng trong sheet Pause
 
-- [ ] **M02** · Mức: **Cao** · Branch: `feat/m02-music-toggle-volume`
+- [x] **M02** · Mức: **Cao** · Branch: `feat/m02-music-toggle-volume`
 
 **Spec** (quyết định M02)
 - `store.js`: slice `music: { on, volume }`, `setMusicOn(on)`, `setMusicVolume(v)` (kẹp 0–1, làm tròn 0.1), đọc/ghi `ran-xinh-music` (JSON lỗi → mặc định `{ on: true, volume: 0.6 }`).
@@ -355,7 +354,7 @@ Khoá bằng test cái đang đúng (hàng đợi rẽ, độ trễ ≤ 1 tick) 
 
 ## M03 — Bản nhạc "Moonlit Garden Lullaby"
 
-- [ ] **M03** · Mức: **Cao** · Branch: `feat/m03-moonlit-lullaby`
+- [x] **M03** · Mức: **Cao** · Branch: `feat/m03-moonlit-lullaby`
 
 **Spec** (quyết định M03)
 - Mới: `src/audio/lullaby.js` — **thuần, không Web Audio**: `composeLoop(seed, arrangement)` → mảng nốt `{ t (beat), dur, midi, voice: 'box'|'pad'|'bass'|'sparkle', vel }` cho 16 ô nhịp 3/4; giai điệu chỉ dùng F G A C D (+ quãng tám), hợp âm F–Dm–B♭–C, biến tấu theo seed (PRNG nhỏ, không `Math.random` trong hàm thuần).

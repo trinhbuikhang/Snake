@@ -1,12 +1,13 @@
-// Fully procedural Web Audio: koto pluck on eat, airy pad while playing,
+// Fully procedural Web Audio: koto pluck on eat, lullaby while playing,
 // bamboo tick on turn, dull thud + water drop on death. No external assets required.
+import { music } from './music.js'
 
 let ctx = null
 let master = null
 let muted = false
 let unlocked = false
 // M02: the music bus — a child of master carrying every music voice
-// (pad, ambient, water), but NOT the SFX, so turning music off leaves
+// (lullaby, water), but NOT the SFX, so turning music off leaves
 // eat/bloom/turn/death sounds audible. Created with master in
 // ensureCtx; volume changes only retarget it, never rebuild it.
 let musicGain = null
@@ -37,10 +38,6 @@ export function setCtxStateListener(cb) {
 export function getCtxState() {
   return ctx ? ctx.state : null
 }
-let padOn = false
-let pad = null
-let padGain = null
-let padLfo = null
 let noiseBuf = null
 let eatStep = 0
 
@@ -64,6 +61,8 @@ function ensureCtx() {
   musicGain = ctx.createGain()
   musicGain.gain.value = musicOn ? musicVolume : 0
   musicGain.connect(master)
+  // M03: the lullaby scheduler feeds the M02 bus from here on.
+  music.attach(ctx, musicGain)
   // 0.6s of smoothed white noise, reused by every percussive voice.
   const len = Math.floor(ctx.sampleRate * 0.6)
   noiseBuf = ctx.createBuffer(1, len, ctx.sampleRate)
@@ -73,14 +72,12 @@ function ensureCtx() {
 }
 
 // A voice enabled while there is no AudioContext yet — or while muted —
-// only records its desired state (the *On flags below). Start it as soon as
+// only records its desired state (the *On flag below). Start it as soon as
 // sound becomes possible: when the context is unlocked, or on unmute.
-// Without this, setAmbientOn(true) before the first user gesture wedged the
+// Without this, setWaterOn(true) before the first user gesture wedged the
 // flag forever (AUDIT L5): the voice never started and later calls no-oped.
 function startPendingVoices() {
   if (!ctx || !master || muted) return
-  if (ambientOn) startAmbient()
-  if (padOn) startPad()
   if (waterOn) startWater()
 }
 
@@ -318,111 +315,9 @@ export function playDeath() {
   tickNoise(t + 0.015, 0.12, 400)
 }
 
-function startPad() {
-  if (pad) return
-  const c = ctx
-  padGain = c.createGain()
-  padGain.gain.value = 0
-  padGain.connect(musicGain)
-  const o1 = c.createOscillator()
-  o1.type = 'sine'
-  o1.frequency.value = 55
-  const o2 = c.createOscillator()
-  o2.type = 'sine'
-  o2.frequency.value = 110.4
-  const o3 = c.createOscillator()
-  o3.type = 'triangle'
-  o3.frequency.value = 219.7
-  const o1g = c.createGain()
-  o1g.gain.value = 0.16
-  const o2g = c.createGain()
-  o2g.gain.value = 0.1
-  const o3g = c.createGain()
-  o3g.gain.value = 0.035
-  const filter = c.createBiquadFilter()
-  filter.type = 'lowpass'
-  filter.frequency.value = 520
-  let noise = null
-  if (noiseBuf) {
-    noise = c.createBufferSource()
-    noise.buffer = noiseBuf
-    noise.loop = true
-    const nf = c.createBiquadFilter()
-    nf.type = 'lowpass'
-    nf.frequency.value = 240
-    const ng = c.createGain()
-    ng.gain.value = 0.05
-    noise.connect(nf)
-    nf.connect(ng)
-    ng.connect(padGain)
-    noise.start()
-  }
-  o1.connect(o1g)
-  o2.connect(o2g)
-  o3.connect(o3g)
-  o1g.connect(filter)
-  o2g.connect(filter)
-  o3g.connect(filter)
-  filter.connect(padGain)
-  o1.start()
-  o2.start()
-  o3.start()
-  padLfo = c.createOscillator()
-  padLfo.frequency.value = 0.08
-  const lfoGain = c.createGain()
-  lfoGain.gain.value = 0
-  padLfo.connect(lfoGain)
-  lfoGain.connect(padGain.gain)
-  padLfo.start()
-  padGain.gain.setTargetAtTime(0.055, c.currentTime, 0.6)
-  lfoGain.gain.setTargetAtTime(0.02, c.currentTime, 0.8)
-  pad = { o1, o2, o3, noise }
-}
-
-function stopPad() {
-  const voices = pad
-  if (!voices) return
-  // Detach the live refs NOW, not when the teardown fires (AUDIT L5): a
-  // re-enable inside the 1.2s window must build a fresh voice below, never
-  // inherit these fading ones and stay silent while the flag says "on".
-  pad = null
-  const gain = padGain
-  const lfo = padLfo
-  padGain = null
-  padLfo = null
-  gain.gain.setTargetAtTime(0, ctx.currentTime, 0.25)
-  // This teardown owns exactly the nodes captured above and always runs —
-  // checking the desired-state flag here is what leaked the old graph.
-  setTimeout(() => {
-    try {
-      voices.o1.stop()
-      voices.o2.stop()
-      voices.o3.stop()
-      if (voices.noise) voices.noise.stop()
-      if (lfo) lfo.stop()
-      gain.disconnect()
-    } catch {
-      /* already stopped or disconnected */
-    }
-  }, 1200)
-}
-
-export function setPadOn(on) {
-  if (on === padOn) return
-  padOn = on
-  if (!on) {
-    if (ctx && master) stopPad()
-    return
-  }
-  // No context yet, or muted: record the intent only — no oscillators are
-  // created (L5). unlockAudio()/setMuted(false) start the voice later.
-  if (!ctx || !master || muted) return
-  startPad()
-}
-
 // P6 "First Light": Silent Night keeps its promise — no music, only water.
 // A soft looping lap of filtered noise with a slow swell and the occasional
-// droplet plink. Mirrors setPadOn's fade structure.
+// droplet plink. Mirrors the fade structure of the old pad voice.
 let waterOn = false
 let waterNodes = null
 
@@ -520,172 +415,12 @@ export function setWaterOn(on) {
 
 // (ambient score section follows; `audio` is exported at the end of the file)
 
-// ---- Generative ambient score ("the garden sings") -------------------------
-// P6 music, part 1: a sparse, endless koto-like melody woven from the minor
-// pentatonic, retuned by the night's moon phase. No samples, no files — pure
-// oscillators through the shared master bus, so the existing mute toggle and
-// compressor govern it exactly like every other voice. Silent Night is
-// untouched: engine.js never turns the ambient on for it.
-
-const MINOR_PENTA = [0, 3, 5, 7, 10, 12, 15, 17]
-
-// root note, phrase density (0..1) and air (lowpass Hz) per moon phase.
-// Thin moons sing low, dark and rare; the full moon sings higher and brighter.
-const PHASE_TUNING = {
-  new:      { root: 110.0,  density: 0.45, air: 640 },
-  crescent: { root: 98.0,   density: 0.55, air: 760 },
-  half:     { root: 110.0,  density: 0.65, air: 880 },
-  gibbous:  { root: 130.81, density: 0.75, air: 1020 },
-  full:     { root: 146.83, density: 0.85, air: 1180 },
-}
-let ambientPhase = PHASE_TUNING.half
-let ambientOn = false
-let ambientTimer = null
-let ambientGain = null
-let ambientFilter = null
-let nextPhraseAt = 0
-
-export function setAmbientPhase(phaseId) {
-  ambientPhase = PHASE_TUNING[phaseId] || PHASE_TUNING.half
-  if (ambientFilter && ctx) {
-    ambientFilter.frequency.setTargetAtTime(ambientPhase.air, ctx.currentTime, 0.8)
-  }
-}
-
-// A long soft bloom: slow attack, a silk harmonic, a gentle fall.
-// Sits an octave or two below the SFX chimes so the two never blur.
-function bloom(freq, at, vol = 0.07, dur = 2.4) {
-  if (!ctx || !ambientFilter) return
-  const c = ctx
-  const o = c.createOscillator()
-  o.type = 'sine'
-  o.frequency.value = freq
-  const o2 = c.createOscillator()
-  o2.type = 'triangle'
-  o2.frequency.value = freq * 2.001
-  const g2 = c.createGain()
-  g2.gain.value = 0.22 // shimmer blend
-  const g = c.createGain()
-  g.gain.setValueAtTime(0.0001, at)
-  g.gain.linearRampToValueAtTime(vol, at + 0.35)
-  g.gain.exponentialRampToValueAtTime(0.0001, at + dur)
-  o.connect(g)
-  o2.connect(g2)
-  g2.connect(g)
-  g.connect(ambientFilter)
-  o.start(at)
-  o2.start(at)
-  o.stop(at + dur + 0.1)
-  o2.stop(at + dur + 0.1)
-}
-
-// One phrase: 1–3 notes wandering the minor pentatonic, then silence.
-// Rests are music too — density follows the moon.
-function maybePlayPhrase(at) {
-  const { root, density } = ambientPhase
-  if (Math.random() > 0.3 + 0.7 * density) return
-  const count = 1 + Math.floor(Math.random() * 3)
-  let deg = Math.floor(Math.random() * 5)
-  const dir = Math.random() < 0.5 ? 1 : -1
-  let t = at
-  for (let i = 0; i < count; i++) {
-    const semis = MINOR_PENTA[Math.max(0, Math.min(MINOR_PENTA.length - 1, deg))]
-    bloom(root * Math.pow(2, semis / 12), t, 0.05 + Math.random() * 0.035, 2.0 + Math.random() * 1.2)
-    deg += dir * (1 + Math.floor(Math.random() * 2))
-    t += 0.8 + Math.random() * 0.7
-  }
-}
-
-function planPhrases() {
-  if (!ambientOn || !ctx || !ambientGain) return
-  // While muted the master bus is silent, but scheduling anyway would
-  // still build (and throw away) a phrase's oscillators every few
-  // seconds for nothing (AUDIT L5). Skip the pass entirely and leave
-  // nextPhraseAt behind; the clamp below resyncs it on the first live
-  // pass after unmute, so no backed-up phrases burst out.
-  if (muted) return
-  // The scheduler interval is throttled while the tab is hidden, but the
-  // audio clock keeps running. Without this clamp, a returning tab finds
-  // nextPhraseAt far in the past and the loop below schedules every
-  // overdue phrase at a past timestamp — a burst of notes all at once.
-  // Overdue phrases are dropped; the garden resumes singing from now.
-  // M01: same skip as the water droplet — a suspended/interrupted
-  // context schedules nothing while its timer keeps firing hidden.
-  if (ctx.state !== undefined && ctx.state !== 'running') return
-  nextPhraseAt = Math.max(nextPhraseAt, ctx.currentTime + 0.1)
-  const horizon = ctx.currentTime + 2.0
-  while (nextPhraseAt < horizon) {
-    maybePlayPhrase(nextPhraseAt)
-    // Longer silences under a thin moon.
-    nextPhraseAt += 2.5 + Math.random() * (7 - 5 * ambientPhase.density)
-  }
-}
-
-function startAmbient() {
-  if (ambientTimer) return
-  const c = ctx
-  ambientGain = c.createGain()
-  ambientGain.gain.value = 0
-  ambientFilter = c.createBiquadFilter()
-  ambientFilter.type = 'lowpass'
-  ambientFilter.frequency.value = ambientPhase.air
-  ambientFilter.connect(ambientGain)
-  ambientGain.connect(musicGain)
-  nextPhraseAt = c.currentTime + 1.4 // first phrase arrives after the fade-in
-  ambientTimer = setInterval(planPhrases, 700)
-  ambientGain.gain.setTargetAtTime(1, c.currentTime, 1.2)
-}
-
-function stopAmbient() {
-  if (!ambientTimer) return
-  clearInterval(ambientTimer)
-  ambientTimer = null
-  const g = ambientGain
-  const f = ambientFilter
-  // Detach the live refs NOW (AUDIT L5): the teardown below owns exactly
-  // these two nodes and always disconnects them. The old code nulled the
-  // refs inside the timeout and skipped it entirely when the voice had
-  // been re-enabled — leaking the faded gain/filter pair into the graph
-  // on every rapid off→on.
-  ambientGain = null
-  ambientFilter = null
-  g.gain.setTargetAtTime(0, ctx.currentTime, 0.5)
-  setTimeout(() => {
-    try {
-      g.disconnect()
-      f.disconnect()
-    } catch {
-      /* already disconnected */
-    }
-  }, 1600)
-}
-
-export function setAmbientOn(on) {
-  if (on === ambientOn) return
-  ambientOn = on
-  if (!on) {
-    if (ctx && master) stopAmbient()
-    return
-  }
-  // No context yet, or muted: record the intent only (L5) — the voice
-  // starts from unlockAudio()/setMuted(false) via startPendingVoices().
-  if (!ctx || !master || muted) return
-  startAmbient()
-}
-export const audio = { unlockAudio, setMuted, setMusicOn, setMusicVolume, playEat, playBloom, playVerse, playTurn, playDeath, setPadOn, setWaterOn, setAmbientOn, setAmbientPhase }
+export const audio = { unlockAudio, setMuted, setMusicOn, setMusicVolume, playEat, playBloom, playVerse, playTurn, playDeath, setWaterOn }
 
 // Test seam (T05/T10d): lets unit tests drive the phrase scheduler and the
 // voice toggles against a mock AudioContext and observe what gets
 // scheduled, created and torn down. Not part of the public audio API.
 export const __test__ = {
-  planPhrases,
-  mockAmbient(fakeCtx, { on = true, nextAt = 0 } = {}) {
-    ctx = fakeCtx
-    ambientFilter = fakeCtx.createBiquadFilter()
-    ambientGain = fakeCtx.createGain()
-    ambientOn = on
-    nextPhraseAt = nextAt
-  },
   // M01: inject a full mock context (plus its master bus) so voice
   // toggles and the fade/suspend path can be driven without a browser.
   mockCtx(fakeCtx) {
@@ -698,7 +433,6 @@ export const __test__ = {
     // by ensureCtx); a mock buffer object is enough for its source node.
     noiseBuf = fakeCtx.createBuffer ? fakeCtx.createBuffer(1, 10, fakeCtx.sampleRate || 44100) : {}
   },
-  nextPhraseAt: () => nextPhraseAt,
   // Restore every module-level voice/context field to its load-time value
   // so toggle tests can start from a pristine module (T10d).
   reset() {
@@ -711,34 +445,18 @@ export const __test__ = {
     musicGain = null
     musicOn = true
     musicVolume = 0.6
-    padOn = false
-    pad = null
-    padGain = null
-    padLfo = null
     noiseBuf = null
     eatStep = 0
     waterOn = false
     waterNodes = null
-    ambientPhase = PHASE_TUNING.half
-    ambientOn = false
-    ambientTimer = null
-    ambientGain = null
-    ambientFilter = null
-    nextPhraseAt = 0
   },
   state: () => ({
     muted,
     musicOn,
     musicVolume,
     musicGain,
-    padOn,
-    pad,
     waterOn,
     waterNodes,
-    ambientOn,
-    ambientTimer,
-    ambientGain,
-    ambientFilter,
   }),
 }
 export default audio

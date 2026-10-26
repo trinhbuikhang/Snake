@@ -25,6 +25,7 @@ import { useGame, READY_BEAT_S, readSkins, readOnboarded } from '../game/store.j
 import { inputBus } from '../game/inputBus.js'
 import { isTypingTarget } from '../game/keyboard.js'
 import audio from '../audio/sound.js'
+import { music } from '../audio/music.js'
 import { createGovernor, observeWarmupFrame, settleWarmup, nextQualityIdx, msaaRetargetNeeded, msaaFor, QUALITY_STEPS, SPIKE_FRAME_MULTIPLE } from './qualityGovernor.js'
 import { disposeObject3D } from './dispose.js'
 import { rescaleAccum, runTicks } from './tickClock.js'
@@ -643,7 +644,7 @@ export function createEngine(canvas, { reduced } = {}) {
 
   function handleDeath(ev) {
     const timeUp = ev.cause === 'time' // Lantern Rush: the feast ends, no tragedy
-    audio.setPadOn(false)
+    music.stop()
     audio.setWaterOn(false)
     if (timeUp) audio.playBloom()
     else audio.playDeath()
@@ -868,19 +869,18 @@ export function createEngine(canvas, { reduced } = {}) {
   // ---- store wiring ----------------------------------------------------------
   // Run audio, shared by run start and resume-from-pause so the two paths
   // can never drift apart: Silent Night hears only water; every other
-  // night gets the pad and the generative score tuned to its moon.
+  // night gets the Moonlit Garden Lullaby, its pad brightness tuned to
+  // the night's moon.
   function startRunAudio() {
     const ev = nightEventById(useGame.getState().nightEvent)
     if (ev.id === 'silent') {
-      audio.setPadOn(false)
+      music.stop()
       audio.setWaterOn(true)
-      audio.setAmbientOn(false)
     } else {
       audio.setWaterOn(false)
-      audio.setPadOn(true)
-      // P6 music: the generative score tunes itself to the night's moon.
-      audio.setAmbientPhase(useGame.getState().moonPhase)
-      audio.setAmbientOn(true)
+      // M03: the lullaby replaces the old pad drone + ambient score.
+      music.setBrightness(useGame.getState().moonPhase)
+      music.start('play')
     }
   }
 
@@ -909,22 +909,19 @@ export function createEngine(canvas, { reduced } = {}) {
         prevCells = curCells
         startRunAudio() // fade the night's sounds back in
       } else if (s.status === 'paused') {
-        // Pause silences the garden too (T05): ambient, pad and water all
-        // fade out; startRunAudio() restores them on resume.
-        audio.setAmbientOn(false)
-        audio.setPadOn(false)
+        // Pause silences the garden too (T05): lullaby and water fade
+        // out; startRunAudio() restores them on resume.
+        music.stop()
         audio.setWaterOn(false)
       } else if (s.status === 'prologue' && (prev.status === 'title' || prev.status === 'dead')) {
         unlock() // start() runs in the gesture; the demo garden keeps drifting behind the prologue
       } else if (s.status === 'title') {
         resetDemo()
-        audio.setPadOn(false)
+        music.stop()
         audio.setWaterOn(false)
-        audio.setAmbientOn(false)
       } else if (s.status === 'dead') {
-        audio.setPadOn(false)
+        music.stop()
         audio.setWaterOn(false)
-        audio.setAmbientOn(false)
       }
       // C03: Dash already held through the ready beat — boost from the
       // first tick instead of dropping the press (setBoost gates on
@@ -1243,11 +1240,10 @@ export function createEngine(canvas, { reduced } = {}) {
     unsubStore()
     unsubGarden()
     ro.disconnect()
-    // Silence the garden (T08): without this the ambient scheduler's
-    // setInterval and the pad/water voices keep running after unmount,
-    // stacking a new layer of music on every remount.
-    audio.setAmbientOn(false)
-    audio.setPadOn(false)
+    // Silence the garden (T08): without this the lullaby scheduler's
+    // setInterval keeps running after unmount, stacking a new layer of
+    // music on every remount.
+    music.stop()
     audio.setWaterOn(false)
     // Release the composer's GPU targets before the scene and renderer
     // go (dispose is idempotent; the explicit target disposes cover
