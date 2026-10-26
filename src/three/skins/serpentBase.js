@@ -20,6 +20,7 @@ import {
   writeTube,
   spineBob,
   yawAlpha,
+  wrapAngle,
   smoothstep,
   RADIAL,
   CAP,
@@ -445,6 +446,11 @@ export function createSerpent(scene, cfg) {
       while (dyaw > Math.PI) dyaw -= Math.PI * 2
       while (dyaw < -Math.PI) dyaw += Math.PI * 2
       rig.yawView += dyaw * yawAlpha(dt, interval)
+      // Keep the stored yaw bounded (dt-hang fix): yawView feeds the
+      // dyaw wrap loop above, so an unbounded value would make that
+      // loop run |yawView| / 2π iterations. Wrapping is invisible —
+      // head rotation is periodic — and keeps the loop at ≤ 2 steps.
+      rig.yawView = wrapAngle(rig.yawView)
       rig.rollView = THREE.MathUtils.lerp(rig.rollView, -Math.max(-0.2, Math.min(0.2, dyaw * 1.4)), Math.min(1, dt * 8))
       const sq = Math.sin(rig.chomp * Math.PI) * 0.1
       headMesh.scale.set(1 + sq, 1 - sq * 0.5, 1 + sq * 0.3)

@@ -35,10 +35,26 @@ export function spineBob(animT, d) {
 // unlike the old min(1, dt * 20) factor, whose effective rate changed
 // with the frame rate (and took 2.6-3.8 ticks at dash/worst speeds).
 // Returns the fraction of the remaining yaw gap to close this frame,
-// in (0, 1] for dt > 0.
+// in (0, 1] for dt > 0. Clamped to [0, 1]: a negative dt (a first-frame
+// rAF timestamp racing start()'s performance.now()) used to return a
+// hugely negative factor, exploding rig.yawView until paint()'s 2π
+// wrap loop could no longer terminate and the tab hung. Non-finite
+// dt closes nothing that frame instead of poisoning the rig.
 export function yawAlpha(dt, interval) {
   const tau = Math.min(0.05, 0.25 * interval)
-  return tau > 0 ? 1 - Math.exp(-dt / tau) : 1
+  if (!(tau > 0)) return 1
+  const a = 1 - Math.exp(-dt / tau)
+  return Number.isFinite(a) ? Math.max(0, Math.min(1, a)) : 0
+}
+
+// Wrap any angle to [-π, π) in constant time. The modulo form — not a
+// subtract-2π loop — is deliberate: with a huge |a| a loop would take
+// |a| / 2π iterations, which is exactly the hang this fix closes in
+// paint(). Non-finite input maps to 0 rather than NaN.
+export function wrapAngle(a) {
+  if (!Number.isFinite(a)) return 0
+  const TAU = Math.PI * 2
+  return ((a + Math.PI) % TAU + TAU) % TAU - Math.PI
 }
 
 // Scratch state, allocated once per rig and reused every frame.

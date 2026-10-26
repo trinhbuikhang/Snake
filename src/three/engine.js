@@ -1040,7 +1040,13 @@ export function createEngine(canvas, { reduced } = {}) {
   function frame(now) {
     rafId = requestAnimationFrame(frame)
     const rawDt = (now - prevTS) / 1000
-    const dt = Math.min(rawDt, 0.1)
+    // Lower clamp is load-bearing (dt-hang fix): the first rAF
+    // timestamp can predate start()'s performance.now(), making
+    // rawDt negative — and a negative dt used to drive yawAlpha
+    // hugely negative, exploding yawView until paint()'s 2π wrap
+    // loop could no longer terminate. A racing first frame now
+    // simply paints with dt 0 instead of hanging the tab.
+    const dt = Math.max(0, Math.min(rawDt, 0.1))
     prevTS = now
     animT += dt
 

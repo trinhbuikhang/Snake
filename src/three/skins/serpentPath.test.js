@@ -6,6 +6,7 @@ import {
   radiusAt,
   writeTube,
   yawAlpha,
+  wrapAngle,
   STEP,
   ARC_K,
   CORNER_R,
@@ -199,5 +200,76 @@ describe('yawAlpha() head-yaw smoothing (C04)', () => {
       const tau = Math.min(0.05, 0.25 * iv)
       expect(r60).toBeCloseTo(Math.exp(-T / tau), 6)
     }
+  })
+})
+
+// Negative-dt hang guards: the pre-existing master bug where a racing
+// first-frame timestamp (now earlier than start()'s performance.now())
+// made dt negative, yawAlpha hugely negative, and paint()'s 2π wrap
+// loop unable to terminate.
+describe('dt-hang guards (yawAlpha clamp + wrapAngle)', () => {
+  it('yawAlpha() clamps to 0 for the racing first-frame dt instead of exploding', () => {
+    // The measured race: first rAF timestamp ~185–236 ms before
+    // start()'s performance.now(), i.e. dt ≈ -0.2. Unclamped this
+    // returned 1 - exp(0.2 / 0.04125) ≈ -126 at base speed.
+    expect(yawAlpha(-0.236, 0.165)).toBe(0)
+    expect(yawAlpha(-0.185, 0.165)).toBe(0)
+    expect(yawAlpha(-1, 0.0308)).toBe(0)
+    expect(yawAlpha(-1e6, 0.165)).toBe(0)
+    expect(yawAlpha(NaN, 0.165)).toBe(0)
+    expect(yawAlpha(-Infinity, 0.165)).toBe(0)
+  })
+
+  it('yawAlpha() still stays in [0, 1] for every non-negative dt', () => {
+    for (const iv of [0.165, 0.08, 0.0416, 0.0308]) {
+      for (const dt of [0, 1 / 240, 1 / 60, 0.1, 1, 10, Infinity]) {
+        const a = yawAlpha(dt, iv)
+        expect(a).toBeGreaterThanOrEqual(0)
+        expect(a).toBeLessThanOrEqual(1)
+      }
+    }
+  })
+
+  it('wrapAngle() maps any finite angle into [-π, π)', () => {
+    expect(wrapAngle(0)).toBe(0)
+    expect(wrapAngle(Math.PI)).toBe(-Math.PI)
+    expect(wrapAngle(3 * Math.PI)).toBe(-Math.PI)
+    expect(wrapAngle(-3 * Math.PI)).toBe(-Math.PI)
+    for (const a of [0.5, -2.9, 7, -13.3]) {
+      const w = wrapAngle(a)
+      expect(w).toBeGreaterThanOrEqual(-Math.PI)
+      expect(w).toBeLessThan(Math.PI)
+      // Same orientation: rotating by w equals rotating by a.
+      expect(Math.sin(w)).toBeCloseTo(Math.sin(a), 9)
+      expect(Math.cos(w)).toBeCloseTo(Math.cos(a), 9)
+    }
+    // Huge angles: only the range is asserted — the modulo itself
+    // carries ~1e-7 rad of float error at 1e9, so a sin/cos match at
+    // precision 9 would be meaningless here. What matters is that
+    // these return at all (a subtract-2π loop would need ~1e11 steps).
+    for (const a of [1e9, -1e9, 1e12]) {
+      const w = wrapAngle(a)
+      expect(w).toBeGreaterThanOrEqual(-Math.PI)
+      expect(w).toBeLessThan(Math.PI)
+    }
+  })
+
+  it('wrapAngle() never produces NaN for non-finite input', () => {
+    expect(wrapAngle(Infinity)).toBe(0)
+    expect(wrapAngle(-Infinity)).toBe(0)
+    expect(wrapAngle(NaN)).toBe(0)
+  })
+
+  it('the old hang chain now terminates: racing dt closes no yaw gap', () => {
+    // One paint step with the racing dt: alpha 0 means yawView does
+    // not move at all, and the wrap keeps it bounded — no explosion
+    // for the next frame's dyaw loop to chew on.
+    let yawView = 0
+    const yaw = 2.5
+    let dyaw = yaw - yawView
+    while (dyaw > Math.PI) dyaw -= Math.PI * 2
+    while (dyaw < -Math.PI) dyaw += Math.PI * 2
+    yawView = wrapAngle(yawView + dyaw * yawAlpha(-0.236, 0.165))
+    expect(yawView).toBe(0)
   })
 })
