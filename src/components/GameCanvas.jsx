@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createAudioLifecycle } from '../audio/unlock.js'
 
 // P6 "First Light": the 3D engine (three.js) loads as a separate chunk so the
 // first paint — title, HUD, poems — never waits on the heaviest dependency.
@@ -10,6 +11,10 @@ export default function GameCanvas() {
   useEffect(() => {
     let cancelled = false
     let engine = null
+    // M01: the audio unlock lifecycle lives here, not in the engine —
+    // it must arm before the first gesture (title taps count) and it
+    // owns document listeners the engine's test mock cannot hold twice.
+    const audioLifecycle = createAudioLifecycle()
     import('../three/engine.js')
       .then(({ createEngine }) => {
         if (cancelled) return
@@ -24,6 +29,7 @@ export default function GameCanvas() {
       cancelled = true
       if (engine) engine.destroy()
       engine = null
+      audioLifecycle.destroy()
     }
   }, [])
 

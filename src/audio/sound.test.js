@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { __test__, unlockAudio, setMuted, setPadOn, setWaterOn, setAmbientOn } from './sound.js'
+import { __test__, unlockAudio, fadeOutAudio, suspendAudio, setMuted, setPadOn, setWaterOn, setAmbientOn } from './sound.js'
 
 // Minimal mock AudioContext: records every oscillator start time so a
 // test can see exactly what one planning pass scheduled. Gain/filter
@@ -91,12 +91,15 @@ class MockParam {
   constructor(value = 0) {
     this.value = value
     this.targets = []
+    this.ramps = []
+    this.cancelled = false
   }
   setValueAtTime(v) {
     this.value = v
   }
-  linearRampToValueAtTime(v) {
+  linearRampToValueAtTime(v, t) {
     this.value = v
+    this.ramps.push([v, t])
   }
   exponentialRampToValueAtTime(v) {
     this.value = v
@@ -104,6 +107,9 @@ class MockParam {
   setTargetAtTime(v) {
     this.targets.push(v)
     this.value = v
+  }
+  cancelScheduledValues() {
+    this.cancelled = true
   }
 }
 
@@ -135,6 +141,7 @@ function trackedCtx(now = 0) {
     destination: {},
     created,
     resume: () => Promise.resolve(),
+    suspend: () => Promise.resolve(),
     createGain() {
       const n = node({ gain: new MockParam(0) })
       created.gains.push(n)
@@ -334,5 +341,119 @@ describe('voice toggles (AUDIT L5)', () => {
     vi.advanceTimersByTime(1300)
     expect(oscs.every((o) => o.stopped)).toBe(true)
     expect(__test__.state().pad).toBe(null)
+  })
+})
+
+// ---- M01: unlock lifecycle (no context before gesture, interrupted,
+// hide fade + suspend, scheduler skip while suspended) ------------------
+describe('M01 unlock lifecycle (sound.js)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    __test__.reset()
+  })
+
+  afterEach(() => {
+    setPadOn(false)
+    setAmbientOn(false)
+    setWaterOn(false)
+    delete globalThis.window
+    __test__.reset()
+    vi.clearAllTimers()
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
+  it('creates no AudioContext before the first unlock; unlock creates exactly one', () => {
+    const AC = vi.fn(function () {
+      return trackedCtx(0)
+    })
+    globalThis.window = { AudioContext: AC }
+    // Intent recorded, no context: the voices must not exist yet.
+    setPadOn(true)
+    setAmbientOn(true)
+    setWaterOn(true)
+    expect(AC).not.toHaveBeenCalled()
+    unlockAudio()
+    expect(AC).toHaveBeenCalledTimes(1)
+    unlockAudio()
+    expect(AC).toHaveBeenCalledTimes(1)
+  })
+
+  it("resume() is called for 'interrupted' and 'suspended', not for 'running'", () => {
+    for (const state of ['interrupted', 'suspended']) {
+      __test__.reset()
+      const fake = trackedCtx(0)
+      fake.state = state
+      fake.resume = vi.fn(() => Promise.resolve())
+      __test__.mockCtx(fake)
+      unlockAudio()
+      expect(fake.resume).toHaveBeenCalledTimes(1)
+    }
+    __test__.reset()
+    const fake = trackedCtx(0)
+    fake.state = 'running'
+    fake.resume = vi.fn(() => Promise.resolve())
+    __test__.mockCtx(fake)
+    unlockAudio()
+    expect(fake.resume).not.toHaveBeenCalled()
+  })
+
+  it('fadeOut ramps the master bus to 0 over 0.2s; suspend fires after the fade', () => {
+    const fake = trackedCtx(10)
+    fake.suspend = vi.fn(() => Promise.resolve())
+    __test__.mockCtx(fake)
+    const masterGain = fake.created.gains[0].gain
+    fadeOutAudio()
+    expect(masterGain.cancelled).toBe(true)
+    expect(masterGain.ramps).toEqual([[0, 10.2]])
+    suspendAudio()
+    expect(fake.suspend).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(199)
+    expect(fake.suspend).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(1)
+    expect(fake.suspend).toHaveBeenCalledTimes(1)
+    // A second suspend while one is still pending schedules nothing new.
+    suspendAudio()
+    suspendAudio()
+    vi.advanceTimersByTime(1000)
+    expect(fake.suspend).toHaveBeenCalledTimes(2)
+  })
+
+  it('a gesture during the fade cancels the pending suspend', () => {
+    const fake = trackedCtx(0)
+    fake.suspend = vi.fn(() => Promise.resolve())
+    __test__.mockCtx(fake)
+    fadeOutAudio()
+    suspendAudio()
+    unlockAudio() // the returning gesture wins over the pending suspend
+    vi.advanceTimersByTime(500)
+    expect(fake.suspend).not.toHaveBeenCalled()
+  })
+
+  it('planPhrases schedules nothing while suspended, resumes when running', () => {
+    const fake = trackedCtx(1000)
+    fake.state = 'suspended'
+    __test__.mockAmbient(fake, { nextAt: 1000.5 })
+    __test__.planPhrases()
+    expect(fake.created.oscillators.length).toBe(0)
+    fake.state = 'running'
+    vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    __test__.planPhrases()
+    expect(fake.created.oscillators.length).toBeGreaterThan(0)
+  })
+
+  it('water droplets are skipped while suspended, resume when running', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    const fake = trackedCtx(0)
+    fake.state = 'suspended'
+    __test__.mockCtx(fake)
+    setWaterOn(true)
+    const lfoCount = fake.created.oscillators.length // the swell LFO only
+    expect(lfoCount).toBe(1)
+    vi.advanceTimersByTime(2600 * 3)
+    expect(fake.created.oscillators.length).toBe(lfoCount)
+    fake.state = 'running'
+    vi.advanceTimersByTime(2600)
+    expect(fake.created.oscillators.length).toBeGreaterThan(lfoCount)
   })
 })

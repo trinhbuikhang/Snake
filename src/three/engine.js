@@ -814,7 +814,10 @@ export function createEngine(canvas, { reduced } = {}) {
   // second turn inside one gesture needs a clear axis (no curl turns).
   const swipe = createSwipeTracker()
   const onTouchStart = (e) => {
-    unlock()
+    // M01: no unlock() here — touchstart is not a WebKit activation
+    // event, so it never unlocked anything on iOS. The document
+    // activation listeners in audio/unlock.js (mounted by GameCanvas)
+    // catch the touchend instead.
     swipe.start(e)
   }
 
