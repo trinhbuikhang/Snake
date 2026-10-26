@@ -53,7 +53,7 @@ const ZERO = { top: 0, right: 0, bottom: 0, left: 0 }
 // the cluster's rect at the bottom-right. Portrait also reports
 // coachStrip: the band just above the pad reserved for the coach
 // card (a soft reserve for the camera fit, see H04/H05).
-export function hudReserve({ w, h, safe = ZERO, showControls = false }) {
+export function hudReserve({ w, h, safe = ZERO, showControls = false, coachVisible = true }) {
   const s = { ...ZERO, ...safe }
   const barTop = Math.max(HUD.edge, s.top)
   const out = {
@@ -71,7 +71,10 @@ export function hudReserve({ w, h, safe = ZERO, showControls = false }) {
       w: c.w + Math.max(HUD.padInset, s.right),
       h: c.h + Math.max(HUD.padInset, s.bottom),
     }
-    if (w / h <= 1) out.coachStrip = HUD.coachGap + HUD.coachH
+    // V03: the coach strip is only reserved while the first-night
+    // coach can actually be on screen; once it is gone the portrait
+    // board may use the band down to the cluster.
+    if (w / h <= 1 && coachVisible) out.coachStrip = HUD.coachGap + HUD.coachH
   }
   return out
 }

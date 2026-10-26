@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { useGame } from './store.js'
+import { useGame, readOnboarded } from './store.js'
+import { coachBlocksCamera } from '../three/cameraFit.js'
 
 // Snapshot of the pristine state (fresh profile, empty localStorage stub
 // from test/setup.js). Restored before every test for isolation.
@@ -248,5 +249,47 @@ describe('buySkin and milestone grants (S06)', () => {
     useGame.getState().hydrate()
     expect(useGame.getState().skins.owned).toContain('plushMoon')
     expect(JSON.parse(localStorage.getItem('ran-xinh-skin')).owned).toContain('plushMoon')
+  })
+})
+
+// V03 fix round 3 (owner review): the first-night camera hold must be
+// read off the REAL store journey, not hand-fed nights. A fresh profile
+// starts at night 0 (readNight() on empty storage) and only becomes 1
+// in start() — the round-2 chain test fed night 1 for title and missed
+// the title→prologue tilt on a real first run.
+describe('V03 first-night camera hold on real store state', () => {
+  it('fresh profile: title (night 0) through coach dismiss changes exactly once', () => {
+    const held = []
+    const snap = () => {
+      const s = useGame.getState()
+      held.push(
+        coachBlocksCamera({ coachStep: s.coachStep, night: s.night, onboarded: readOnboarded() }),
+      )
+    }
+    // beforeEach restored the pristine profile: title, night 0, no coach.
+    expect(useGame.getState().status).toBe('title')
+    expect(useGame.getState().night).toBe(0)
+    snap() // title, night 0
+    useGame.getState().start() // prologue, night 1
+    expect(useGame.getState().night).toBe(1)
+    snap()
+    useGame.getState().beginNight() // ready
+    snap()
+    useGame.getState().enterPlaying() // playing; coach timer armed (fake timers hold it)
+    snap()
+    // The timer would set coachStep 0; steps advance through the real actions.
+    useGame.setState({ coachStep: 0 })
+    snap()
+    useGame.getState().advanceCoach() // 0 -> 1
+    snap()
+    useGame.getState().advanceCoach() // 1 -> 2
+    snap()
+    useGame.getState().advanceCoach() // 2 -> dismissCoach: writes onboarded, coachStep -1
+    snap()
+    expect(useGame.getState().coachStep).toBe(-1)
+    expect(readOnboarded()).toBe(true)
+    expect(held).toEqual([true, true, true, true, true, true, true, false])
+    const changes = held.slice(1).filter((v, i) => v !== held[i]).length
+    expect(changes).toBe(1)
   })
 })

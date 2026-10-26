@@ -265,7 +265,7 @@ Khoá bằng test cái đang đúng (hàng đợi rẽ, độ trễ ≤ 1 tick) 
 
 ## V03 — Bàn chơi dọc dùng hết chiều cao (từ H07)
 
-- [ ] **V03** · Mức: **Trung bình** · Branch: `feat/v03-portrait-camera`
+- [x] **V03** · Mức: **Trung bình** · Branch: `feat/v03-portrait-camera`
 
 **Vấn đề**
 - Bàn dọc nhỏ (`p390` 271px, `teams375` 247px) với dải trống 118–212px dưới bàn; `coachStrip` luôn được chừa dù coach chỉ hiện đêm đầu (xem bảng V ở trên).
