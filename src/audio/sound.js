@@ -5,6 +5,31 @@ let ctx = null
 let master = null
 let muted = false
 let unlocked = false
+let suspendTimer = null
+let ctxStateListener = null
+
+// Report context state changes to the lifecycle layer (unlock.js): the
+// reducer tracks ctxState, and only a real onstatechange can tell it an
+// iOS interruption happened — no poll, no gesture, no event otherwise
+// reveals 'interrupted'. The handler is owned by the context instance it
+// was attached to, so a test reset that drops the context cannot make a
+// stale context report a new context's state.
+function attachStateListener() {
+  if (!ctx || !ctxStateListener) return
+  const owned = ctx
+  ctx.onstatechange = () => {
+    if (ctxStateListener && ctx === owned) ctxStateListener(owned.state)
+  }
+}
+
+export function setCtxStateListener(cb) {
+  ctxStateListener = cb
+  attachStateListener()
+}
+
+export function getCtxState() {
+  return ctx ? ctx.state : null
+}
 let padOn = false
 let pad = null
 let padGain = null
@@ -20,6 +45,7 @@ function ensureCtx() {
   const AC = window.AudioContext || window.webkitAudioContext
   if (!AC) return null
   ctx = new AC()
+  attachStateListener()
   const comp = ctx.createDynamicsCompressor()
   comp.threshold.value = -18
   comp.ratio.value = 8
@@ -48,10 +74,72 @@ function startPendingVoices() {
 }
 
 export function unlockAudio() {
+  // A gesture during the 0.2s hide-fade must win over the pending
+  // suspend, or the context would suspend right after the user returned.
+  cancelPendingSuspend()
   const c = ensureCtx()
-  if (c && c.state === 'suspended') c.resume().catch(() => {})
+  // M01: Teams iPhone parks the context in 'interrupted', not
+  // 'suspended' — resuming only the latter left returning players mute
+  // until some later gesture happened to call unlockAudio again.
+  if (c && (c.state === 'suspended' || c.state === 'interrupted')) c.resume().catch(() => {})
+  // A hide-fade may have ramped the master bus to 0; restore it so the
+  // resumed context is actually audible. No-op when already at 1.
+  resetMasterGain()
   unlocked = true
   startPendingVoices()
+}
+
+// Round-2 review: cancel any scheduled automation BEFORE setting the
+// restore target. A setTarget inserted before an existing linearRamp
+// loses to the ramp at its end time — on rapid hide→show the fade's
+// ramp pulled the bus back to 0 after the restore and held it there,
+// while the context stayed 'running' (so no activation listener was left
+// to rescue it). fadeOutAudio already follows this pattern; the restore
+// paths must too. Creates nothing: callers that must not create a
+// context (visible before the first gesture) use restoreAudio below.
+function resetMasterGain() {
+  if (!ctx || !master) return
+  const t = ctx.currentTime
+  master.gain.cancelScheduledValues(t)
+  master.gain.setValueAtTime(master.gain.value, t)
+  master.gain.setTargetAtTime(muted ? 0 : 1, t, 0.05)
+}
+
+// M01 hide path, as two reducer actions: fade the master bus to silence
+// over exactly 0.2s, then suspend the context once the fade has landed.
+export function fadeOutAudio() {
+  if (!ctx || !master) return
+  const t = ctx.currentTime
+  master.gain.cancelScheduledValues(t)
+  master.gain.setValueAtTime(master.gain.value, t)
+  master.gain.linearRampToValueAtTime(0, t + 0.2)
+}
+
+export function suspendAudio() {
+  if (!ctx || suspendTimer) return
+  // Round-2 review note: 250ms, not exactly 200ms — the fade lands at
+  // 200ms, and suspending a hair later guarantees the bus is fully
+  // silent first (one probe caught a suspend with gain still at 0.013).
+  suspendTimer = setTimeout(() => {
+    suspendTimer = null
+    if (ctx) ctx.suspend().catch(() => {})
+  }, 250)
+}
+
+export function cancelPendingSuspend() {
+  if (!suspendTimer) return
+  clearTimeout(suspendTimer)
+  suspendTimer = null
+}
+
+// M01 review fix: restore the master bus gain WITHOUT creating a
+// context. unlockAudio() cannot serve the visible/pageshow pre-step —
+// it calls ensureCtx, so a visible event before the first gesture would
+// create an AudioContext, breaking the no-create-before-gesture rule.
+// restoreAudio is a no-op with no context, so it is safe to call on
+// every visible/pageshow.
+export function restoreAudio() {
+  resetMasterGain()
 }
 
 export function setMuted(m) {
@@ -343,6 +431,10 @@ function startWater() {
   const droplet = () => {
     if (muted) return // T10d review: no droplet oscillators while muted
     if (!waterOn || !ctx || !master) return
+    // M01: the water timer keeps firing while the tab is hidden, but a
+    // suspended/interrupted context must not schedule droplets that
+    // would burst out on resume (the "bỏ qua" half of the acceptance).
+    if (ctx.state !== undefined && ctx.state !== 'running') return
     const t = c.currentTime + 0.02
     const o = c.createOscillator()
     o.type = 'sine'
@@ -490,6 +582,9 @@ function planPhrases() {
   // nextPhraseAt far in the past and the loop below schedules every
   // overdue phrase at a past timestamp — a burst of notes all at once.
   // Overdue phrases are dropped; the garden resumes singing from now.
+  // M01: same skip as the water droplet — a suspended/interrupted
+  // context schedules nothing while its timer keeps firing hidden.
+  if (ctx.state !== undefined && ctx.state !== 'running') return
   nextPhraseAt = Math.max(nextPhraseAt, ctx.currentTime + 0.1)
   const horizon = ctx.currentTime + 2.0
   while (nextPhraseAt < horizon) {
@@ -564,10 +659,21 @@ export const __test__ = {
     ambientOn = on
     nextPhraseAt = nextAt
   },
+  // M01: inject a full mock context (plus its master bus) so voice
+  // toggles and the fade/suspend path can be driven without a browser.
+  mockCtx(fakeCtx) {
+    ctx = fakeCtx
+    master = fakeCtx.createGain()
+    // startWater refuses without the shared noise buffer (normally built
+    // by ensureCtx); a mock buffer object is enough for its source node.
+    noiseBuf = fakeCtx.createBuffer ? fakeCtx.createBuffer(1, 10, fakeCtx.sampleRate || 44100) : {}
+  },
   nextPhraseAt: () => nextPhraseAt,
   // Restore every module-level voice/context field to its load-time value
   // so toggle tests can start from a pristine module (T10d).
   reset() {
+    cancelPendingSuspend()
+    ctxStateListener = null
     ctx = null
     master = null
     muted = false
