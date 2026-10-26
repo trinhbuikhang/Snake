@@ -1182,14 +1182,23 @@ export function createEngine(canvas, { reduced } = {}) {
     paintParams.interval = tickClock.interval
     rig.paint(paintParams)
 
-    // Headlight follows snake head
+    // Headlight follows snake head. In the top-down (2D) view the camera
+    // looks straight down, so the headlight's illuminated disk on the
+    // board becomes a flat bright patch that hides the board and the
+    // snake. Tone it down there so the playfield stays readable.
     headLight.position.copy(rig.group.position).add(_headOff)
-    headLight.intensity = headLightBase + (isBoosting ? 1.5 : 0) + pulse * 2.5
+    const isTopDown = (useGame.getState().cameraMode || 'aligned') === 'topdown'
+    const headLightScale = isTopDown ? 0.25 : 1
+    headLight.intensity = (headLightBase + (isBoosting ? 1.5 : 0) + pulse * 2.5) * headLightScale
 
     // Bloom pulse decay
     if (bloomPass) {
       pulse = Math.max(0, pulse - dt * 1.8)
-      bloomPass.strength = BLOOM_BASE + pulse * 1.1 + (isBoosting ? 0.15 : 0)
+      // In top-down (2D) the camera looks straight down, so bloom
+      // spreads bright light into a flat patch over the board; keep it
+      // gentler there so the playfield and snake stay readable.
+      const bloomScale = isTopDown ? 0.6 : 1
+      bloomPass.strength = (BLOOM_BASE + pulse * 1.1 + (isBoosting ? 0.15 : 0)) * bloomScale
     }
 
     // P02 warm-up: one off-screen render with every planet shown, on
