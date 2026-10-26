@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import * as THREE from 'three'
 import { fitAligned, fitMargins, alignedCamera, presetFor, coachBlocksCamera } from './cameraFit.js'
-import { hudReserve } from '../game/hudLayout.js'
+import { hudReserve, controlsVisible } from '../game/hudLayout.js'
 
 // S05 acceptance: with the aligned preset's el/fov and the board
 // half (rim included), every board corner projects inside the NDC
@@ -314,7 +314,7 @@ describe('portrait board with the coach gone (V03)', () => {
   }
 })
 
-describe('coach visible / non-portrait fits are unchanged (V03)', () => {
+describe('coach visible / non-portrait fits (V03, Dash-centre)', () => {
   for (const vp of VIEWPORTS) {
     it(`${vp.name}: coach-visible fit equals the pre-V03 fit exactly`, () => {
       const preset = presetFor(PRESET, { w: vp.w, h: vp.h, coachVisible: true })
@@ -325,13 +325,22 @@ describe('coach visible / non-portrait fits are unchanged (V03)', () => {
       expect(fit.lookZ).toBe(before.lookZ)
     })
   }
-  for (const vp of VIEWPORTS.filter((v) => v.w / v.h > 1)) {
-    it(`${vp.name}: coach state changes nothing outside portrait`, () => {
+  // Dash-centre: outside portrait the coach state now changes ONLY
+  // the right reserve. While the coach is up, the board must also
+  // stay left of the 272px pad-column coach card; once the coach is
+  // done the board takes the room the narrower cluster frees. The
+  // preset (el) still never changes outside portrait (see the
+  // presetFor tests above). Desktop (d1280) has no cluster, so it
+  // is out of this loop.
+  for (const vp of VIEWPORTS.filter((v) => v.w / v.h > 1 && controlsVisible(v.w, false))) {
+    it(`${vp.name}: landscape coach-off narrows the right reserve to the cluster, cells still clear it`, () => {
       const { fit } = fitCoachOff(vp)
-      const before = fitVp(vp)
-      expect(fit.dist).toBe(before.dist)
-      expect(fit.lookX).toBe(before.lookX)
-      expect(fit.lookZ).toBe(before.lookZ)
+      const res = hudReserve({ w: vp.w, h: vp.h, safe: vp.safe, showControls: false, coachVisible: false })
+      expect(fit.margins.right).toBeCloseTo(1 - (2 * (res.cluster.w + GAP)) / vp.w, 6)
+      const pts = projectWithEl(fit, EL, vp.w / vp.h, [...GRID, ...CORNERS])
+      expect(violates(pts, fit.margins)).toBe(false)
+      const scr = pts.map((p) => toScreen(p, vp.w, vp.h))
+      for (const s of scr) expect(s.x).toBeLessThanOrEqual(vp.w - res.cluster.w - GAP + 0.5)
     })
   }
 })

@@ -16,7 +16,7 @@ export const HUD = {
   fitGap: 8, // breathing room between board and any HUD band
   padInset: 16, // touch cluster inset from bottom/right (before safe-area)
   padGap: 8, // gap between d-pad buttons
-  dashGap: 16, // gap Dash <-> d-pad
+  coachW: 272, // width of the coach card (pad-column + top-left placements)
   coachH: 92, // max height of the compact coach card (portrait strip above the pad)
   coachGap: 12, // coach card <-> d-pad
 }
@@ -35,15 +35,17 @@ export const isCompact = (w) => w < COMPACT_MAX_W
 export const controlsVisible = (w, showControls) => !!showControls || w <= CONTROLS_MAX_W
 
 // .dpad grid tracks are 58px at every width (only the buttons
-// shrink to 52px under 480px), so the pad is always 190px wide;
-// Dash shrinks 66 -> 56 under 480px. Keep in sync with styles.css
-// (.dpad / .btn-boost) — the test asserts both sides.
+// shrink to 52px under 480px), so the pad is always 190px wide.
+// Dash-centre: Dash lives inside the pad's centre cell, so the
+// cluster IS the pad — its width no longer adds Dash + a gap.
+// (Dash keeps its own 66/56px size for the CSS-sync test; it just
+// no longer widens the cluster.)
 export function clusterSize(w) {
   const small = w <= 480
   const btn = small ? 52 : 58
   const dash = small ? 56 : 66
   const pad = 3 * 58 + 2 * HUD.padGap
-  return { btn, dash, pad, w: dash + HUD.dashGap + pad, h: pad }
+  return { btn, dash, pad, w: pad, h: pad }
 }
 
 const ZERO = { top: 0, right: 0, bottom: 0, left: 0 }
@@ -67,8 +69,19 @@ export function hudReserve({ w, h, safe = ZERO, showControls = false, coachVisib
   }
   if (controlsVisible(w, showControls)) {
     const c = clusterSize(w)
+    // Dash-centre: the visual cluster is the pad alone (190px).
+    // Landscape exception: while the first-night coach is up, the
+    // pad-column coach card (coachW) sits in the right column above
+    // the cluster, so the board must stay left of the card too —
+    // otherwise the card would cover board cells the narrower
+    // cluster reserve just freed. Once the coach is done the engine
+    // refits on the predicate edge and the board takes the room.
+    let cw = c.w + Math.max(HUD.padInset, s.right)
+    if (w / h > 1 && coachVisible) {
+      cw = Math.max(cw, HUD.coachW + Math.max(HUD.padInset, s.right))
+    }
     out.cluster = {
-      w: c.w + Math.max(HUD.padInset, s.right),
+      w: cw,
       h: c.h + Math.max(HUD.padInset, s.bottom),
     }
     // V03: the coach strip is only reserved while the first-night

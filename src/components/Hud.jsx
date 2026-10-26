@@ -1400,6 +1400,15 @@ function OnScreenControls() {
   // offset to the pad centre (padDirection), and sliding the finger into
   // another quadrant steers again. The buttons are display + a11y only
   // (pointer-events: none in CSS); the pad owns the pointer via capture.
+  // Dash-centre: the Dash button lives in the pad's empty centre cell
+  // (grid-area 2 / 2), so two fingers share one 190px square — one
+  // holding Dash, one steering. The pointers stay independent by
+  // construction: Dash captures its own pointer, the pad captures only
+  // the steering pointer, and the pad ignores any press that starts
+  // on Dash (target check below) so a Dash press can never steal the
+  // pad's capture or leave boost stuck on. Sliding the steering
+  // finger over the centre reads as the dead zone, exactly as the
+  // empty centre cell did before.
   const padRef = useRef(null)
   const padPointer = useRef(null) // pointerId currently steering, if any
   const shownDir = useRef(null) // direction currently lit on the pad
@@ -1431,37 +1440,18 @@ function OnScreenControls() {
 
   return (
     <div className="touch-controls-wrapper">
-      {/* Boost button */}
-      <button
-        type="button"
-        className="btn-boost"
-        aria-label="Dash"
-        title="Hold to dash"
-        onPointerDown={(e) => {
-          e.preventDefault()
-          // Capture: sliding off the button must not lose the release.
-          e.currentTarget.setPointerCapture?.(e.pointerId)
-          inputBus.emit({ type: 'boost', boosting: true })
-        }}
-        onPointerUp={(e) => {
-          e.preventDefault()
-          inputBus.emit({ type: 'boost', boosting: false })
-        }}
-        onPointerCancel={() => {
-          inputBus.emit({ type: 'boost', boosting: false })
-        }}
-      >
-        {icons.zap}
-        <span>Dash</span>
-      </button>
-
-      {/* D-Pad */}
+      {/* D-Pad, with Dash in the centre cell (grid-area 2 / 2 in CSS) */}
       <div
         className="dpad"
         aria-label="Direction pad"
         role="group"
         ref={padRef}
         onPointerDown={(e) => {
+          // A press starting on Dash belongs to Dash alone: its own
+          // handler captures that pointer, and the pad must not
+          // capture it too, or the release would never reach Dash
+          // and boost would stick on.
+          if (e.target instanceof Element && e.target.closest('.btn-boost')) return
           if (padPointer.current !== null) return
           e.preventDefault()
           padPointer.current = e.pointerId
@@ -1485,6 +1475,29 @@ function OnScreenControls() {
             {arr(icon)}
           </button>
         ))}
+        {/* Boost button — centre cell of the pad */}
+        <button
+          type="button"
+          className="btn-boost"
+          aria-label="Dash"
+          title="Hold to dash"
+          onPointerDown={(e) => {
+            e.preventDefault()
+            // Capture: sliding off the button must not lose the release.
+            e.currentTarget.setPointerCapture?.(e.pointerId)
+            inputBus.emit({ type: 'boost', boosting: true })
+          }}
+          onPointerUp={(e) => {
+            e.preventDefault()
+            inputBus.emit({ type: 'boost', boosting: false })
+          }}
+          onPointerCancel={() => {
+            inputBus.emit({ type: 'boost', boosting: false })
+          }}
+        >
+          {icons.zap}
+          <span>Dash</span>
+        </button>
       </div>
     </div>
   )
