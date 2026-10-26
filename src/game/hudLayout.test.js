@@ -13,7 +13,7 @@ describe('hudLayout tokens (H01)', () => {
   it('exposes the settled token values', () => {
     expect(HUD).toEqual({
       edge: 10, barH: 44, btn: 44, gap: 8, fitGap: 8,
-      padInset: 16, padGap: 8, dashGap: 16, coachH: 92, coachGap: 12,
+      padInset: 16, padGap: 8, coachW: 272, coachH: 92, coachGap: 12,
     })
     expect(COMPACT_MAX_W).toBe(560)
     expect(CONTROLS_MAX_W).toBe(900)
@@ -35,8 +35,10 @@ describe('hudLayout tokens (H01)', () => {
   })
 
   it('clusterSize matches the plan table (pad tracks never shrink)', () => {
-    expect(clusterSize(390)).toEqual({ btn: 52, dash: 56, pad: 190, w: 262, h: 190 })
-    expect(clusterSize(844)).toEqual({ btn: 58, dash: 66, pad: 190, w: 272, h: 190 })
+    // Dash-centre: the cluster IS the pad (190px) at every width;
+    // Dash's own size no longer widens it.
+    expect(clusterSize(390)).toEqual({ btn: 52, dash: 56, pad: 190, w: 190, h: 190 })
+    expect(clusterSize(844)).toEqual({ btn: 58, dash: 66, pad: 190, w: 190, h: 190 })
     expect(clusterSize(480).dash).toBe(56)
     expect(clusterSize(481).dash).toBe(66)
   })
@@ -59,10 +61,21 @@ describe('hudReserve (H01)', () => {
   })
 
   it('cluster rect grows by the larger of padInset and the safe-area inset', () => {
-    // 844x390 with safe right 47: w = 272 + 47, h = 190 + max(16, 0)
+    // 844x390 with safe right 47: w = 272 + 47, h = 190 + max(16, 0).
+    // Dash-centre: the 272 here is the pad-column coach card
+    // (coachVisible defaults true), not the cluster — the visual
+    // cluster is only 190 wide.
     expect(hudReserve({ w: 844, h: 390, safe: { right: 47 } }).cluster).toEqual({ w: 319, h: 206 })
     // forced on at desktop size
     expect(hudReserve({ w: 1280, h: 800, showControls: true }).cluster).toEqual({ w: 288, h: 206 })
+  })
+
+  it('Dash-centre: portrait cluster rect is the pad alone; landscape narrows once the coach is done', () => {
+    expect(hudReserve({ w: 390, h: 844 }).cluster).toEqual({ w: 206, h: 206 })
+    // landscape, coach up: reserve still covers the 272px coach card
+    expect(hudReserve({ w: 844, h: 390, coachVisible: true }).cluster).toEqual({ w: 288, h: 206 })
+    // landscape, coach done: the board takes the freed room
+    expect(hudReserve({ w: 844, h: 390, coachVisible: false }).cluster).toEqual({ w: 206, h: 206 })
   })
 
   it('portrait with a cluster reserves the coach strip; landscape does not', () => {
@@ -109,6 +122,9 @@ describe('coachPlacement (H01)', () => {
     // lines and measured 106px — over HUD.coachH (92). 272px keeps
     // it at 88px; pin the width so it cannot drift back.
     expect(css).toMatch(/\.coach-marks--top-left\s*{[^}]*width: 272px/)
+    // Dash-centre: the pad-column card shares that width (HUD.coachW)
+    // — hudReserve's landscape coach reserve is built from it.
+    expect(css).toMatch(/\.coach-marks--pad-column\s*{[^}]*width: 272px/)
   })
 })
 
@@ -129,6 +145,14 @@ describe('CSS sync (H01)', () => {
     const mobile = css.slice(css.indexOf('@media (max-width: 480px)'))
     expect(mobile).toMatch(/\.btn-boost\s*\{\s*width: 56px/)
     expect(mobile).toMatch(/\.dbtn\s*\{\s*width: 52px/)
+  })
+
+  it('Dash-centre: Dash sits in the pad centre cell; portrait centres the cluster', () => {
+    expect(css).toMatch(/\.dpad \.btn-boost\s*\{[^}]*grid-area: 2 \/ 2/)
+    expect(css).toMatch(/\.dpad \.btn-boost\s*\{[^}]*justify-self: center/)
+    const portrait = css.slice(css.indexOf('@media (orientation: portrait)'))
+    expect(portrait).toMatch(/\.touch-controls-wrapper\s*\{[^}]*left: 50%/)
+    expect(portrait).toMatch(/\.touch-controls-wrapper\s*\{[^}]*transform: translateX\(-50%\)/)
   })
 
   it('defines the .safe-probe the safe-area reader relies on', () => {

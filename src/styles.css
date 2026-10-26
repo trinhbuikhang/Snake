@@ -583,6 +583,19 @@ kbd {
   gap: 16px;
 }
 
+/* Dash-centre: in portrait the whole cluster (now just the pad,
+   Dash lives inside it) sits centred horizontally. Landscape keeps
+   the current bottom-right placement — centring does not fit the
+   narrow landscape height, and the camera fit's right reserve
+   assumes the cluster on the right. */
+@media (orientation: portrait) {
+  .touch-controls-wrapper {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+  }
+}
+
 /* Dash / Turbo Button */
 .btn-boost {
   display: flex;
@@ -629,10 +642,24 @@ kbd {
   touch-action: none;
   /* V02: one rounded plate under the buttons, in the HUD glass tokens.
      The 1.5px line is an inset shadow, not a border, so the pad's box
-     stays exactly 190x190 and hudLayout's clusterSize math is untouched. */
+     stays exactly 190x190. Dash-centre: the pad IS the cluster now
+     (hudLayout.clusterSize w = pad), so the fit's right reserve
+     follows the pad alone — widened back to the coach-card width
+     while the first-night coach is up (see hudReserve). */
   border-radius: 44px;
   background: var(--hud-glass);
   box-shadow: inset 0 0 0 1.5px var(--hud-line), 0 12px 28px rgba(0, 0, 0, 0.35);
+}
+
+/* Dash-centre: Dash occupies the pad's empty centre cell. It keeps
+   its 66px size (56px under 480px) — centred in the 58px cell, so
+   it overflows 4px into the 8px gaps on each side and stays 4px
+   clear of every arrow box: no touch-area overlap, every button
+   still >= 44px. */
+.dpad .btn-boost {
+  grid-area: 2 / 2;
+  justify-self: center;
+  align-self: center;
 }
 
 .dbtn {
