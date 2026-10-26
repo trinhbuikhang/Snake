@@ -120,10 +120,13 @@ export function composeLoop(seed, arrangement = 'play') {
     }
     // Sparkle: a high pentatonic glint on beat 3. Play sprinkles it
     // (35% of bars) but never in two adjacent bars — the plan caps it
-    // at one per two bars. Moonrise lights every bar (M04 decides
-    // whether to keep that); menu has none.
+    // at one per two bars. The last bar of the loop never sparkles:
+    // otherwise its sparkle would sit adjacent to the next loop's bar
+    // 0 (the loop always restarts at the same point, so every run
+    // longer than ~2:10 would hit the boundary pair). Moonrise lights
+    // every other bar through the same gap rule; menu has none.
     const sparkleChance = isMoonrise ? 1 : isMenu ? 0 : 0.35
-    if (rand() < sparkleChance && bar - lastSparkleBar >= 2) {
+    if (rand() < sparkleChance && bar - lastSparkleBar >= 2 && bar < BARS - 1) {
       lastSparkleBar = bar
       let d = Math.floor(rand() * 5)
       if (!allowed.includes(d)) d = allowed[0]

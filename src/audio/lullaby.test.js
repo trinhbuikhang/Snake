@@ -94,6 +94,27 @@ describe('lullaby composition (M03)', () => {
     }
   })
 
+  it('sparkle gap across the loop boundary (round-2 review): loop N bar 15 never sparkles, so loop N+1 bar 0 stays >= 2 bars away', () => {
+    for (const arrangement of ['play', 'moonrise']) {
+      for (let seed = 1; seed <= 30; seed++) {
+        // The scheduler recomposes each loop with seed + loopIndex, so
+        // two consecutive loops are composeLoop(s) then composeLoop(s+1).
+        const bars = []
+        for (const [loop, notes] of [composeLoop(seed, arrangement), composeLoop(seed + 1, arrangement)].entries()) {
+          for (const n of notes.filter((x) => x.voice === 'sparkle')) {
+            bars.push(loop * BARS + Math.floor(n.t / BEATS_PER_BAR))
+          }
+        }
+        bars.sort((a, b) => a - b)
+        for (let i = 1; i < bars.length; i++) {
+          expect(bars[i] - bars[i - 1]).toBeGreaterThanOrEqual(2)
+        }
+        // And the ban itself: no sparkle on the last bar of either loop.
+        expect(bars.some((b) => b % BARS === BARS - 1)).toBe(false)
+      }
+    }
+  })
+
   it('melody density is 25-60 notes/min and the longest melody silence is <= 4s', () => {
     for (const arrangement of ['play', 'menu', 'moonrise']) {
       for (let seed = 1; seed <= 5; seed++) {
