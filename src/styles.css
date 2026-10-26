@@ -146,7 +146,11 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  /* V04 round 1: the top padding reserves the corner-button row at
+     EVERY width (not just < 560px) — at w600 the title overline ran
+     under the corners. It must stay a padding-top only (never part
+     of a padding shorthand below) or the reserve is lost. */
+  padding: calc(max(14px, env(safe-area-inset-top, 0px)) + 44px + 8px) 24px 24px;
   overflow-y: auto;
   background: radial-gradient(120% 92% at 50% 32%, rgba(8, 18, 14, 0.4), rgba(6, 14, 11, 0.88));
   animation: sheet-in 0.45s cubic-bezier(0.22, 1, 0.36, 1);
@@ -688,6 +692,15 @@ kbd {
 .sheet-card {
   max-width: 500px;
   width: 100%;
+  /* V04 round 1: margin:auto is what makes an overflowing sheet scroll
+     from its top. With plain flex centering, a card taller than the
+     viewport is centred past the scroll origin, so its head sits above
+     scrollTop=0 and can never be scrolled to (and the corner buttons
+     cover it). Auto margins centre the card when it fits and collapse
+     to 0 — starting it exactly at the padding-top reserve — when it
+     overflows. .lockup already had margin:auto; this is the same fix
+     for every card sheet. */
+  margin: auto;
   padding: 2.2rem 2rem;
   background: var(--panel-solid);
   border: 1px solid var(--hairline-strong);
@@ -823,7 +836,9 @@ kbd {
 /* ---------------- mobile adjustments ---------------- */
 
 @media (max-width: 480px) {
-  .sheet { padding: 16px; }
+  /* Sides/bottom only — the top reserve lives on base .sheet and must
+     survive this breakpoint (a padding shorthand here would reset it). */
+  .sheet { padding-right: 16px; padding-bottom: 16px; padding-left: 16px; }
   .sheet-card { padding: 1.8rem 1.3rem; }
   .actions .btn { width: 100%; max-width: 320px; }
   .sheet-actions .btn { flex: 1 1 42%; min-width: 140px; }
@@ -832,16 +847,13 @@ kbd {
 }
 
 /* ---------------- V04: narrow sheets + compact title ----------------
-   Narrow sheets reserve the corner-button row at the top so the
-   .chrome-actions trio (z 35, above sheets) never covers sheet
-   content. The compact title turns the 3 secondary actions into one
-   pill row and tightens the lockup's vertical rhythm so 390×844 needs
-   no scroll — no content is removed, only spacing and the secondary
-   labels (short labels show only in the compact row). */
+   The corner-row reserve now lives on base .sheet (all widths); this
+   block keeps only the compact title rules. The compact title turns
+   the 3 secondary actions into one pill row and tightens the lockup's
+   vertical rhythm so 390×844 needs no scroll — no content is removed,
+   only spacing and the secondary labels (short labels show only in
+   the compact row). */
 @media (max-width: 559px) {
-  .sheet {
-    padding-top: calc(max(14px, env(safe-area-inset-top, 0px)) + 44px + 8px);
-  }
   .lockup .actions { gap: 10px; }
   .title-menu {
     display: flex;
