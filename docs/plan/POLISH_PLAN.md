@@ -284,7 +284,7 @@ Khoá bằng test cái đang đúng (hàng đợi rẽ, độ trễ ≤ 1 tick) 
 
 ## V04 — Title/Pause màn dọc
 
-- [ ] **V04** · Mức: **Trung bình** · Branch: `feat/v04-portrait-menus`
+- [x] **V04** · Mức: **Trung bình** · Branch: `feat/v04-portrait-menus`
 
 **Vấn đề**
 - `.sheet` (z 30) phủ `.chrome-actions` (z 10) → nút camera / touch pad / **mute** ở title và game over **không bấm được** (`polish/baseline/title-probe-f9d1dd6.txt`: "covered by overline"). Title cao 984px: cuộn ở 390×844, ở `teams375` khối chọn chế độ bị cắt.

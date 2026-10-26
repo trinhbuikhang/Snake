@@ -232,20 +232,28 @@ export function TitleOverlay() {
               Start playing
             </button>
           )}
-          <button type="button" className="btn" onClick={() => setShowGarden(true)}>
-            🏮 Garden
-          </button>
-          <button type="button" className="btn" onClick={openHowTo}>
-            How to play
-          </button>
-          <button
-            type="button"
-            className="btn btn--secondary"
-            onClick={toggleCameraMode}
-            title="Change camera (C key)"
-          >
-            Camera: {CAM_LABELS[cameraMode] || 'Classic 3D'}
-          </button>
+          {/* V04: the 3 secondary actions form one pill row below 560px
+              (.title-menu); at wider widths display:contents keeps the
+              old .actions flow byte-identical. Short labels show only
+              in the compact row; full copy is unchanged elsewhere. */}
+          <div className="title-menu">
+            <button type="button" className="btn" onClick={() => setShowGarden(true)}>
+              🏮 Garden
+            </button>
+            <button type="button" className="btn" onClick={openHowTo}>
+              <span className="btn-label--full">How to play</span>
+              <span className="btn-label--short">How to</span>
+            </button>
+            <button
+              type="button"
+              className="btn btn--secondary"
+              onClick={toggleCameraMode}
+              title="Change camera (C key)"
+            >
+              <span className="btn-label--full">Camera: {CAM_LABELS[cameraMode] || 'Classic 3D'}</span>
+              <span className="btn-label--short">Camera</span>
+            </button>
+          </div>
         </div>
         <ModePicker />
         <MoonPicker />

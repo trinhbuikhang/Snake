@@ -43,6 +43,8 @@
   --z-chrome: 10;
   --z-dpad: 15;
   --z-sheet: 30;
+  /* V04: corner buttons above every sheet, below the moonrise coda (40). */
+  --z-chrome-actions: 35;
 
   /* HUD layout tokens (H01) — MUST equal HUD in src/game/hudLayout.js
      (hudLayout.test.js asserts this); the camera fit reads the same
@@ -144,7 +146,11 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 24px;
+  /* V04 round 1: the top padding reserves the corner-button row at
+     EVERY width (not just < 560px) — at w600 the title overline ran
+     under the corners. It must stay a padding-top only (never part
+     of a padding shorthand below) or the reserve is lost. */
+  padding: calc(max(14px, env(safe-area-inset-top, 0px)) + 44px + 8px) 24px 24px;
   overflow-y: auto;
   background: radial-gradient(120% 92% at 50% 32%, rgba(8, 18, 14, 0.4), rgba(6, 14, 11, 0.88));
   animation: sheet-in 0.45s cubic-bezier(0.22, 1, 0.36, 1);
@@ -241,6 +247,16 @@ body {
   gap: 14px;
 }
 
+/* V04: at wider widths the title-menu wrapper vanishes from layout so
+   the 3 secondary title buttons flow in .actions exactly as before. */
+.title-menu {
+  display: contents;
+}
+
+.btn-label--short {
+  display: none;
+}
+
 .best-note {
   margin: 1.5rem 0 0;
   font-size: 0.9rem;
@@ -320,7 +336,7 @@ body {
   right: max(14px, env(safe-area-inset-right, 0px));
   display: flex;
   gap: 10px;
-  z-index: var(--z-chrome);
+  z-index: var(--z-chrome-actions);
 }
 
 .icon-btn {
@@ -676,6 +692,15 @@ kbd {
 .sheet-card {
   max-width: 500px;
   width: 100%;
+  /* V04 round 1: margin:auto is what makes an overflowing sheet scroll
+     from its top. With plain flex centering, a card taller than the
+     viewport is centred past the scroll origin, so its head sits above
+     scrollTop=0 and can never be scrolled to (and the corner buttons
+     cover it). Auto margins centre the card when it fits and collapse
+     to 0 — starting it exactly at the padding-top reserve — when it
+     overflows. .lockup already had margin:auto; this is the same fix
+     for every card sheet. */
+  margin: auto;
   padding: 2.2rem 2rem;
   background: var(--panel-solid);
   border: 1px solid var(--hairline-strong);
@@ -811,12 +836,61 @@ kbd {
 /* ---------------- mobile adjustments ---------------- */
 
 @media (max-width: 480px) {
-  .sheet { padding: 16px; }
+  /* Sides/bottom only — the top reserve lives on base .sheet and must
+     survive this breakpoint (a padding shorthand here would reset it). */
+  .sheet { padding-right: 16px; padding-bottom: 16px; padding-left: 16px; }
   .sheet-card { padding: 1.8rem 1.3rem; }
   .actions .btn { width: 100%; max-width: 320px; }
   .sheet-actions .btn { flex: 1 1 42%; min-width: 140px; }
   .btn-boost { width: 56px; height: 56px; }
   .dbtn { width: 52px; height: 52px; }
+}
+
+/* ---------------- V04: narrow sheets + compact title ----------------
+   The corner-row reserve now lives on base .sheet (all widths); this
+   block keeps only the compact title rules. The compact title turns
+   the 3 secondary actions into one pill row and tightens the lockup's
+   vertical rhythm so 390×844 needs no scroll — no content is removed,
+   only spacing and the secondary labels (short labels show only in
+   the compact row). */
+@media (max-width: 559px) {
+  .lockup .actions { gap: 10px; }
+  .title-menu {
+    display: flex;
+    gap: 10px;
+    width: 100%;
+  }
+  .actions .title-menu .btn {
+    flex: 1 1 0;
+    width: auto;
+    min-width: 0;
+    padding: 0.7rem 0.5rem;
+  }
+  .btn-label--full { display: none; }
+  .btn-label--short { display: inline; }
+  .lockup .overline { margin-bottom: 0.35rem; }
+  .lockup .tagline { margin-top: 0.5rem; }
+  .lockup .rule { margin: 0.8rem auto 0.9rem; }
+  .lockup .title-wallet { margin: 0.25rem 0 0.5rem; }
+  .lockup .journey-bar { margin-bottom: 0.5rem; }
+  .lockup .journey-bar__label { margin-top: 0.25rem; }
+  .lockup .mode-picker { margin-top: 0.7rem; }
+  .lockup .moon-picker { margin-top: 0.8rem; }
+  .lockup .tonight-note { margin-top: 0.5rem; }
+  .lockup .community-sky { margin-top: 0.35rem; }
+  .lockup .journal-link { margin-top: 0.5rem; }
+}
+
+/* V04: Pause actions at 375px stack full-width so no label wraps to a
+   second line (each button stays one line, ≥ 44px). Scoped to the
+   Paused sheet only — game-over keeps its wrapping row. */
+@media (max-width: 480px) {
+  .sheet[aria-label="Paused"] .sheet-actions { flex-direction: column; }
+  .sheet[aria-label="Paused"] .sheet-actions .btn {
+    flex: none;
+    width: 100%;
+    min-width: 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
