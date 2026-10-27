@@ -1003,6 +1003,7 @@ export function buildGarden(scene, { envTex, reduced }) {
 
   const garden = {
     moonGroup,
+    water,
 
     setFood(x, z, bloom, planetType = 'earth') {
       foodVisible = true

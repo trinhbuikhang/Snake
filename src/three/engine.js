@@ -938,6 +938,13 @@ export function createEngine(canvas, { reduced } = {}) {
       audio.setMusicVolume(s.music.volume)
     }
     if (s.cameraMode !== prev.cameraMode || s.showControls !== prev.showControls) updateCameraTarget()
+    // Top-down (2D) view looks straight down, so the water's env-map
+    // reflection (RoomEnvironment) lands as a bright streak across the
+    // board; reduce it there. 3D / cinematic keep the full reflection.
+    if (s.cameraMode !== prev.cameraMode) {
+      const isTopDown = (s.cameraMode || 'aligned') === 'topdown'
+      if (garden.water?.material) garden.water.material.envMapIntensity = isTopDown ? 0.225 : 0.75
+    }
     // V03: the portrait reframe keys off the coach holding the camera —
     // on the first night that includes every screen before the card
     // shows (coachBlocksCamera), so the refit fires once when the coach
@@ -956,6 +963,11 @@ export function createEngine(canvas, { reduced } = {}) {
   audio.setMuted(initialStore.muted)
   audio.setMusicOn(initialStore.music.on)
   audio.setMusicVolume(initialStore.music.volume)
+  // Initial water reflection based on the persisted camera mode.
+  if (garden.water?.material) {
+    const isTopDown = (initialStore.cameraMode || 'aligned') === 'topdown'
+    garden.water.material.envMapIntensity = isTopDown ? 0.225 : 0.75
+  }
 
   // ---- camera calculation ----------------------------------------------------
   function updateCameraTarget() {
