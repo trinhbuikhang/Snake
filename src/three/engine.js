@@ -938,6 +938,13 @@ export function createEngine(canvas, { reduced } = {}) {
       audio.setMusicVolume(s.music.volume)
     }
     if (s.cameraMode !== prev.cameraMode || s.showControls !== prev.showControls) updateCameraTarget()
+    // Top-down (2D) view looks straight down, so the water's env-map
+    // reflection (RoomEnvironment) lands as a bright streak across the
+    // board; reduce it there. 3D / cinematic keep the full reflection.
+    if (s.cameraMode !== prev.cameraMode) {
+      const isTopDown = (s.cameraMode || 'aligned') === 'topdown'
+      if (garden.water?.material) garden.water.material.envMapIntensity = isTopDown ? 0.225 : 0.75
+    }
     // V03: the portrait reframe keys off the coach holding the camera —
     // on the first night that includes every screen before the card
     // shows (coachBlocksCamera), so the refit fires once when the coach
@@ -956,6 +963,11 @@ export function createEngine(canvas, { reduced } = {}) {
   audio.setMuted(initialStore.muted)
   audio.setMusicOn(initialStore.music.on)
   audio.setMusicVolume(initialStore.music.volume)
+  // Initial water reflection based on the persisted camera mode.
+  if (garden.water?.material) {
+    const isTopDown = (initialStore.cameraMode || 'aligned') === 'topdown'
+    garden.water.material.envMapIntensity = isTopDown ? 0.225 : 0.75
+  }
 
   // ---- camera calculation ----------------------------------------------------
   function updateCameraTarget() {
@@ -1182,23 +1194,14 @@ export function createEngine(canvas, { reduced } = {}) {
     paintParams.interval = tickClock.interval
     rig.paint(paintParams)
 
-    // Headlight follows snake head. In the top-down (2D) view the camera
-    // looks straight down, so the headlight's illuminated disk on the
-    // board becomes a flat bright patch that hides the board and the
-    // snake. Tone it down there so the playfield stays readable.
+    // Headlight follows snake head
     headLight.position.copy(rig.group.position).add(_headOff)
-    const isTopDown = (useGame.getState().cameraMode || 'aligned') === 'topdown'
-    const headLightScale = isTopDown ? 0.25 : 1
-    headLight.intensity = (headLightBase + (isBoosting ? 1.5 : 0) + pulse * 2.5) * headLightScale
+    headLight.intensity = headLightBase + (isBoosting ? 1.5 : 0) + pulse * 2.5
 
     // Bloom pulse decay
     if (bloomPass) {
       pulse = Math.max(0, pulse - dt * 1.8)
-      // In top-down (2D) the camera looks straight down, so bloom
-      // spreads bright light into a flat patch over the board; keep it
-      // gentler there so the playfield and snake stay readable.
-      const bloomScale = isTopDown ? 0.6 : 1
-      bloomPass.strength = (BLOOM_BASE + pulse * 1.1 + (isBoosting ? 0.15 : 0)) * bloomScale
+      bloomPass.strength = BLOOM_BASE + pulse * 1.1 + (isBoosting ? 0.15 : 0)
     }
 
     // P02 warm-up: one off-screen render with every planet shown, on
