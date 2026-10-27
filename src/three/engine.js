@@ -206,6 +206,15 @@ export function createEngine(canvas, { reduced } = {}) {
   const envTex = pmrem.fromScene(roomEnv, 0.04).texture
 
   const garden = buildGarden(scene, { envTex, reduced })
+  // Base water env-map reflection, captured from the material so the
+  // top-down scaler stays in sync with garden.js (see PR #69 review).
+  const waterMat = garden.water?.material
+  const WATER_ENV_BASE = waterMat ? waterMat.envMapIntensity : 0.75
+  function applyWaterReflection(mode) {
+    if (!garden.water?.material) return
+    const isTopDown = (mode || 'aligned') === 'topdown'
+    garden.water.material.envMapIntensity = isTopDown ? WATER_ENV_BASE * 0.3 : WATER_ENV_BASE
+  }
   // The worn skin is read from storage directly (validated by
   // readSkins), NOT from the store: hydrate() only runs later, so a
   // returning player who wears Plush Moon would otherwise boot a
@@ -941,10 +950,7 @@ export function createEngine(canvas, { reduced } = {}) {
     // Top-down (2D) view looks straight down, so the water's env-map
     // reflection (RoomEnvironment) lands as a bright streak across the
     // board; reduce it there. 3D / cinematic keep the full reflection.
-    if (s.cameraMode !== prev.cameraMode) {
-      const isTopDown = (s.cameraMode || 'aligned') === 'topdown'
-      if (garden.water?.material) garden.water.material.envMapIntensity = isTopDown ? 0.225 : 0.75
-    }
+    if (s.cameraMode !== prev.cameraMode) applyWaterReflection(s.cameraMode)
     // V03: the portrait reframe keys off the coach holding the camera —
     // on the first night that includes every screen before the card
     // shows (coachBlocksCamera), so the refit fires once when the coach
@@ -964,10 +970,7 @@ export function createEngine(canvas, { reduced } = {}) {
   audio.setMusicOn(initialStore.music.on)
   audio.setMusicVolume(initialStore.music.volume)
   // Initial water reflection based on the persisted camera mode.
-  if (garden.water?.material) {
-    const isTopDown = (initialStore.cameraMode || 'aligned') === 'topdown'
-    garden.water.material.envMapIntensity = isTopDown ? 0.225 : 0.75
-  }
+  applyWaterReflection(initialStore.cameraMode)
 
   // ---- camera calculation ----------------------------------------------------
   function updateCameraTarget() {
