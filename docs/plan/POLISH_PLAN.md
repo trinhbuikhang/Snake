@@ -412,3 +412,14 @@ Khoá bằng test cái đang đúng (hàng đợi rẽ, độ trễ ≤ 1 tick) 
 | M03 | #68 | Lullaby procedural `composeLoop` + scheduler look-ahead; Silent Night chỉ có nước; sparkle không kề nhau kể cả qua biên loop. |
 | M04 | #71 | Nhạc theo trạng thái qua `applyMusic` (crossfade thật 1.5s, resume ở ô nhịp kế, menu 0.7, Moonrise lên G trưởng) + ducking SFX −6 dB; chết giữ arrangement của ván 2s rồi về menu. |
 | Closeout | #72 | PR này: cập nhật `AGENT.md` + bảng này + README tooling (xem dưới). |
+
+PR ngoài plan cùng giai đoạn: #63 (fix dt âm trong `serpentBase.paint()`), #65 (Dash ở giữa d-pad), #69/#70 (OpenCode: headlight/bloom top-down, `applyWaterReflection`).
+
+### Output cuối trên master (`4ae9d12`)
+
+- `steer-sim.mjs`: [1] lượt rẽ đôi bị rơi 0/24000, 0 chết; [3] input → đổi hướng, logic mean ở 120fps: base 80.8ms, floor 29.9ms, dash 19.8ms, worst 10.4ms (max ≤ 1 tick); [4] yaw settle target/drawn head ở 120fps: base 71.7/138.3ms (0.84 tick), floor 35/68.3ms (0.85 tick), dash 16.9/33.5ms (0.81 tick), worst 16.1/24.4ms (0.79 tick).
+- `swipe-sim.mjs`: swipe scenarios ok: 9/9 (S1–S9 qua `src/game/swipe.js` thật).
+- Harness 11 viewport: `hudOverlaps=0 cellsCovered=0` — reviewer chạy lại trên branch này được 7/11 viewport (p390, p375, p414, teams375, p390safe, l844t, l844safe: `hudOverlaps=0 cellsCovered=0 offscreen=0 smallTaps=0 errs=0`); viewport thứ 8 dừng vì `page.click('.btn--primary')` timeout 30s (flaky tooling, không do PR này, không chặn); DOM/CSS không đổi kể từ #65 (0/0 × 11).
+- `portrait-shots.mjs`: 5 dòng, `errs=0` ở cả 5 viewport (p390 / p375 / p414 / teams375 / p390safe): `statValue=18.4px Inter lining-nums tabular-nums`, `dpad=190x190`, `dbtn=52px`, `padHit=0.965`, `dash=56px`, `pauseTaps<44=0`.
+- `music-baseline.mjs` (seed 1): menu 76.5 osc/phút (peak 7), play 112.7 osc/phút (peak 10), moonrise 118.1 osc/phút (peak 10); melody 31.6 / 45.4 / 37.1 nốt/phút; im lặng dài nhất 2.73s; bus 0.25; tick p95 ≤ 0.005ms.
+- gzip (`gzip -9`, số reviewer đo trên build này): `engine-*.js` 164466 B, `index-*.js` 77184 B, `index-*.css` 7586 B; M01–M04 +3.05 kB so với `b3f38e2` (trong budget +6 kB).
