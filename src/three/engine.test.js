@@ -166,6 +166,7 @@ vi.mock('./decor.js', () => ({ buildDecor: () => h.decor }))
 vi.mock('../audio/sound.js', () => {
   const audio = {
     unlockAudio: vi.fn(),
+    isUnlocked: vi.fn(() => false),
     setMuted: vi.fn(),
     setMusicOn: vi.fn(),
     setMusicVolume: vi.fn(),
@@ -186,6 +187,7 @@ vi.mock('../audio/music.js', () => {
     start: vi.fn(),
     stop: vi.fn(),
     setBrightness: vi.fn(),
+    applyMusic: vi.fn(),
   }
   h.music = music
   return { music }
@@ -759,40 +761,133 @@ describe('frame() negative-dt guard (dt-hang fix)', () => {
   })
 })
 
-describe('run audio (M03)', () => {
-  it('entering a normal run starts the lullaby and tunes its brightness to the moon', () => {
+describe('run audio (M04)', () => {
+  // The engine's single audio path: every audio-relevant store change
+  // recomputes musicTarget and applies it once. Tests pin the target
+  // each transition applies, not the old start/stop calls.
+  function toStatus(status) {
+    useGame.setState({ status: 'title' })
+    vi.clearAllMocks()
+    h.audio.isUnlocked.mockReturnValue(true)
+    useGame.setState({ status })
+  }
+
+  it('entering a normal run applies play and tunes its brightness to the moon', () => {
     const engine = createEngine(freshCanvas(), { reduced: false })
     engine.start()
-    vi.clearAllMocks()
-    useGame.setState({ status: 'ready' })
+    toStatus('ready')
     expect(h.music.setBrightness).toHaveBeenCalledWith(useGame.getState().moonPhase)
-    expect(h.music.start).toHaveBeenCalledWith('play')
+    expect(h.music.applyMusic).toHaveBeenCalledWith({ mode: 'play', gain: 1 })
     expect(h.audio.setWaterOn).toHaveBeenCalledWith(false)
     engine.destroy()
   })
 
-  it('entering a Silent Night run stops the lullaby and hears only water', () => {
+  it('entering a Moonrise run applies moonrise, not play', () => {
     const engine = createEngine(freshCanvas(), { reduced: false })
     engine.start()
-    useGame.setState({ nightEvent: 'silent' })
+    useGame.setState({ moonriseActive: true, status: 'title' })
     vi.clearAllMocks()
+    h.audio.isUnlocked.mockReturnValue(true)
     useGame.setState({ status: 'ready' })
-    expect(h.music.stop).toHaveBeenCalled()
-    expect(h.music.start).not.toHaveBeenCalled()
-    expect(h.audio.setWaterOn).toHaveBeenCalledWith(true)
+    expect(h.music.applyMusic).toHaveBeenCalledWith({ mode: 'moonrise', gain: 1 })
+    useGame.setState({ moonriseActive: false })
     engine.destroy()
   })
 
-  it('pausing stops the lullaby; resuming restarts it', () => {
+  it('entering a Silent Night run applies off and hears only water', () => {
     const engine = createEngine(freshCanvas(), { reduced: false })
     engine.start()
-    useGame.setState({ status: 'ready' })
-    vi.clearAllMocks()
-    useGame.setState({ status: 'paused' })
-    expect(h.music.stop).toHaveBeenCalled()
-    vi.clearAllMocks()
-    useGame.setState({ status: 'playing' })
-    expect(h.music.start).toHaveBeenCalledWith('play')
+    useGame.setState({ nightEvent: 'silent' })
+    toStatus('ready')
+    expect(h.music.applyMusic).toHaveBeenCalledWith({ mode: 'off', gain: 0 })
+    expect(h.music.setBrightness).not.toHaveBeenCalled()
+    expect(h.audio.setWaterOn).toHaveBeenCalledWith(true)
+    useGame.setState({ nightEvent: 'none' })
     engine.destroy()
+  })
+
+  it('pausing applies off; resuming applies play', () => {
+    const engine = createEngine(freshCanvas(), { reduced: false })
+    engine.start()
+    toStatus('ready')
+    vi.clearAllMocks()
+    h.audio.isUnlocked.mockReturnValue(true)
+    useGame.setState({ status: 'paused' })
+    expect(h.music.applyMusic).toHaveBeenCalledWith({ mode: 'off', gain: 0 })
+    vi.clearAllMocks()
+    h.audio.isUnlocked.mockReturnValue(true)
+    useGame.setState({ status: 'playing' })
+    expect(h.music.applyMusic).toHaveBeenCalledWith({ mode: 'play', gain: 1 })
+    engine.destroy()
+  })
+
+  it('before any gesture, entering a run applies off (no menu/play without gesture)', () => {
+    const engine = createEngine(freshCanvas(), { reduced: false })
+    engine.start()
+    useGame.setState({ status: 'title' })
+    vi.clearAllMocks()
+    h.audio.isUnlocked.mockReturnValue(false)
+    useGame.setState({ status: 'ready' })
+    expect(h.music.applyMusic).toHaveBeenCalledWith({ mode: 'off', gain: 0 })
+    engine.destroy()
+  })
+
+  it('death rings out play for 2s, then falls back to menu', () => {
+    const engine = createEngine(freshCanvas(), { reduced: false })
+    engine.start()
+    toStatus('playing')
+    vi.useFakeTimers()
+    try {
+      vi.clearAllMocks()
+      h.audio.isUnlocked.mockReturnValue(true)
+      useGame.setState({ status: 'dead' })
+      expect(h.music.applyMusic).toHaveBeenCalledWith({ mode: 'play', gain: 1 })
+      vi.clearAllMocks()
+      h.audio.isUnlocked.mockReturnValue(true)
+      vi.advanceTimersByTime(2000)
+      expect(h.music.applyMusic).toHaveBeenCalledWith({ mode: 'menu', gain: 1 })
+    } finally {
+      vi.useRealTimers()
+    }
+    engine.destroy()
+  })
+
+  it('leaving death before 2s cancels the ring-out timer', () => {
+    const engine = createEngine(freshCanvas(), { reduced: false })
+    engine.start()
+    toStatus('playing')
+    vi.useFakeTimers()
+    try {
+      vi.clearAllMocks()
+      h.audio.isUnlocked.mockReturnValue(true)
+      useGame.setState({ status: 'dead' })
+      vi.advanceTimersByTime(1000)
+      useGame.setState({ status: 'title' })
+      vi.clearAllMocks()
+      vi.advanceTimersByTime(5000)
+      expect(h.music.applyMusic).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+    engine.destroy()
+  })
+
+  it('destroy() cancels a pending ring-out timer', () => {
+    const engine = createEngine(freshCanvas(), { reduced: false })
+    engine.start()
+    toStatus('playing')
+    vi.useFakeTimers()
+    try {
+      vi.clearAllMocks()
+      h.audio.isUnlocked.mockReturnValue(true)
+      useGame.setState({ status: 'dead' })
+      expect(h.music.applyMusic).toHaveBeenCalledWith({ mode: 'play', gain: 1 })
+      engine.destroy()
+      vi.clearAllMocks()
+      vi.advanceTimersByTime(5000)
+      expect(h.music.applyMusic).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

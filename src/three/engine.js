@@ -26,6 +26,7 @@ import { inputBus } from '../game/inputBus.js'
 import { isTypingTarget } from '../game/keyboard.js'
 import audio from '../audio/sound.js'
 import { music } from '../audio/music.js'
+import { musicTarget } from '../audio/musicState.js'
 import { createGovernor, observeWarmupFrame, settleWarmup, nextQualityIdx, msaaRetargetNeeded, msaaFor, QUALITY_STEPS, SPIKE_FRAME_MULTIPLE } from './qualityGovernor.js'
 import { disposeObject3D } from './dispose.js'
 import { rescaleAccum, runTicks } from './tickClock.js'
@@ -653,8 +654,11 @@ export function createEngine(canvas, { reduced } = {}) {
 
   function handleDeath(ev) {
     const timeUp = ev.cause === 'time' // Lantern Rush: the feast ends, no tragedy
-    music.stop()
-    audio.setWaterOn(false)
+    // M04: the lullaby is NOT stopped here — it rings out through the
+    // death animation (status is still 'playing') and the first 2s of
+    // the game-over screen, then the dead timer falls it back to
+    // 'menu'. The sting below ducks the ringing music instead of
+    // replacing it; water stops with the 'dead' status, not here.
     if (timeUp) audio.playBloom()
     else audio.playDeath()
     garden.petalFall()
@@ -876,21 +880,35 @@ export function createEngine(canvas, { reduced } = {}) {
   document.addEventListener('visibilitychange', onVis)
 
   // ---- store wiring ----------------------------------------------------------
-  // Run audio, shared by run start and resume-from-pause so the two paths
-  // can never drift apart: Silent Night hears only water; every other
-  // night gets the Moonlit Garden Lullaby, its pad brightness tuned to
-  // the night's moon.
-  function startRunAudio() {
-    const ev = nightEventById(useGame.getState().nightEvent)
-    if (ev.id === 'silent') {
-      music.stop()
-      audio.setWaterOn(true)
-    } else {
-      audio.setWaterOn(false)
-      // M03: the lullaby replaces the old pad drone + ambient score.
-      music.setBrightness(useGame.getState().moonPhase)
-      music.start('play')
+  // M04: the single audio path — every store change that can affect
+  // sound recomputes the target and applies it once. Arrangement
+  // changes crossfade (1.5s), off fades (0.6s), resume re-enters at
+  // the next bar; Silent Night stays water-only via the target table.
+  // The dead ring-out holds 'play' for 2s, then the timer falls it
+  // back to 'menu'.
+  let deadTimer = null
+  function clearDeadTimer() {
+    if (deadTimer) {
+      clearTimeout(deadTimer)
+      deadTimer = null
     }
+  }
+  function applyRunAudio(deadMs = 0) {
+    const s = useGame.getState()
+    const silent = nightEventById(s.nightEvent).id === 'silent'
+    audio.setWaterOn(silent && (s.status === 'ready' || s.status === 'playing'))
+    const target = musicTarget({
+      gestured: audio.isUnlocked(),
+      musicOn: s.music.on,
+      muted: s.muted,
+      status: s.status,
+      nightEvent: s.nightEvent,
+      moonrise: s.moonriseActive,
+      hidden: typeof document !== 'undefined' ? document.hidden : false,
+      deadMs,
+    })
+    if (target.mode !== 'off') music.setBrightness(s.moonPhase)
+    music.applyMusic(target)
   }
 
   const unsubStore = useGame.subscribe((s, prev) => {
@@ -906,7 +924,6 @@ export function createEngine(canvas, { reduced } = {}) {
         resetGame()
         readyAccum = 0
         // P6 "First Light": Silent Night keeps its promise — no music, only water.
-        startRunAudio()
       } else if (s.status === 'playing' && prev.status === 'ready') {
         // The ready beat ends: start the simulation from a clean slate.
         // Snap prev onto cur (same buffer, P06): interpolation across
@@ -916,22 +933,22 @@ export function createEngine(canvas, { reduced } = {}) {
       } else if (s.status === 'playing' && prev.status === 'paused') {
         tickClock.accum = 0
         prevCells = curCells
-        startRunAudio() // fade the night's sounds back in
-      } else if (s.status === 'paused') {
-        // Pause silences the garden too (T05): lullaby and water fade
-        // out; startRunAudio() restores them on resume.
-        music.stop()
-        audio.setWaterOn(false)
       } else if (s.status === 'prologue' && (prev.status === 'title' || prev.status === 'dead')) {
         unlock() // start() runs in the gesture; the demo garden keeps drifting behind the prologue
       } else if (s.status === 'title') {
         resetDemo()
-        music.stop()
-        audio.setWaterOn(false)
       } else if (s.status === 'dead') {
-        music.stop()
-        audio.setWaterOn(false)
+        // The lullaby rings out (the unified call below keeps 'play');
+        // after the 2s hold this timer falls it back to 'menu'.
+        clearDeadTimer()
+        deadTimer = setTimeout(() => {
+          deadTimer = null
+          if (useGame.getState().status === 'dead') applyRunAudio(2000)
+        }, 2000)
       }
+      // Leaving death cancels the ring-out timer (a new run, title, or
+      // prologue all re-apply their own mode through the unified call).
+      if (prev.status === 'dead' && s.status !== 'dead') clearDeadTimer()
       // C03: Dash already held through the ready beat — boost from the
       // first tick instead of dropping the press (setBoost gates on
       // 'playing', so the ready-time press only set the flag).
@@ -942,6 +959,20 @@ export function createEngine(canvas, { reduced } = {}) {
     if (s.music !== prev.music) {
       audio.setMusicOn(s.music.on)
       audio.setMusicVolume(s.music.volume)
+    }
+    // M04: one audio application for every change that can affect
+    // sound — applyMusic itself no-ops when the mode is unchanged, so
+    // unrelated changes (score, garden picks) never restart the loop.
+    if (
+      s.status !== prev.status ||
+      s.muted !== prev.muted ||
+      s.music !== prev.music ||
+      s.nightEvent !== prev.nightEvent ||
+      s.moonriseActive !== prev.moonriseActive ||
+      s.cameraMode !== prev.cameraMode ||
+      s.showControls !== prev.showControls
+    ) {
+      applyRunAudio()
     }
     if (s.cameraMode !== prev.cameraMode || s.showControls !== prev.showControls) updateCameraTarget()
     // Top-down (2D) view looks straight down, so the water's env-map
@@ -1258,6 +1289,7 @@ export function createEngine(canvas, { reduced } = {}) {
     // Silence the garden (T08): without this the lullaby scheduler's
     // setInterval keeps running after unmount, stacking a new layer of
     // music on every remount.
+    clearDeadTimer()
     music.stop()
     audio.setWaterOn(false)
     // Release the composer's GPU targets before the scene and renderer

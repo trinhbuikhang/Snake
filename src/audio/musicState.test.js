@@ -163,3 +163,21 @@ describe('musicTarget table (M01, wired by M04)', () => {
     expect(musicTarget({ ...base, status: 'mystery' })).toEqual({ mode: 'off', gain: 0 })
   })
 })
+
+describe('musicTarget gaps (M04)', () => {
+  const base = { gestured: true, musicOn: true, muted: false, hidden: false, nightEvent: 'none' }
+  it('paused + moonrise -> off (moonrise only colours play states)', () => {
+    expect(musicTarget({ ...base, status: 'paused', moonrise: true })).toEqual({ mode: 'off', gain: 0 })
+    expect(musicTarget({ ...base, status: 'paused', nightEvent: 'moonrise' })).toEqual({ mode: 'off', gain: 0 })
+  })
+  it('dead + moonrise holds play for 2s, then menu (same as a normal night)', () => {
+    expect(musicTarget({ ...base, status: 'dead', moonrise: true, deadMs: 0 })).toEqual({ mode: 'play', gain: 1 })
+    expect(musicTarget({ ...base, status: 'dead', moonrise: true, deadMs: 2000 })).toEqual({ mode: 'menu', gain: 1 })
+  })
+  it('ready + moonrise flag (not nightEvent) -> moonrise', () => {
+    expect(musicTarget({ ...base, status: 'ready', moonrise: true })).toEqual({ mode: 'moonrise', gain: 1 })
+  })
+  it('prologue + Silent Night -> off', () => {
+    expect(musicTarget({ ...base, status: 'prologue', nightEvent: 'silent' })).toEqual({ mode: 'off', gain: 0 })
+  })
+})

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { __test__, unlockAudio, fadeOutAudio, suspendAudio, restoreAudio, setMuted, setMusicOn, setMusicVolume, setWaterOn } from './sound.js'
+import { __test__, unlockAudio, fadeOutAudio, suspendAudio, restoreAudio, setMuted, setMusicOn, setMusicVolume, setWaterOn, duckMusic, playEat, playBloom, playVerse, playDeath, playTurn } from './sound.js'
 
 // ---- T10d: voice toggle edge cases (AUDIT L5) ----------------------------
 
@@ -352,5 +352,86 @@ describe('M02 music bus (sound.js)', () => {
     setWaterOn(true)
     const waterGain = fake.created.gains.find((g) => g !== bus && g.connectedTo === bus)
     expect(waterGain).toBeDefined()
+  })
+})
+
+// ---- M04: SFX ducking -------------------------------------------------------
+describe('ducking (M04)', () => {
+  function boot(now = 0) {
+    const fake = trackedCtx(now)
+    globalThis.window = {
+      AudioContext: function () {
+        return fake
+      },
+    }
+    unlockAudio()
+    return fake
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    __test__.reset()
+  })
+
+  afterEach(() => {
+    delete globalThis.window
+    __test__.reset()
+    vi.clearAllTimers()
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
+  // [0] master, [1] music bus, [2] scheduler bus, [3] water gain.
+  const musicParam = (fake) => fake.created.gains[1].gain
+
+  it('duckMusic dips the music bus exactly -6 dB and returns within 0.6s', () => {
+    const fake = boot(10)
+    duckMusic()
+    const p = musicParam(fake)
+    expect(p.calls[0]).toBe('cancel') // cancel first, then set, then ramp
+    expect(p.ramps).toContainEqual([0.3, 10.02]) // 0.6 * 0.5, 20ms attack
+    expect(p.ramps).toContainEqual([0.6, 10.57]) // hold 0.15s + release 0.4s
+  })
+
+  it('three ducks in 100ms never dip below -6 dB and return after the last one', () => {
+    const fake = boot(10)
+    duckMusic()
+    fake.currentTime = 10.05
+    duckMusic()
+    fake.currentTime = 10.09
+    duckMusic()
+    const ramps = musicParam(fake).ramps
+    expect(Math.min(...ramps.map(([v]) => v))).toBeGreaterThanOrEqual(0.3)
+    const lastReturn = ramps[ramps.length - 1]
+    expect(lastReturn).toEqual([0.6, 10.66]) // 0.57s after the last duck
+    expect(lastReturn[1] - 10.09).toBeLessThanOrEqual(0.6)
+  })
+
+  it('eat/bloom/verse/death duck the music bus; turn does not', () => {
+    const fake = boot(10)
+    const p = musicParam(fake)
+    playEat()
+    expect(p.ramps).toContainEqual([0.3, 10.02])
+    playBloom()
+    playVerse()
+    playDeath()
+    expect(p.ramps.filter(([v]) => v === 0.3).length).toBe(4)
+    const before = p.calls.length
+    playTurn()
+    expect(p.calls.length).toBe(before) // turn swish rides the master bus untouched
+  })
+
+  it('ducking while music is off stays at 0', () => {
+    const fake = boot(10)
+    setMusicOn(false)
+    duckMusic()
+    expect(musicParam(fake).ramps).toEqual([
+      [0, 10.02],
+      [0, 10.57],
+    ])
+  })
+
+  it('duckMusic with no context is a no-op', () => {
+    expect(() => duckMusic()).not.toThrow()
   })
 })
