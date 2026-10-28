@@ -11,10 +11,10 @@ npm run build && npx vite preview --port 4462 --strictPort &
 
 | Script | Loại | Việc |
 |--------|------|------|
-| `steer-sim.mjs [--json f] [--yaw-tau-k K]` | Node | Lái ở 4 tốc độ × 30/60/120 fps bằng `turn`/`step`/`speedInterval` thật + path builder thật của rig: [1] lượt rẽ đôi bị rơi, [2] ba lần bấm/tick, [3] độ trễ input → tick / frame vẽ, [4] thời gian đầu rắn quay xong. `--yaw-tau-k` thử làm mượt yaw tham chiếu C04. Vòng lặp tick là **bản sao** `engine.js` @ `f9d1dd6` — **sau C01 phải gọi `runTicks` thật**. |
-| `swipe-sim.mjs [--reference] [--json f]` | Node | 9 kịch bản vuốt (S1–S9) qua mô hình màn cảm ứng (`touches` = mọi ngón, `changedTouches` = ngón của event, ngón Dash không tới canvas). Mặc định: bản sao nguyên văn handler của master; `--reference`: `../reference/swipeTracker.js`. **Sau C02 thêm chế độ chạy `src/game/swipe.js`.** |
-| `portrait-fit.mjs` | Node | Bàn dọc ở 5 viewport cho `el` 1.0/1.1/1.2 × có/không coach strip, gọi `hudReserve` + `fitMargins` + `fitAligned` của engine, chiếu bằng `THREE.PerspectiveCamera`. **Sau V03 gọi `presetFor`/`alignedCamera` thật.** |
-| `music-baseline.mjs` | Node | Chạy scheduler ambient hiện tại qua `__test__` của `sound.js` với `AudioContext` giả, 10 phút: nốt/phút, im lặng dài nhất, dải cao độ. M03 thêm mục cho bản nhạc mới. |
+| `steer-sim.mjs [--json f]` | Node | Lái ở 4 tốc độ × 30/60/120 fps bằng `turn`/`step`/`speedInterval` thật + path builder thật của rig + `runTicks` thật từ `src/three/tickClock.js` (C01): [1] lượt rẽ đôi bị rơi, [2] ba lần bấm/tick, [3] độ trễ input → tick / frame vẽ, [4] thời gian đầu rắn quay xong với `yawAlpha` thật (C04). |
+| `swipe-sim.mjs [--master \| --reference] [--json f]` | Node | 9 kịch bản vuốt (S1–S9) qua mô hình màn cảm ứng (`touches` = mọi ngón, `changedTouches` = ngón của event, ngón Dash không tới canvas). Mặc định: `src/game/swipe.js` thật (C02); `--master`: bản sao nguyên văn handler trước C02; `--reference`: `../reference/swipeTracker.js`. |
+| `portrait-fit.mjs` | Node | Bàn dọc ở 5 viewport cho `el` 1.0/1.1/1.2 × có/không coach strip, gọi `hudReserve` + `presetFor`/`alignedCamera` thật của engine, chiếu bằng `THREE.PerspectiveCamera`. |
+| `music-baseline.mjs [seed] [arrangement]` | Node | Chạy scheduler lullaby (`src/audio/music.js` qua `__test__`) với `AudioContext` giả, 10 phút mô phỏng: nốt/phút, im lặng dài nhất, dải cao độ, số oscillator đồng thời cao nhất. Mặc định arrangement `play`; `menu`/`moonrise` đo riêng. |
 | `portrait-shots.mjs <url> <label> <outdir> [id,id]` | Playwright | 5 viewport dọc: ảnh `title`, `coach`, `play` (đã tắt coach), `paused` + JSON (font/size số, rect d-pad/Dash, `padHit`, tap size Pause, lỗi console). Gameplay chạy ở Zen Garden (headless ~2 fps). |
 | `title-probe.mjs [url]` | Playwright | Title 390×844 và 375×640: cần cuộn không, nút góc có bấm được không (`elementFromPoint`), rect mọi nút. |
 
