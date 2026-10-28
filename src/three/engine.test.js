@@ -167,6 +167,7 @@ vi.mock('../audio/sound.js', () => {
   const audio = {
     unlockAudio: vi.fn(),
     isUnlocked: vi.fn(() => false),
+    setUnlockListener: vi.fn(),
     setMuted: vi.fn(),
     setMusicOn: vi.fn(),
     setMusicVolume: vi.fn(),
@@ -845,7 +846,7 @@ describe('run audio (M04)', () => {
       vi.clearAllMocks()
       h.audio.isUnlocked.mockReturnValue(true)
       vi.advanceTimersByTime(2000)
-      expect(h.music.applyMusic).toHaveBeenCalledWith({ mode: 'menu', gain: 1 })
+      expect(h.music.applyMusic).toHaveBeenCalledWith({ mode: 'menu', gain: 0.7 })
     } finally {
       vi.useRealTimers()
     }
@@ -872,7 +873,7 @@ describe('run audio (M04)', () => {
     engine.destroy()
   })
 
-  it('destroy() cancels a pending ring-out timer', () => {
+  it('destroy() cancels a pending ring-out timer and unregisters the unlock listener', () => {
     const engine = createEngine(freshCanvas(), { reduced: false })
     engine.start()
     toStatus('playing')
@@ -883,11 +884,76 @@ describe('run audio (M04)', () => {
       useGame.setState({ status: 'dead' })
       expect(h.music.applyMusic).toHaveBeenCalledWith({ mode: 'play', gain: 1 })
       engine.destroy()
+      expect(h.audio.setUnlockListener).toHaveBeenCalledWith(null)
       vi.clearAllMocks()
       vi.advanceTimersByTime(5000)
       expect(h.music.applyMusic).not.toHaveBeenCalled()
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('title at engine start with a gesture already applies menu (round-1 review)', () => {
+    useGame.setState({ status: 'title' })
+    h.audio.isUnlocked.mockReturnValue(true)
+    const engine = createEngine(freshCanvas(), { reduced: false })
+    engine.start()
+    expect(h.music.applyMusic).toHaveBeenCalledWith({ mode: 'menu', gain: 0.7 })
+    engine.destroy()
+  })
+
+  it('the first touch applies menu at title even with no store change (round-1 review)', () => {
+    const engine = createEngine(freshCanvas(), { reduced: false })
+    engine.start()
+    const calls = h.audio.setUnlockListener.mock.calls
+    const unlockCb = calls[calls.length - 1][0]
+    expect(typeof unlockCb).toBe('function')
+    useGame.setState({ status: 'title' })
+    vi.clearAllMocks()
+    h.audio.isUnlocked.mockReturnValue(true)
+    unlockCb()
+    expect(h.music.applyMusic).toHaveBeenCalledWith({ mode: 'menu', gain: 0.7 })
+    engine.destroy()
+  })
+
+  it('title after a Silent Night applies menu on unlock, not off (round-1 review)', () => {
+    const engine = createEngine(freshCanvas(), { reduced: false })
+    engine.start()
+    const calls = h.audio.setUnlockListener.mock.calls
+    const unlockCb = calls[calls.length - 1][0]
+    useGame.setState({ nightEvent: 'silent', status: 'title' })
+    vi.clearAllMocks()
+    h.audio.isUnlocked.mockReturnValue(true)
+    unlockCb()
+    expect(h.music.applyMusic).toHaveBeenCalledWith({ mode: 'menu', gain: 0.7 })
+    useGame.setState({ nightEvent: 'none' })
+    engine.destroy()
+  })
+
+  it('death during a Moonrise run keeps moonrise for 2s, then menu (round-1 review)', () => {
+    const engine = createEngine(freshCanvas(), { reduced: false })
+    engine.start()
+    useGame.setState({ moonriseActive: true, status: 'title' })
+    vi.clearAllMocks()
+    h.audio.isUnlocked.mockReturnValue(true)
+    useGame.setState({ status: 'ready' })
+    expect(h.music.applyMusic).toHaveBeenCalledWith({ mode: 'moonrise', gain: 1 })
+    vi.useFakeTimers()
+    try {
+      vi.clearAllMocks()
+      h.audio.isUnlocked.mockReturnValue(true)
+      // The store clears moonriseActive together with status 'dead' —
+      // the ring-out must still be moonrise, never play.
+      useGame.setState({ status: 'dead', moonriseActive: false })
+      expect(h.music.applyMusic).toHaveBeenCalledWith({ mode: 'moonrise', gain: 1 })
+      expect(h.music.applyMusic).not.toHaveBeenCalledWith({ mode: 'play', gain: 1 })
+      vi.clearAllMocks()
+      h.audio.isUnlocked.mockReturnValue(true)
+      vi.advanceTimersByTime(2000)
+      expect(h.music.applyMusic).toHaveBeenCalledWith({ mode: 'menu', gain: 0.7 })
+    } finally {
+      vi.useRealTimers()
+    }
+    engine.destroy()
   })
 })

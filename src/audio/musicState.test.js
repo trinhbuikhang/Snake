@@ -127,9 +127,9 @@ describe('musicTarget table (M01, wired by M04)', () => {
       expect(musicTarget({ ...base, gestured: false, status }).mode).toBe('off')
     }
   })
-  it('title/prologue -> menu; ready/playing -> play; paused -> off', () => {
-    expect(musicTarget({ ...base, status: 'title' })).toEqual({ mode: 'menu', gain: 1 })
-    expect(musicTarget({ ...base, status: 'prologue' })).toEqual({ mode: 'menu', gain: 1 })
+  it('title/prologue -> menu at 0.7; ready/playing -> play; paused -> off', () => {
+    expect(musicTarget({ ...base, status: 'title' })).toEqual({ mode: 'menu', gain: 0.7 })
+    expect(musicTarget({ ...base, status: 'prologue' })).toEqual({ mode: 'menu', gain: 0.7 })
     expect(musicTarget({ ...base, status: 'ready' })).toEqual({ mode: 'play', gain: 1 })
     expect(musicTarget({ ...base, status: 'playing' })).toEqual({ mode: 'play', gain: 1 })
     expect(musicTarget({ ...base, status: 'paused' })).toEqual({ mode: 'off', gain: 0 })
@@ -140,18 +140,21 @@ describe('musicTarget table (M01, wired by M04)', () => {
       mode: 'moonrise',
       gain: 1,
     })
-    expect(musicTarget({ ...base, status: 'title', moonrise: true })).toEqual({ mode: 'menu', gain: 1 })
+    expect(musicTarget({ ...base, status: 'title', moonrise: true })).toEqual({ mode: 'menu', gain: 0.7 })
   })
-  it('Silent Night -> off in every status', () => {
-    for (const status of ['title', 'ready', 'playing', 'dead']) {
+  it('Silent Night -> off in every run status', () => {
+    for (const status of ['prologue', 'ready', 'playing', 'paused', 'dead']) {
       expect(musicTarget({ ...base, status, nightEvent: 'silent' }).mode).toBe('off')
     }
+  })
+  it('title after a Silent Night is NOT silent (round-1 review: title is not a run state)', () => {
+    expect(musicTarget({ ...base, status: 'title', nightEvent: 'silent' })).toEqual({ mode: 'menu', gain: 0.7 })
   })
   it('dead holds play for 2s, then menu', () => {
     expect(musicTarget({ ...base, status: 'dead', deadMs: 0 })).toEqual({ mode: 'play', gain: 1 })
     expect(musicTarget({ ...base, status: 'dead', deadMs: 1999 })).toEqual({ mode: 'play', gain: 1 })
-    expect(musicTarget({ ...base, status: 'dead', deadMs: 2000 })).toEqual({ mode: 'menu', gain: 1 })
-    expect(musicTarget({ ...base, status: 'dead', deadMs: 9000 })).toEqual({ mode: 'menu', gain: 1 })
+    expect(musicTarget({ ...base, status: 'dead', deadMs: 2000 })).toEqual({ mode: 'menu', gain: 0.7 })
+    expect(musicTarget({ ...base, status: 'dead', deadMs: 9000 })).toEqual({ mode: 'menu', gain: 0.7 })
   })
   it('music off, muted, or hidden -> off', () => {
     expect(musicTarget({ ...base, status: 'playing', musicOn: false }).mode).toBe('off')
@@ -172,12 +175,64 @@ describe('musicTarget gaps (M04)', () => {
   })
   it('dead + moonrise holds play for 2s, then menu (same as a normal night)', () => {
     expect(musicTarget({ ...base, status: 'dead', moonrise: true, deadMs: 0 })).toEqual({ mode: 'play', gain: 1 })
-    expect(musicTarget({ ...base, status: 'dead', moonrise: true, deadMs: 2000 })).toEqual({ mode: 'menu', gain: 1 })
+    expect(musicTarget({ ...base, status: 'dead', moonrise: true, deadMs: 2000 })).toEqual({ mode: 'menu', gain: 0.7 })
   })
   it('ready + moonrise flag (not nightEvent) -> moonrise', () => {
     expect(musicTarget({ ...base, status: 'ready', moonrise: true })).toEqual({ mode: 'moonrise', gain: 1 })
   })
   it('prologue + Silent Night -> off', () => {
     expect(musicTarget({ ...base, status: 'prologue', nightEvent: 'silent' })).toEqual({ mode: 'off', gain: 0 })
+  })
+})
+
+describe('musicTarget full table (M04 round-1 review)', () => {
+  // The acceptance criterion demands every status x {Silent, Moonrise,
+  // normal} x {music on/off} x {muted} x {gestured} cell. The expected
+  // table below is written from the plan's rules, not copied from the
+  // implementation's branches, so a drift in either shows up here.
+  function expected({ status, nightEvent, moonrise, musicOn, muted, gestured }) {
+    if (!gestured || muted || musicOn === false) return { mode: 'off', gain: 0 }
+    if (status === 'title') return { mode: 'menu', gain: 0.7 }
+    if (nightEvent === 'silent') return { mode: 'off', gain: 0 }
+    const moon = moonrise === true || nightEvent === 'moonrise'
+    switch (status) {
+      case 'prologue':
+        return { mode: 'menu', gain: 0.7 }
+      case 'ready':
+      case 'playing':
+        return { mode: moon ? 'moonrise' : 'play', gain: 1 }
+      case 'paused':
+        return { mode: 'off', gain: 0 }
+      case 'dead':
+        return { mode: 'play', gain: 1 }
+      default:
+        return { mode: 'off', gain: 0 }
+    }
+  }
+
+  it('every combination matches the expected mode/gain', () => {
+    let cells = 0
+    for (const status of ['title', 'prologue', 'ready', 'playing', 'paused', 'dead']) {
+      for (const nightEvent of ['none', 'silent', 'moonrise']) {
+        for (const moonrise of [false, true]) {
+          for (const musicOn of [true, false]) {
+            for (const muted of [false, true]) {
+              for (const gestured of [true, false]) {
+                const input = { status, nightEvent, moonrise, musicOn, muted, gestured, hidden: false, deadMs: 0 }
+                const got = musicTarget(input)
+                expect(got).toEqual(expected(input))
+                // And the hard guard, whatever the cell: no sounding
+                // mode without a gesture, while muted, or with music off.
+                if (!gestured || muted || musicOn === false) {
+                  expect(got.mode).toBe('off')
+                }
+                cells++
+              }
+            }
+          }
+        }
+      }
+    }
+    expect(cells).toBe(6 * 3 * 2 * 2 * 2 * 2)
   })
 })

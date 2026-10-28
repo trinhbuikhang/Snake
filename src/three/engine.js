@@ -893,11 +893,16 @@ export function createEngine(canvas, { reduced } = {}) {
       deadTimer = null
     }
   }
+  // Round-1 review (M04): the store clears moonriseActive together
+  // with status 'dead', but the ring-out must keep the run's own
+  // arrangement — otherwise a Moonrise death crossfades moonrise ->
+  // play -> menu, two dips in 3s instead of one ring-out.
+  let runArrangement = 'play'
   function applyRunAudio(deadMs = 0) {
     const s = useGame.getState()
     const silent = nightEventById(s.nightEvent).id === 'silent'
     audio.setWaterOn(silent && (s.status === 'ready' || s.status === 'playing'))
-    const target = musicTarget({
+    let target = musicTarget({
       gestured: audio.isUnlocked(),
       musicOn: s.music.on,
       muted: s.muted,
@@ -907,9 +912,18 @@ export function createEngine(canvas, { reduced } = {}) {
       hidden: typeof document !== 'undefined' ? document.hidden : false,
       deadMs,
     })
+    if (s.status === 'dead' && deadMs < 2000 && target.mode === 'play') {
+      target = { mode: runArrangement, gain: 1 }
+    } else if (target.mode === 'play' || target.mode === 'moonrise') {
+      runArrangement = target.mode
+    }
     if (target.mode !== 'off') music.setBrightness(s.moonPhase)
     music.applyMusic(target)
   }
+  // Round-1 review (M04): the first touch creates the context through
+  // unlock.js without changing any store, so the subscription alone
+  // would never start the title menu music — re-apply on unlock.
+  audio.setUnlockListener(() => applyRunAudio())
 
   const unsubStore = useGame.subscribe((s, prev) => {
     if (s.status !== prev.status) {
@@ -1267,6 +1281,10 @@ export function createEngine(canvas, { reduced } = {}) {
     // appliedMsaa starts null, so this first call performs the one
     // MSAA retarget; later resizes stay size-only.
     applyQuality()
+    // Round-1 review (M04): apply the music target once at engine
+    // start too — if the engine mounts after the first gesture (a
+    // remount), the title menu must not wait for a store change.
+    applyRunAudio()
     prevTS = performance.now()
     rafId = requestAnimationFrame(frame)
   }
@@ -1290,6 +1308,7 @@ export function createEngine(canvas, { reduced } = {}) {
     // setInterval keeps running after unmount, stacking a new layer of
     // music on every remount.
     clearDeadTimer()
+    audio.setUnlockListener(null)
     music.stop()
     audio.setWaterOn(false)
     // Release the composer's GPU targets before the scene and renderer

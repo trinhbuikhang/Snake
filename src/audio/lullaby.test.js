@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import { composeLoop, BPM, BEATS_PER_BAR, BARS, LOOP_BEATS, LOOP_SECONDS, SEC_PER_BEAT } from './lullaby.js'
 
-// F major pentatonic pitch classes: F G A C D.
+// F major pentatonic pitch classes: F G A C D. Moonrise transposes
+// +2 (M04 round-1 review): G major pentatonic G A B D E.
 const PENTA_PC = new Set([5, 7, 9, 0, 2])
+const MOONRISE_PC = new Set([7, 9, 11, 2, 4])
 const pc = (midi) => ((midi % 12) + 12) % 12
 
 // All notes sounding at time t (in beats), across one loop.
@@ -33,13 +35,29 @@ describe('lullaby composition (M03)', () => {
     expect(pad.every((n) => n.t % BEATS_PER_BAR === 0 && n.dur === BEATS_PER_BAR)).toBe(true)
   })
 
-  it('every box/sparkle note is in the F pentatonic', () => {
-    for (const arrangement of ['play', 'menu', 'moonrise']) {
+  it('every box/sparkle note is in the arrangement pentatonic', () => {
+    for (const arrangement of ['play', 'menu']) {
       for (let seed = 1; seed <= 5; seed++) {
         const notes = composeLoop(seed, arrangement)
         for (const n of notes.filter((x) => x.voice === 'box' || x.voice === 'sparkle')) {
           expect(PENTA_PC.has(pc(n.midi))).toBe(true)
         }
+      }
+    }
+  })
+
+  it('moonrise (round-1 review): box/sparkle pitch classes are the G pentatonic, chords G-Em-C-D', () => {
+    for (let seed = 1; seed <= 10; seed++) {
+      const notes = composeLoop(seed, 'moonrise')
+      for (const n of notes.filter((x) => x.voice === 'box' || x.voice === 'sparkle')) {
+        expect(MOONRISE_PC.has(pc(n.midi))).toBe(true)
+      }
+      // Bass roots cycle G - Em - C - D (one per bar, in order).
+      const bass = notes.filter((n) => n.voice === 'bass')
+      expect(bass.length).toBe(16)
+      const roots = [7, 4, 0, 2]
+      for (let bar = 0; bar < 16; bar++) {
+        expect(pc(bass[bar].midi)).toBe(roots[bar % 4])
       }
     }
   })

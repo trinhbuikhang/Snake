@@ -96,8 +96,22 @@ export function unlockAudio() {
   // A hide-fade may have ramped the master bus to 0; restore it so the
   // resumed context is actually audible. No-op when already at 1.
   resetMasterGain()
-  unlocked = true
+  // Round-1 review (M04): the engine's title menu music must start on
+  // the first touch even when no store change follows it — notify the
+  // unlock listener on the false -> true edge only, so later SFX calls
+  // (which also route through unlockAudio) do not re-trigger it.
+  if (!unlocked) {
+    unlocked = true
+    if (unlockListener) unlockListener()
+  }
   startPendingVoices()
+}
+
+// Round-1 review (M04): lets the engine run its music target on the
+// first real activation gesture. Set to null to unregister (destroy).
+let unlockListener = null
+export function setUnlockListener(cb) {
+  unlockListener = cb
 }
 
 // Round-2 review: cancel any scheduled automation BEFORE setting the
@@ -167,16 +181,27 @@ export function setMuted(m) {
 // 0.03 time constant) — dragging the slider never creates or destroys
 // a node. With no context yet they only record the intent; ensureCtx
 // builds the bus from these flags when the first gesture creates it.
+// Round-1 review (M04): cancel + anchor before retargeting, with the
+// M01 pattern — a ducking envelope's return ramp to the old volume
+// must never outlive a Music-off or volume change and win over it.
 export function setMusicOn(on) {
   musicOn = on
   music.setGate({ muted, musicOn })
-  if (musicGain && ctx) musicGain.gain.setTargetAtTime(on ? musicVolume : 0, ctx.currentTime, 0.03)
+  if (musicGain && ctx) {
+    const t = ctx.currentTime
+    musicGain.gain.cancelScheduledValues(t)
+    musicGain.gain.setValueAtTime(musicGain.gain.value, t)
+    musicGain.gain.setTargetAtTime(on ? musicVolume : 0, t, 0.03)
+  }
 }
 
 export function setMusicVolume(v) {
   musicVolume = Math.round(Math.min(1, Math.max(0, v)) * 10) / 10
   if (musicGain && ctx && musicOn) {
-    musicGain.gain.setTargetAtTime(musicVolume, ctx.currentTime, 0.03)
+    const t = ctx.currentTime
+    musicGain.gain.cancelScheduledValues(t)
+    musicGain.gain.setValueAtTime(musicGain.gain.value, t)
+    musicGain.gain.setTargetAtTime(musicVolume, t, 0.03)
   }
 }
 
@@ -456,7 +481,7 @@ export function setWaterOn(on) {
 
 // (ambient score section follows; `audio` is exported at the end of the file)
 
-export const audio = { unlockAudio, isUnlocked, setMuted, setMusicOn, setMusicVolume, playEat, playBloom, playVerse, playTurn, playDeath, setWaterOn }
+export const audio = { unlockAudio, isUnlocked, setUnlockListener, setMuted, setMusicOn, setMusicVolume, playEat, playBloom, playVerse, playTurn, playDeath, setWaterOn }
 
 // Test seam (T05/T10d): lets unit tests drive the phrase scheduler and the
 // voice toggles against a mock AudioContext and observe what gets
@@ -479,6 +504,7 @@ export const __test__ = {
   reset() {
     cancelPendingSuspend()
     ctxStateListener = null
+    unlockListener = null
     ctx = null
     master = null
     muted = false

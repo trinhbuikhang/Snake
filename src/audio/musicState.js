@@ -73,13 +73,17 @@ export function audioLifecycle(state, event) {
 
 // musicTarget: which music mode the game wants, purely from state.
 // M02 will scale `gain` by the music volume and M03 caps the bus at
-// 0.25; M01 only needs off vs sounding, so gain is 1 whenever audible.
+// 0.25; the `gain` here is the arrangement's own level — menu sits at
+// 0.7 of play (M04 decision), so the ceiling bus lands at 0.175 for
+// menu and 0.25 for play/moonrise.
 //   status: 'title' | 'prologue' | 'ready' | 'playing' | 'paused' | 'dead'
 //   nightEvent: 'none' | 'silent' | 'moonrise' | ... (store values)
 //   moonrise: the moonrise-night flag (also true when nightEvent is
 //     'moonrise', since the store folds it into nightEvent on start)
-//   deadMs: milliseconds since death — the ring-out holds 'play' for
-//     2s before falling back to 'menu' (M04 wires the timer)
+//   deadMs: milliseconds since death — the ring-out holds the run's
+//     arrangement for 2s before falling back to 'menu' (M04 wires the
+//     timer; the engine overrides the dead mode with the run's
+//     arrangement, see applyRunAudio)
 export function musicTarget({
   gestured,
   musicOn,
@@ -93,20 +97,23 @@ export function musicTarget({
   // Never any music before the first gesture, while muted, while the
   // music toggle is off, or while the tab is hidden.
   if (!gestured || muted || musicOn === false || hidden) return { mode: 'off', gain: 0 }
+  // Round-1 review (M04): the title screen is not a run state, so a
+  // Silent Night left over from the last run must not silence it —
+  // the Silent rule applies to run states only.
+  if (status === 'title') return { mode: 'menu', gain: 0.7 }
   // Silent Night keeps its promise: water only, no music.
   if (nightEvent === 'silent') return { mode: 'off', gain: 0 }
   const moon = moonrise === true || nightEvent === 'moonrise'
   switch (status) {
-    case 'title':
     case 'prologue':
-      return { mode: 'menu', gain: 1 }
+      return { mode: 'menu', gain: 0.7 }
     case 'ready':
     case 'playing':
       return { mode: moon ? 'moonrise' : 'play', gain: 1 }
     case 'paused':
       return { mode: 'off', gain: 0 }
     case 'dead':
-      return deadMs < 2000 ? { mode: 'play', gain: 1 } : { mode: 'menu', gain: 1 }
+      return deadMs < 2000 ? { mode: 'play', gain: 1 } : { mode: 'menu', gain: 0.7 }
     default:
       return { mode: 'off', gain: 0 }
   }

@@ -14,6 +14,11 @@ class MockParam {
     // exactly an ordering bug (setTarget inserted before an existing
     // ramp), so pinning the call order pins the fix.
     this.calls = []
+    // Round-1 review (M04): ramps a cancel has killed, by reference.
+    // cancelScheduledValues must not delete them from `ramps` — other
+    // tests count every duck's ramps — but applyUntil() must skip them,
+    // the way a real AudioParam drops cancelled events.
+    this.dead = new Set()
   }
   setValueAtTime(v) {
     this.value = v
@@ -36,6 +41,17 @@ class MockParam {
   cancelScheduledValues() {
     this.cancelled = true
     this.calls.push('cancel')
+    for (const r of this.ramps) this.dead.add(r)
+  }
+  // Advance the mock timeline: pending (not cancelled) ramps at or
+  // before t take effect in order, then leave the list. Cancelled
+  // ramps are matched by reference — the `ramps` array itself is left
+  // intact for tests that count every duck's ramps.
+  applyUntil(t) {
+    for (const r of this.ramps) {
+      if (r[1] <= t && !this.dead.has(r)) this.value = r[0]
+    }
+    this.ramps = this.ramps.filter(([_, rt]) => rt > t)
   }
 }
 
@@ -393,18 +409,43 @@ describe('ducking (M04)', () => {
     expect(p.ramps).toContainEqual([0.6, 10.57]) // hold 0.15s + release 0.4s
   })
 
-  it('three ducks in 100ms never dip below -6 dB and return after the last one', () => {
+  it('three playEats in 100ms never dip below -6 dB and return after the last one', () => {
     const fake = boot(10)
-    duckMusic()
+    playEat()
     fake.currentTime = 10.05
-    duckMusic()
+    playEat()
     fake.currentTime = 10.09
-    duckMusic()
+    playEat()
     const ramps = musicParam(fake).ramps
     expect(Math.min(...ramps.map(([v]) => v))).toBeGreaterThanOrEqual(0.3)
     const lastReturn = ramps[ramps.length - 1]
     expect(lastReturn).toEqual([0.6, 10.66]) // 0.57s after the last duck
     expect(lastReturn[1] - 10.09).toBeLessThanOrEqual(0.6)
+  })
+
+  it('a volume change after a duck ends at the new volume, not the duck return (round-1 review)', () => {
+    const fake = boot(10)
+    duckMusic()
+    const p = musicParam(fake)
+    fake.currentTime = 10.1
+    setMusicVolume(0.2)
+    expect(p.targets).toContain(0.2)
+    expect(p.value).toBe(0.2)
+    // Past the duck's return ramp: the cancelled return must not win.
+    p.applyUntil(10.6)
+    expect(p.value).toBe(0.2)
+  })
+
+  it('Music off after a duck ends at 0, not the duck return (round-1 review)', () => {
+    const fake = boot(10)
+    duckMusic()
+    const p = musicParam(fake)
+    fake.currentTime = 10.1
+    setMusicOn(false)
+    expect(p.targets).toContain(0)
+    expect(p.value).toBe(0)
+    p.applyUntil(10.6)
+    expect(p.value).toBe(0)
   })
 
   it('eat/bloom/verse/death duck the music bus; turn does not', () => {
