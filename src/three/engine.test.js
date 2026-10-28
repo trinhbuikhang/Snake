@@ -174,13 +174,21 @@ vi.mock('../audio/sound.js', () => {
     playVerse: vi.fn(),
     playTurn: vi.fn(),
     playDeath: vi.fn(),
-    setPadOn: vi.fn(),
     setWaterOn: vi.fn(),
-    setAmbientOn: vi.fn(),
-    setAmbientPhase: vi.fn(),
   }
   h.audio = audio
   return { default: audio, audio, playVerse: audio.playVerse }
+})
+
+vi.mock('../audio/music.js', () => {
+  const music = {
+    attach: vi.fn(),
+    start: vi.fn(),
+    stop: vi.fn(),
+    setBrightness: vi.fn(),
+  }
+  h.music = music
+  return { music }
 })
 
 // ---- DOM stubs -------------------------------------------------------------
@@ -551,8 +559,7 @@ describe('createEngine lifecycle', () => {
     vi.clearAllMocks()
 
     engine.destroy()
-    expect(h.audio.setAmbientOn).toHaveBeenCalledWith(false)
-    expect(h.audio.setPadOn).toHaveBeenCalledWith(false)
+    expect(h.music.stop).toHaveBeenCalled()
     expect(h.audio.setWaterOn).toHaveBeenCalledWith(false)
 
     // After destroy, store changes must not reach the engine anymore:
@@ -561,8 +568,7 @@ describe('createEngine lifecycle', () => {
     vi.clearAllMocks()
     useGame.setState({ status: 'dead' })
     useGame.setState({ garden: { lantern: 2, lotus: 1, ink: 'gold' } })
-    expect(h.audio.setPadOn).not.toHaveBeenCalled()
-    expect(h.audio.setAmbientOn).not.toHaveBeenCalled()
+    expect(h.music.stop).not.toHaveBeenCalled()
     expect(h.decor.setLanternCount).not.toHaveBeenCalled()
   })
 })
@@ -749,6 +755,44 @@ describe('frame() negative-dt guard (dt-hang fix)', () => {
     // paintParams is shared across frames, so the last call carries
     // this frame's dt. Reverting the clamp makes this -5, failing here.
     expect(calls[calls.length - 1][0].dt).toBe(0)
+    engine.destroy()
+  })
+})
+
+describe('run audio (M03)', () => {
+  it('entering a normal run starts the lullaby and tunes its brightness to the moon', () => {
+    const engine = createEngine(freshCanvas(), { reduced: false })
+    engine.start()
+    vi.clearAllMocks()
+    useGame.setState({ status: 'ready' })
+    expect(h.music.setBrightness).toHaveBeenCalledWith(useGame.getState().moonPhase)
+    expect(h.music.start).toHaveBeenCalledWith('play')
+    expect(h.audio.setWaterOn).toHaveBeenCalledWith(false)
+    engine.destroy()
+  })
+
+  it('entering a Silent Night run stops the lullaby and hears only water', () => {
+    const engine = createEngine(freshCanvas(), { reduced: false })
+    engine.start()
+    useGame.setState({ nightEvent: 'silent' })
+    vi.clearAllMocks()
+    useGame.setState({ status: 'ready' })
+    expect(h.music.stop).toHaveBeenCalled()
+    expect(h.music.start).not.toHaveBeenCalled()
+    expect(h.audio.setWaterOn).toHaveBeenCalledWith(true)
+    engine.destroy()
+  })
+
+  it('pausing stops the lullaby; resuming restarts it', () => {
+    const engine = createEngine(freshCanvas(), { reduced: false })
+    engine.start()
+    useGame.setState({ status: 'ready' })
+    vi.clearAllMocks()
+    useGame.setState({ status: 'paused' })
+    expect(h.music.stop).toHaveBeenCalled()
+    vi.clearAllMocks()
+    useGame.setState({ status: 'playing' })
+    expect(h.music.start).toHaveBeenCalledWith('play')
     engine.destroy()
   })
 })

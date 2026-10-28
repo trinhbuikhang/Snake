@@ -1,37 +1,119 @@
-// Audio baseline for docs/plan/POLISH_PLAN.md (workstream M).
-// Tooling only — not part of the game build, not part of `npm test`.
-// Drives the CURRENT ambient scheduler in src/audio/sound.js through its
-// existing __test__ seam with a fake AudioContext and counts what one
-// minute of "music" schedules (no audio device needed).
-// usage (repo root): node docs/plan/polish/tooling/music-baseline.mjs
-import { __test__ } from '../../../../src/audio/sound.js'
+// music-baseline.mjs — M03 lullaby acceptance metrics, no browser needed.
+// Runs the real composeLoop + scheduler against a mock AudioContext for
+// 10 simulated minutes and reports the numbers the plan's M03 acceptance
+// pins: oscillators created/min, peak concurrency, melody density,
+// longest melody silence, scheduler bus gain, tick p95.
+// usage: node docs/plan/polish/tooling/music-baseline.mjs [seed] [arrangement]
+import { music, __test__ } from '../../../../src/audio/music.js'
+import { composeLoop, LOOP_SECONDS, SEC_PER_BEAT } from '../../../../src/audio/lullaby.js'
 
-let seed = 7
-Math.random = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296)
-
-function fakeCtx() {
-  const c = {
-    currentTime: 0, oscStarts: [], freqs: [],
-    createOscillator() { const o = { type: '', frequency: { value: 0, setValueAtTime() {}, exponentialRampToValueAtTime() {} }, connect() {}, start(at) { c.oscStarts.push(at); c.freqs.push(o.frequency.value) }, stop() {} }; return o },
-    createGain() { return { gain: { value: 0, setValueAtTime() {}, linearRampToValueAtTime() {}, exponentialRampToValueAtTime() {}, setTargetAtTime() {} }, connect() {}, disconnect() {} } },
-    createBiquadFilter() { return { type: '', frequency: { value: 0, setTargetAtTime() {} }, Q: { value: 0 }, connect() {}, disconnect() {} } },
+class MockParam {
+  constructor(value = 0) {
+    this.value = value
   }
-  return c
+  setValueAtTime(v) {
+    this.value = v
+  }
+  linearRampToValueAtTime(v) {
+    this.value = v
+  }
+  exponentialRampToValueAtTime(v) {
+    this.value = v
+  }
+  setTargetAtTime(v) {
+    this.value = v
+  }
+  cancelScheduledValues() {}
+}
+class MockNode {
+  constructor() {
+    this.stoppedAt = null
+    this.type = ''
+  }
+  connect() {}
+  disconnect() {}
+  start(at) {
+    this.startedAt = at
+  }
+  stop(at) {
+    this.stoppedAt = at
+  }
+  setPeriodicWave() {}
+}
+class MockCtx {
+  constructor() {
+    this.currentTime = 0
+    this.state = 'running'
+    this.oscillators = []
+  }
+  createOscillator() {
+    const o = new MockNode()
+    o.frequency = new MockParam(440)
+    this.oscillators.push(o)
+    return o
+  }
+  createGain() {
+    const g = new MockNode()
+    g.gain = new MockParam(0)
+    return g
+  }
+  createBiquadFilter() {
+    const f = new MockNode()
+    f.frequency = new MockParam(2400)
+    return f
+  }
+  createPeriodicWave(real, imag) {
+    return { real, imag }
+  }
 }
 
-for (const phase of ['new', 'half', 'full']) {
-  __test__.reset()
-  const c = fakeCtx()
-  __test__.mockAmbient(c, { on: true, nextAt: 0 })
-  // setAmbientPhase is exported from the module too
-  const mod = await import('../../../../src/audio/sound.js')
-  mod.setAmbientPhase(phase)
-  for (let t = 0; t <= 600; t += 0.7) { c.currentTime = t; __test__.planPhrases() } // 10 minutes
-  const notes = c.oscStarts.length / 2 // bloom() = sine + triangle shimmer
-  const sorted = [...c.oscStarts].sort((a, b) => a - b)
-  let maxGap = 0
-  for (let i = 2; i < sorted.length; i += 2) maxGap = Math.max(maxGap, sorted[i] - sorted[i - 2])
-  const f = c.freqs.filter((_, i) => i % 2 === 0)
-  console.log(`ambient phase=${phase}: ${(notes / 10).toFixed(1)} notes/min, longest silence ${maxGap.toFixed(1)}s, pitch ${Math.min(...f).toFixed(0)}-${Math.max(...f).toFixed(0)} Hz (minor pentatonic), oscillators/min ${(c.oscStarts.length / 10).toFixed(1)}`)
+const seed = parseInt(process.argv[2] || '1', 10)
+const arrangement = process.argv[3] || 'play'
+const fake = new MockCtx()
+const bus = fake.createGain()
+music.attach(fake, bus)
+music.start(arrangement, seed)
+
+const notes = composeLoop(seed, arrangement)
+const box = notes.filter((n) => n.voice === 'box')
+const onsets = box.map((n) => n.t).sort((a, b) => a - b)
+let maxGap = 0
+for (let i = 0; i < onsets.length; i++) {
+  const next = i + 1 < onsets.length ? onsets[i + 1] : onsets[0] + 48
+  maxGap = Math.max(maxGap, next - onsets[i])
 }
-console.log('pad (setPadOn): 3 oscillators 55/110.4/219.7 Hz + looped noise + LFO, lowpass 520 Hz — a constant drone under the ambient while playing')
+
+let peak = 0
+const tickTimes = []
+for (let step = 0; step < 3000; step++) {
+  fake.currentTime += 0.2
+  const t0 = performance.now()
+  __test__.tick()
+  tickTimes.push(performance.now() - t0)
+  peak = Math.max(peak, __test__.state().activeCount)
+}
+tickTimes.sort((a, b) => a - b)
+const p95 = tickTimes[Math.floor(tickTimes.length * 0.95)]
+const busGainDuringPlay = __test__.state().schedBusGain
+music.stop(0)
+
+console.log(
+  JSON.stringify(
+    {
+      arrangement,
+      seed,
+      loopSeconds: LOOP_SECONDS,
+      notesPerLoop: notes.length,
+      boxNotesPerLoop: box.length,
+      melodyNotesPerMin: +(box.length / (LOOP_SECONDS / 60)).toFixed(1),
+      longestMelodySilenceS: +(maxGap * SEC_PER_BEAT).toFixed(2),
+      oscillatorsCreated: fake.oscillators.length,
+      oscillatorsPerMin: +(fake.oscillators.length / 10).toFixed(1),
+      peakConcurrentOscillators: peak,
+      schedulerBusGain: busGainDuringPlay,
+      tickP95Ms: +p95.toFixed(3),
+    },
+    null,
+    2,
+  ),
+)
