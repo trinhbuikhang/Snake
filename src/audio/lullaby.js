@@ -4,7 +4,9 @@
 // 66 BPM. The melody lives only in the F major pentatonic (F G A C D),
 // the chords walk F - Dm - Bb - C, and the form is A(8 bars) B(8 bars)
 // with per-loop seed variation (the scheduler recomposes each loop with
-// seed + loopIndex).
+// seed + loopIndex). The 'moonrise' arrangement is the same loop
+// transposed +2 semitones: G major pentatonic (G A B D E), chords
+// G - Em - C - D (M04 decision: "lên G trưởng").
 //
 // Why the harmony is clash-free (the lullaby test proves it, this is the
 // reasoning): the pad plays only root + fifth of each chord, and the
@@ -141,5 +143,12 @@ export function composeLoop(seed, arrangement = 'play') {
   }
   // Order by time so the scheduler can walk the array with one pointer.
   notes.sort((a, b) => a.t - b.t)
+  // Moonrise transposition: every note +2 semitones. Transposition
+  // preserves every interval, so the clash-free proof above still
+  // holds verbatim — the excluded degree over a transposed Bb bar (C)
+  // is the transposed A (B), the same semitone pair shifted up.
+  if (isMoonrise) {
+    for (const n of notes) n.midi += 2
+  }
   return notes
 }

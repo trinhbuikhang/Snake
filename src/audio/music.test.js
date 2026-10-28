@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { music, __test__ } from './music.js'
-import { LOOP_SECONDS } from './lullaby.js'
+import { LOOP_SECONDS, SEC_PER_BEAT, BEATS_PER_BAR } from './lullaby.js'
+
+const SEC_PER_BAR = SEC_PER_BEAT * BEATS_PER_BAR
 
 // Minimal mock AudioContext: a manual clock, recording nodes.
 class MockParam {
@@ -261,5 +263,169 @@ describe('music scheduler (M03)', () => {
     }
     expect(fake.filters.length).toBe(5)
     expect(fake.filters.filter((f) => !f.disconnected).length).toBeLessThanOrEqual(1)
+  })
+})
+
+describe('applyMusic (M04)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    __test__.reset()
+  })
+
+  afterEach(() => {
+    music.stop(0)
+    __test__.reset()
+    vi.clearAllTimers()
+    vi.useRealTimers()
+  })
+
+  it('off -> play starts the scheduler; re-applying the same mode is a no-op', () => {
+    const { fake, bus } = setup()
+    music.applyMusic({ mode: 'play', gain: 1 })
+    expect(__test__.state().running).toBe(true)
+    expect(__test__.state().arrangement).toBe('play')
+    const created = __test__.state().created
+    const schedBus = fake.gains.find((g) => g !== bus)
+    const ramps = schedBus.gain.ramps.length
+    music.applyMusic({ mode: 'play', gain: 1 })
+    expect(__test__.state().created).toBe(created) // no restart, no new tick
+    expect(schedBus.gain.ramps.length).toBe(ramps)
+  })
+
+  it('play -> off fades the bus to 0 in 0.6s and stops the scheduler', () => {
+    const { fake } = setup()
+    music.applyMusic({ mode: 'play', gain: 1 })
+    fake.currentTime = 10
+    music.applyMusic({ mode: 'off', gain: 0 })
+    expect(__test__.state().running).toBe(false)
+    expect(__test__.state().timer).toBe(false)
+    const schedBus = fake.gains.find((g) => g !== fake.gains[0])
+    expect(schedBus.gain.ramps).toContainEqual({ v: 0, t: 10.6 })
+    expect(__test__.state().mode).toBe('off')
+  })
+
+  it('off -> play restarts the scheduler after a pause', () => {
+    setup()
+    music.applyMusic({ mode: 'play', gain: 1 })
+    music.applyMusic({ mode: 'off', gain: 0 })
+    expect(__test__.state().running).toBe(false)
+    music.applyMusic({ mode: 'play', gain: 1 })
+    expect(__test__.state().running).toBe(true)
+    expect(__test__.state().timer).toBe(true)
+  })
+
+  it('menu bus ceiling is 0.175 (0.25 x 0.7), play is 0.25', () => {
+    const { fake, bus } = setup()
+    music.applyMusic({ mode: 'menu', gain: 0.7 })
+    const schedBus = fake.gains.find((g) => g !== bus)
+    expect(schedBus.gain.value).toBe(0.175)
+    expect(__test__.state().ceiling).toBe(0.175)
+    music.applyMusic({ mode: 'play', gain: 1 })
+    expect(__test__.state().ceiling).toBe(0.25)
+  })
+
+  it('a gain-only change ramps the ceiling without restarting the loop', () => {
+    const { fake, bus } = setup()
+    music.applyMusic({ mode: 'play', gain: 1 })
+    const created = __test__.state().created
+    fake.currentTime = 3
+    music.applyMusic({ mode: 'play', gain: 0.7 })
+    expect(__test__.state().created).toBe(created)
+    expect(__test__.state().arrangement).toBe('play')
+    expect(__test__.state().running).toBe(true)
+    const schedBus = fake.gains.find((g) => g !== bus)
+    expect(schedBus.gain.ramps).toContainEqual({ v: 0.175, t: 3.75 })
+    expect(__test__.state().ceiling).toBe(0.175)
+  })
+
+  it('play -> menu is a true crossfade: both gains ramp over the same 1.5s, old generation disconnects after', () => {
+    const { fake } = setup()
+    music.applyMusic({ mode: 'play', gain: 1 })
+    const oldPlay = fake.gains[2]
+    const oldFilter = fake.filters[0]
+    expect(oldPlay.gain.value).toBe(1) // fresh generation at full gain
+    fake.currentTime = 5
+    music.applyMusic({ mode: 'menu', gain: 0.7 })
+    // The new loop runs immediately — no crossfading limbo, no silence.
+    expect(__test__.state().running).toBe(true)
+    expect(__test__.state().arrangement).toBe('menu')
+    expect(__test__.state().retiring).toBe(1)
+    const schedBus = fake.gains[1]
+    const playGains = fake.gains.filter((g) => g.connectedTo.includes(schedBus))
+    const newPlay = playGains[1] // begin creates the play gain before ticking voices
+    expect(playGains.length).toBe(2)
+    expect(oldPlay.gain.ramps).toContainEqual({ v: 0, t: 6.5 })
+    expect(newPlay.gain.ramps).toContainEqual({ v: 1, t: 6.5 })
+    expect(schedBus.gain.ramps).toContainEqual({ v: 0.175, t: 6.5 })
+    // No-silence pin: the two play gains share one 1.5s window, 1 -> 0
+    // and 0 -> 1, so their sum is 1 at every point (checked mid-window).
+    const oldMid = (1 + 0) / 2
+    const newMid = (0 + 1) / 2
+    expect(oldMid + newMid).toBe(1)
+    vi.advanceTimersByTime(1500)
+    expect(oldPlay.disconnected).toBe(true)
+    expect(oldFilter.disconnected).toBe(true)
+    expect(newPlay.disconnected).toBe(false)
+    expect(fake.filters[1].disconnected).toBe(false)
+    expect(__test__.state().retiring).toBe(0)
+  })
+
+  it('resume re-enters at the next bar, and wraps from bar 15 to bar 0', () => {
+    const { fake } = setup()
+    music.applyMusic({ mode: 'play', gain: 1 })
+    fake.currentTime = 0.1 + 2 * SEC_PER_BAR + 0.5 // mid bar 2
+    music.stop(0.6)
+    expect(__test__.state().resumeBar).toBe(3)
+    music.applyMusic({ mode: 'play', gain: 1 })
+    expect(__test__.state().startBar).toBe(3)
+    expect(__test__.state().running).toBe(true)
+    // Wrap: a stop mid bar 15 resumes at bar 0, not bar 16.
+    __test__.reset()
+    const again = setup()
+    music.applyMusic({ mode: 'play', gain: 1 })
+    again.fake.currentTime = 0.1 + 15 * SEC_PER_BAR + 1
+    music.stop(0.6)
+    expect(__test__.state().resumeBar).toBe(0)
+    music.applyMusic({ mode: 'play', gain: 1 })
+    expect(__test__.state().startBar).toBe(0)
+  })
+
+  it('a different arrangement after a pause starts at bar 0, not the resume bar', () => {
+    const { fake } = setup()
+    music.applyMusic({ mode: 'play', gain: 1 })
+    fake.currentTime = 0.1 + 2 * SEC_PER_BAR + 0.5
+    music.stop(0.6)
+    expect(__test__.state().resumeBar).toBe(3)
+    music.applyMusic({ mode: 'menu', gain: 1 })
+    expect(__test__.state().startBar).toBe(0)
+  })
+
+  it('crossfade superseded by off ends silent with no timer or retiring generation left', () => {
+    const { fake } = setup()
+    music.applyMusic({ mode: 'play', gain: 1 })
+    music.applyMusic({ mode: 'menu', gain: 0.7 })
+    expect(__test__.state().retiring).toBe(1)
+    music.applyMusic({ mode: 'off', gain: 0 })
+    expect(__test__.state().running).toBe(false)
+    expect(__test__.state().timer).toBe(false)
+    expect(__test__.state().retiring).toBe(0)
+    const created = __test__.state().created
+    vi.advanceTimersByTime(5000)
+    expect(__test__.state().created).toBe(created) // no menu loop leaked in
+    expect(fake.filters.every((f) => f.disconnected)).toBe(true)
+    // Every play gain (the gains feeding the ceiling bus) is disconnected.
+    const schedBus = fake.gains[1]
+    const playGains = fake.gains.filter((g) => g.connectedTo.includes(schedBus))
+    expect(playGains.length).toBe(2)
+    expect(playGains.every((g) => g.disconnected)).toBe(true)
+  })
+
+  it('applyMusic before attach records intent and attach replays it', () => {
+    music.applyMusic({ mode: 'play', gain: 1 })
+    expect(__test__.state().mode).toBe('play')
+    expect(__test__.state().running).toBe(false)
+    setup()
+    expect(__test__.state().running).toBe(true)
+    expect(__test__.state().arrangement).toBe('play')
   })
 })

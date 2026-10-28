@@ -372,7 +372,7 @@ Khoá bằng test cái đang đúng (hàng đợi rẽ, độ trễ ≤ 1 tick) 
 
 ## M04 — Nhạc theo trạng thái + ducking SFX
 
-- [ ] **M04** · Mức: **Trung bình** · Branch: `feat/m04-music-states-ducking`
+- [x] **M04** · Mức: **Trung bình** · Branch: `feat/m04-music-states-ducking`
 
 **Spec** (quyết định M04)
 - `musicTarget()` (M01) trả đủ các chế độ: `title`/`prologue` (sau cử chỉ đầu) → `menu`; `ready`/`playing` → `play`, hoặc `moonrise` khi `moonriseActive`; `paused`/tab ẩn → `off`; `dead` → giữ `play` tối đa 2s (ngân ô nhịp) rồi `menu`; Silent Night → `off` (nước do `setWaterOn` lo); `music.on === false` hoặc `muted` → `off`.

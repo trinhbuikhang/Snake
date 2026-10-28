@@ -96,8 +96,22 @@ export function unlockAudio() {
   // A hide-fade may have ramped the master bus to 0; restore it so the
   // resumed context is actually audible. No-op when already at 1.
   resetMasterGain()
-  unlocked = true
+  // Round-1 review (M04): the engine's title menu music must start on
+  // the first touch even when no store change follows it — notify the
+  // unlock listener on the false -> true edge only, so later SFX calls
+  // (which also route through unlockAudio) do not re-trigger it.
+  if (!unlocked) {
+    unlocked = true
+    if (unlockListener) unlockListener()
+  }
   startPendingVoices()
+}
+
+// Round-1 review (M04): lets the engine run its music target on the
+// first real activation gesture. Set to null to unregister (destroy).
+let unlockListener = null
+export function setUnlockListener(cb) {
+  unlockListener = cb
 }
 
 // Round-2 review: cancel any scheduled automation BEFORE setting the
@@ -167,17 +181,57 @@ export function setMuted(m) {
 // 0.03 time constant) — dragging the slider never creates or destroys
 // a node. With no context yet they only record the intent; ensureCtx
 // builds the bus from these flags when the first gesture creates it.
+// Round-1 review (M04): cancel + anchor before retargeting, with the
+// M01 pattern — a ducking envelope's return ramp to the old volume
+// must never outlive a Music-off or volume change and win over it.
 export function setMusicOn(on) {
   musicOn = on
   music.setGate({ muted, musicOn })
-  if (musicGain && ctx) musicGain.gain.setTargetAtTime(on ? musicVolume : 0, ctx.currentTime, 0.03)
+  if (musicGain && ctx) {
+    const t = ctx.currentTime
+    musicGain.gain.cancelScheduledValues(t)
+    musicGain.gain.setValueAtTime(musicGain.gain.value, t)
+    musicGain.gain.setTargetAtTime(on ? musicVolume : 0, t, 0.03)
+  }
 }
 
 export function setMusicVolume(v) {
   musicVolume = Math.round(Math.min(1, Math.max(0, v)) * 10) / 10
   if (musicGain && ctx && musicOn) {
-    musicGain.gain.setTargetAtTime(musicVolume, ctx.currentTime, 0.03)
+    const t = ctx.currentTime
+    musicGain.gain.cancelScheduledValues(t)
+    musicGain.gain.setValueAtTime(musicGain.gain.value, t)
+    musicGain.gain.setTargetAtTime(musicVolume, t, 0.03)
   }
+}
+
+// M04 ducking: the SFX sit on master, the music on musicGain — dipping
+// the music bus (never the SFX) by 6 dB while an eat/bloom/verse/death
+// sounds keeps the chime audible over the lullaby. The envelope is
+// re-issued per SFX, never stacked: each call cancels the previous
+// release first, so the floor is exactly -6 dB no matter how fast the
+// SFX arrive, and the bus is back at full volume 0.57s after the last
+// duck (0.02 attack + 0.15 hold + 0.40 release).
+const DUCK_DEPTH = 0.5 // -6 dB
+const DUCK_ATTACK_S = 0.02
+const DUCK_HOLD_S = 0.15
+const DUCK_RELEASE_S = 0.4
+export function duckMusic() {
+  if (!ctx || !musicGain) return
+  const base = musicOn ? musicVolume : 0
+  const t = ctx.currentTime
+  const p = musicGain.gain
+  p.cancelScheduledValues(t)
+  p.setValueAtTime(p.value, t)
+  p.linearRampToValueAtTime(base * DUCK_DEPTH, t + DUCK_ATTACK_S)
+  p.setValueAtTime(base * DUCK_DEPTH, t + DUCK_ATTACK_S + DUCK_HOLD_S)
+  p.linearRampToValueAtTime(base, t + DUCK_ATTACK_S + DUCK_HOLD_S + DUCK_RELEASE_S)
+}
+
+// M04: whether any real activation gesture has unlocked audio yet —
+// the engine's musicTarget needs it (no menu/play before gesture).
+export function isUnlocked() {
+  return unlocked
 }
 
 function pluck(freq, at, vol = 0.5) {
@@ -233,6 +287,7 @@ const PENTA = [0, 2, 4, 7, 9]
 export function playEat() {
   unlockAudio()
   if (!ctx || !master) return
+  duckMusic()
   const base = 329.63 // E4 (crisp pentatonic chime)
   const idx = PENTA[eatStep % PENTA.length]
   const oct = Math.floor(eatStep / PENTA.length)
@@ -247,6 +302,7 @@ export function playEat() {
 export function playBloom() {
   unlockAudio()
   if (!ctx || !master) return
+  duckMusic()
   const t = ctx.currentTime + 0.01
   // Celestial arpeggio
   pluck(440, t, 0.5) // A4
@@ -261,6 +317,7 @@ export function playBloom() {
 export function playVerse() {
   unlockAudio()
   if (!ctx || !master) return
+  duckMusic()
   const t = ctx.currentTime + 0.01
   pluck(1046.5, t, 0.3) // C6
   pluck(784.0, t + 0.22, 0.24) // G5
@@ -305,6 +362,7 @@ const melodyTone = (freq, at, dur, vol) => {
 export function playDeath() {
   unlockAudio()
   if (!ctx || !master) return
+  duckMusic()
   const t = ctx.currentTime
   melodyTone(105, t, 0.5, 0.5)
   melodyTone(62, t + 0.02, 0.6, 0.4)
@@ -423,7 +481,7 @@ export function setWaterOn(on) {
 
 // (ambient score section follows; `audio` is exported at the end of the file)
 
-export const audio = { unlockAudio, setMuted, setMusicOn, setMusicVolume, playEat, playBloom, playVerse, playTurn, playDeath, setWaterOn }
+export const audio = { unlockAudio, isUnlocked, setUnlockListener, setMuted, setMusicOn, setMusicVolume, playEat, playBloom, playVerse, playTurn, playDeath, setWaterOn }
 
 // Test seam (T05/T10d): lets unit tests drive the phrase scheduler and the
 // voice toggles against a mock AudioContext and observe what gets
@@ -446,6 +504,7 @@ export const __test__ = {
   reset() {
     cancelPendingSuspend()
     ctxStateListener = null
+    unlockListener = null
     ctx = null
     master = null
     muted = false
