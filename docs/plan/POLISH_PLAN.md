@@ -411,4 +411,4 @@ Khoá bằng test cái đang đúng (hàng đợi rẽ, độ trễ ≤ 1 tick) 
 | M02 | #67 | Music on/off + âm lượng lưu `ran-xinh-music`, bus `musicGain` riêng (SFX vẫn ở master); pill + slider chỉ trong sheet Pause. |
 | M03 | #68 | Lullaby procedural `composeLoop` + scheduler look-ahead; Silent Night chỉ có nước; sparkle không kề nhau kể cả qua biên loop. |
 | M04 | #71 | Nhạc theo trạng thái qua `applyMusic` (crossfade thật 1.5s, resume ở ô nhịp kế, menu 0.7, Moonrise lên G trưởng) + ducking SFX −6 dB; chết giữ arrangement của ván 2s rồi về menu. |
-| Closeout | — | PR này: cập nhật `AGENT.md` + bảng này + README tooling (xem dưới). |
+| Closeout | #72 | PR này: cập nhật `AGENT.md` + bảng này + README tooling (xem dưới). |
