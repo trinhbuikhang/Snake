@@ -398,17 +398,17 @@ Khoá bằng test cái đang đúng (hàng đợi rẽ, độ trễ ≤ 1 tick) 
 
 | Task | PR | Ghi chú |
 |------|----|---------|
-| C01 | — | |
-| C02 | — | |
-| C03 | — | |
-| C04 | — | |
-| V01 | — | |
-| V02 | — | |
-| V03 | — | |
-| V04 | — | |
+| C01 | #56 | `runTicks` tách ra `src/three/tickClock.js`; steer-sim [1] 0/24000 lượt rẽ đôi bị rơi, 0 chết. |
+| C02 | #57 | Tracker vuốt thuần `src/game/swipe.js` (18px lượt đầu / 32px + 1.5× sau đó); swipe-sim 9/9. |
+| C03 | #58 | Cả ô `.dpad` là vùng lái qua `padDirection` thuần (dead zone Chebyshev 16px); một `pointerId` lái duy nhất. |
+| C04 | #59 | `yawAlpha` thuần làm mượt yaw đầu; steer-sim [4] settle ≤ ~1.3 tick ở mọi tốc độ. |
+| V01 | #60 | Số trên viên nang HUD → Inter 600 `lining-nums tabular-nums`. |
+| V02 | #61 | `.dpad` thành tấm kính bo 44px, `.dbtn` pastel-mint; kích thước 190×190 giữ nguyên. |
+| V03 | #62 | Bàn dọc dùng hết chiều cao: `presetFor` + `coachBlocksCamera`, `anchor: 'middle'`; coach strip chỉ khi có coach. |
+| V04 | #64 | Menu dọc: 66px reserve cho hàng nút góc, title <560px thành 3 pill ngắn (Garden / How to / Camera), Pause 375px nút xếp dọc full-width. |
 | V05 | — | Tuỳ chọn — chỉ làm khi chủ repo yêu cầu. |
-| M01 | — | |
-| M02 | — | |
-| M03 | — | |
-| M04 | — | |
-| Closeout | — | |
+| M01 | #66 | Vòng đời audio: unlock chỉ ở cử chỉ thật, fade 0.2s + suspend khi ẩn, `musicTarget` thuần, không đổi âm thanh nghe được. |
+| M02 | #67 | Music on/off + âm lượng lưu `ran-xinh-music`, bus `musicGain` riêng (SFX vẫn ở master); pill + slider chỉ trong sheet Pause. |
+| M03 | #68 | Lullaby procedural `composeLoop` + scheduler look-ahead; Silent Night chỉ có nước; sparkle không kề nhau kể cả qua biên loop. |
+| M04 | #71 | Nhạc theo trạng thái qua `applyMusic` (crossfade thật 1.5s, resume ở ô nhịp kế, menu 0.7, Moonrise lên G trưởng) + ducking SFX −6 dB; chết giữ arrangement của ván 2s rồi về menu. |
+| Closeout | — | PR này: cập nhật `AGENT.md` + bảng này + README tooling (xem dưới). |
